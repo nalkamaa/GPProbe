@@ -1,0 +1,4 @@
+__pycache__/
+tools/captures/
+.DS_Store
+xcuserdata/
