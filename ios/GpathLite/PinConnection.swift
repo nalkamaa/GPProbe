@@ -30,8 +30,10 @@ final class PinConnection: NSObject {
                                    options: [CBCentralManagerOptionRestoreIdentifierKey: "GpathLite"])
     }
 
-    /// Re-zeroes the Pin (~3 s) and starts a new set.
+    /// Re-zeroes the Pin (~3 s on first set, ~30 ms on subsequent sets) and starts a new set.
     func startSet() {
+        send(PinProtocol.Command.hello)
+        send(PinProtocol.Command.battery)
         send(PinProtocol.Command.startSet)
         if pin?.state == .connected {
             state = .zeroing
@@ -39,7 +41,7 @@ final class PinConnection: NSObject {
     }
 
     func stopSet() {
-        send(PinProtocol.Command.stopSet)
+        // Keep Pin firmware in 0x03 mode between sets; gate reps in app via state = .idle
         if pin?.state == .connected {
             state = .idle
         }
@@ -130,7 +132,6 @@ extension PinConnection: CBPeripheralDelegate {
         guard characteristic.uuid == PinProtocol.dataCharacteristic, characteristic.isNotifying else { return }
         send(PinProtocol.Command.hello)
         send(PinProtocol.Command.battery)
-        send(PinProtocol.Command.stopSet)
         state = .idle
     }
 

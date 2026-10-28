@@ -669,22 +669,56 @@
     }
 
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    let writeChain = Promise.resolve();
+    let pinStarted = false;
+    let zeroTimer = null;
 
-    async function writeByte(byte) {
-      if (!dataChar) return;
-      const arr = new Uint8Array([byte]);
-      const op = dataChar.writeValueWithResponse
-        ? dataChar.writeValueWithResponse(arr)
-        : dataChar.writeValue(arr);
-      await Promise.race([op, sleep(2500)]);
+    function writeByte(byte) {
+      writeChain = writeChain.then(async () => {
+        if (!dataChar) return;
+        const arr = new Uint8Array([byte]);
+        try {
+          const op = dataChar.writeValueWithResponse
+            ? dataChar.writeValueWithResponse(arr)
+            : dataChar.writeValue(arr);
+          await Promise.race([op, sleep(2000)]);
+        } catch (e) {
+          console.warn('BLE write warning:', e);
+        }
+      });
+      return writeChain;
+    }
+
+    function clearZeroTimer() {
+      if (zeroTimer) {
+        clearTimeout(zeroTimer);
+        zeroTimer = null;
+      }
+    }
+
+    function activateSet() {
+      clearZeroTimer();
+      if (!zeroing && setActive) return;
+      pinStarted = true;
+      zeroing = false;
+      setActive = true;
+      updateSetButton();
+      setStatus('Sarja käynnissä – tee toistoja', 'ready');
+      soundReady();
     }
 
     async function disconnectPin() {
       manualDisconnect = true;
+      clearZeroTimer();
       setActive = false;
       zeroing = false;
+      pinStarted = false;
       try {
-        if (dataChar) await writeByte(CMD_END);
+        if (dataChar) {
+          await writeByte(CMD_STOP);
+          await sleep(50);
+          await writeByte(CMD_END);
+        }
       } catch {}
       try {
         if (bleDevice && bleDevice.gatt && bleDevice.gatt.connected) {
@@ -792,6 +826,7 @@
       await sleep(80);
       await writeByte(CMD_BATTERY);
 
+      pinStarted = false;
       setActive = false;
       zeroing = false;
       document.getElementById('connectBtn').textContent = 'Katkaise';
@@ -802,22 +837,45 @@
     async function startSetOnPin() {
       if (!dataChar) return;
       ensureAudio();
+      clearZeroTimer();
       pendingRep = { propVel: null, propAcc: null, romCm: null };
       zeroing = true;
       setActive = false;
       updateSetButton();
-      setStatus('Pidä Pin paikallaan (3 s)...', 'busy');
-      await writeByte(CMD_START);
+
+      if (!pinStarted) {
+        setStatus('Pidä Pin paikallaan (3 s)...', 'busy');
+        // Fallback timer in case 0x83 packet is missed
+        zeroTimer = setTimeout(activateSet, 3400);
+        await writeByte(CMD_HELLO);
+        await sleep(60);
+        await writeByte(CMD_BATTERY);
+        await sleep(60);
+        await writeByte(CMD_START);
+      } else {
+        // Pin is already running its IMU session; official app sends 06 -> 01 -> 03
+        // and Pin replies 0x83 immediately (~30 ms), or if busy dumping trace, fallback activates in 800 ms.
+        setStatus('Aloitetaan sarja...', 'busy');
+        zeroTimer = setTimeout(activateSet, 800);
+        await writeByte(CMD_HELLO);
+        await sleep(50);
+        await writeByte(CMD_BATTERY);
+        await sleep(50);
+        await writeByte(CMD_START);
+      }
     }
 
     async function stopSetOnPin() {
+      clearZeroTimer();
       setActive = false;
       zeroing = false;
       pendingRep = { propVel: null, propAcc: null, romCm: null };
       updateSetButton();
       if (dataChar) {
+        // Note: Do NOT send 0x04 (CMD_STOP) between sets! In Pin firmware FW-2.82-BETA,
+        // 0x04 terminates the entire workout session. Keeping the Pin in 0x03 mode while
+        // gating reps via setActive allows unlimited consecutive sets.
         setStatus('Sarja pysäytetty – tallenna tai aloita uusi', '');
-        try { await writeByte(CMD_STOP); } catch {}
       }
     }
 
@@ -831,7 +889,9 @@
     }
 
     function onDisconnected() {
+      clearZeroTimer();
       dataChar = null;
+      pinStarted = false;
       setActive = false;
       zeroing = false;
       updateSetButton();
@@ -870,15 +930,7 @@
 
       if (dv.byteLength === 1 && type >= 0x81 && type <= 0x86) {
         if (type === 0x83) {
-          zeroing = false;
-          setActive = true;
-          updateSetButton();
-          setStatus('Sarja käynnissä – tee toistoja', 'ready');
-          soundReady();
-        } else if (type === 0x84) {
-          zeroing = false;
-          setActive = false;
-          updateSetButton();
+          activateSet();
         }
         return;
       }
