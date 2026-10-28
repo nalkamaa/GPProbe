@@ -552,11 +552,13 @@
   <script>
     // --- Gpath Pin BLE Constants ---
     const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
+    const ADV_UUID     = '00008018-0000-1000-8000-00805f9b34fb';
     const CHAR_UUID    = 'beb5483e-36e1-4688-b7f5-ea07361b2688';
     const CMD_HELLO    = 0x06;
     const CMD_BATTERY  = 0x01;
     const CMD_START    = 0x03;
     const CMD_STOP     = 0x04;
+    const CMD_END      = 0x05;
 
     // --- Storage Keys ---
     const KEY_EXERCISES = 'gpath_exercises_v1';
@@ -577,6 +579,7 @@
     // --- State ---
     let bleDevice = null;
     let dataChar = null;
+    let manualDisconnect = false;
     let soundEnabled = true;
     let audioCtx = null;
     let setActive = false;
@@ -665,17 +668,51 @@
       dot.className = 'dot' + (mode ? ' ' + mode : '');
     }
 
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
     async function writeByte(byte) {
       if (!dataChar) return;
       const arr = new Uint8Array([byte]);
-      if (dataChar.writeValueWithResponse) {
-        await dataChar.writeValueWithResponse(arr);
-      } else {
-        await dataChar.writeValue(arr);
-      }
+      const op = dataChar.writeValueWithResponse
+        ? dataChar.writeValueWithResponse(arr)
+        : dataChar.writeValue(arr);
+      await Promise.race([op, sleep(2500)]);
     }
 
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    async function disconnectPin() {
+      manualDisconnect = true;
+      setActive = false;
+      zeroing = false;
+      try {
+        if (dataChar) await writeByte(CMD_END);
+      } catch {}
+      try {
+        if (bleDevice && bleDevice.gatt && bleDevice.gatt.connected) {
+          bleDevice.gatt.disconnect();
+        }
+      } catch {}
+      dataChar = null;
+      updateSetButton();
+      document.getElementById('connectBtn').textContent = 'Yhdistä Pin';
+      setStatus('Ei yhdistetty', '');
+    }
+
+    async function releaseStaleConnections() {
+      try {
+        if (bleDevice && bleDevice.gatt && bleDevice.gatt.connected) {
+          bleDevice.gatt.disconnect();
+          await sleep(300);
+        }
+        if (navigator.bluetooth && navigator.bluetooth.getDevices) {
+          const devs = await navigator.bluetooth.getDevices();
+          for (const d of devs) {
+            if (d.gatt && d.gatt.connected) {
+              d.gatt.disconnect();
+            }
+          }
+        }
+      } catch {}
+    }
 
     async function connectPin() {
       ensureAudio();
@@ -683,16 +720,38 @@
         alert('Selaimesi ei tue Web Bluetoothia. Avaa tämä sivu iPhonessa ilmaisella Bluefy-selaimella (App Store) tai Android/Windows Chrome-selaimella.');
         return;
       }
+
+      // If already connected, pressing the button disconnects cleanly
+      if (bleDevice && bleDevice.gatt && bleDevice.gatt.connected && dataChar) {
+        await disconnectPin();
+        return;
+      }
+
+      manualDisconnect = false;
       try {
+        // If we already have bleDevice in this session, try reconnecting directly first
+        if (bleDevice) {
+          try {
+            await openGattSession();
+            return;
+          } catch {
+            await releaseStaleConnections();
+          }
+        } else {
+          await releaseStaleConnections();
+        }
+
         setStatus('Etsitään Piniä...', 'busy');
         bleDevice = await navigator.bluetooth.requestDevice({
           filters: [
             { namePrefix: 'GPATH' },
             { namePrefix: 'Gpath' },
+            { services: [ADV_UUID] },
             { services: [SERVICE_UUID] }
           ],
-          optionalServices: [SERVICE_UUID]
+          optionalServices: [SERVICE_UUID, ADV_UUID]
         });
+        bleDevice.removeEventListener('gattserverdisconnected', onDisconnected);
         bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
         await openGattSession();
       } catch (err) {
@@ -726,18 +785,16 @@
       // Mandatory 0x06 handshake before and after enabling notifications
       await writeByte(CMD_HELLO);
       await dataChar.startNotifications();
+      dataChar.removeEventListener('characteristicvaluechanged', onNotification);
       dataChar.addEventListener('characteristicvaluechanged', onNotification);
       await sleep(80);
       await writeByte(CMD_HELLO);
       await sleep(80);
       await writeByte(CMD_BATTERY);
-      await sleep(80);
-      // Ensure Pin is idle until user explicitly presses "Aloita sarja"
+
       setActive = false;
       zeroing = false;
-      await writeByte(CMD_STOP);
-
-      document.getElementById('connectBtn').textContent = 'Yhdistetty';
+      document.getElementById('connectBtn').textContent = 'Katkaise';
       setStatus('Yhdistetty – paina Aloita sarja', '');
       updateSetButton();
     }
@@ -779,13 +836,32 @@
       zeroing = false;
       updateSetButton();
       document.getElementById('connectBtn').textContent = 'Yhdistä Pin';
+      if (manualDisconnect) {
+        setStatus('Ei yhdistetty', '');
+        return;
+      }
       setStatus('Yhteys katkesi – yhdistetään...', 'busy');
       setTimeout(async () => {
-        if (bleDevice) {
+        if (bleDevice && !manualDisconnect) {
           try { await openGattSession(); } catch { setStatus('Ei yhdistetty', ''); }
         }
       }, 1200);
     }
+
+    window.addEventListener('pagehide', () => {
+      try {
+        if (bleDevice && bleDevice.gatt && bleDevice.gatt.connected) {
+          bleDevice.gatt.disconnect();
+        }
+      } catch {}
+    });
+    window.addEventListener('beforeunload', () => {
+      try {
+        if (bleDevice && bleDevice.gatt && bleDevice.gatt.connected) {
+          bleDevice.gatt.disconnect();
+        }
+      } catch {}
+    });
 
     function onNotification(event) {
       const dv = event.target.value;
