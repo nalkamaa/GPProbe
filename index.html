@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Gpath Lite</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --card-alt: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --green: #22c55e;
+      --red: #ef4444;
+      --amber: #f59e0b;
+      --border: #334155;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding-bottom: 84px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: rgba(30, 41, 59, 0.9);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+    .dot.ready { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .dot.busy { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+    .top-actions { display: flex; gap: 8px; }
+    button {
+      font: inherit;
+      color: var(--text);
+      background: var(--card-alt);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:active { transform: scale(0.97); }
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    button.success {
+      background: var(--green);
+      border-color: var(--green);
+      color: #052e16;
+    }
+    button.danger {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: var(--red);
+      color: #fca5a5;
+    }
+    button:disabled {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+    main {
+      max-width: 540px;
+      margin: 0 auto;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+    }
+    .setup-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    label.small {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    input, select {
+      font: inherit;
+      color: var(--text);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 10px;
+    }
+    select { flex: 1; min-width: 0; }
+    input[type="number"] {
+      width: 72px;
+      text-align: center;
+      font-weight: 700;
+    }
+    .stepper {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .stepper button {
+      padding: 7px 10px;
+      min-width: 38px;
+    }
+    .hero {
+      text-align: center;
+      padding: 16px 12px;
+    }
+    .hero-vel {
+      font-size: 56px;
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+    }
+    .hero-watts {
+      font-size: 28px;
+      font-weight: 700;
+      color: #60a5fa;
+      margin-top: 4px;
+      font-variant-numeric: tabular-nums;
+    }
+    .sub-metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .sub-metric-val {
+      font-size: 20px;
+      font-weight: 700;
+      margin-top: 2px;
+      font-variant-numeric: tabular-nums;
+    }
+    .green { color: var(--green); }
+    .red { color: var(--red); }
+    .progress-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .progress-bar {
+      height: 10px;
+      background: var(--bg);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      transition: width 0.2s ease, background 0.2s ease;
+    }
+    .progress-fill.done { background: var(--green); }
+    .rep-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .rep-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      background: var(--bg);
+      border-radius: 10px;
+      font-size: 14px;
+      font-variant-numeric: tabular-nums;
+    }
+    .rep-num {
+      font-weight: 700;
+      color: var(--muted);
+      width: 32px;
+    }
+    .action-bar {
+      display: grid;
+      grid-template-columns: 1fr 1.4fr;
+      gap: 10px;
+    }
+    .action-bar button {
+      padding: 13px;
+      font-size: 16px;
+    }
+    /* Bottom navigation */
+    nav.tabs {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(10px);
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      padding: 6px 12px 14px;
+      z-index: 30;
+    }
+    nav.tabs button {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      padding: 8px;
+      font-size: 14px;
+      border-radius: 10px;
+    }
+    nav.tabs button.active {
+      color: var(--text);
+      background: var(--card);
+    }
+    .hidden { display: none !important; }
+    /* Calendar grid */
+    .cal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+      text-align: center;
+      font-size: 13px;
+    }
+    .cal-dow {
+      color: var(--muted);
+      font-size: 11px;
+      padding: 4px 0;
+    }
+    .cal-day {
+      padding: 8px 0;
+      border-radius: 8px;
+      cursor: pointer;
+      position: relative;
+      user-select: none;
+    }
+    .cal-day.selected {
+      background: var(--accent);
+      font-weight: 700;
+    }
+    .cal-day.has-workout::after {
+      content: "";
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--green);
+      position: absolute;
+      bottom: 3px;
+      left: calc(50% - 2.5px);
+    }
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 50;
+    }
+    .modal {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 420px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      gap: 12px;
+    }
+    .ex-list {
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .ex-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--bg);
+      padding: 8px 10px;
+      border-radius: 10px;
+    }
+    .history-set {
+      background: var(--bg);
+      border-radius: 10px;
+      padding: 10px;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="status-row">
+      <div id="statusDot" class="dot"></div>
+      <span id="statusText">Ei yhdistetty</span>
+      <span id="batteryText" style="color: var(--muted); font-weight: 500;"></span>
+    </div>
+    <div class="top-actions">
+      <button id="soundBtn" title="Äänimerkit">🔊</button>
+      <button id="connectBtn" class="primary">Yhdistä Pin</button>
+    </div>
+  </header>
+
+  <!-- TAB 1: LIVE TRAINING -->
+  <main id="tabLift">
+    <div class="card setup-grid">
+      <div class="row">
+        <label class="small" for="workoutDate">Päivä</label>
+        <input type="date" id="workoutDate" />
+      </div>
+
+      <div class="row">
+        <select id="exerciseSelect" aria-label="Liike"></select>
+        <button id="editExercisesBtn" title="Muokkaa liikkeitä">+ Liikkeet</button>
+      </div>
+
+      <div class="row">
+        <div>
+          <label class="small">Paino (kg)</label>
+          <div class="stepper" style="margin-top: 4px;">
+            <button type="button" data-weight-delta="-2.5">-2.5</button>
+            <button type="button" data-weight-delta="-1">-1</button>
+            <input type="number" id="weightInput" value="8" min="0" step="0.5" />
+            <button type="button" data-weight-delta="1">+1</button>
+            <button type="button" data-weight-delta="2.5">+2.5</button>
+          </div>
+        </div>
+
+        <div>
+          <label class="small">Tavoitetoistot</label>
+          <div class="stepper" style="margin-top: 4px;">
+            <button type="button" id="repMinusBtn">-</button>
+            <input type="number" id="targetRepsInput" value="10" min="1" max="100" step="1" style="width: 56px;" />
+            <button type="button" id="repPlusBtn">+</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card hero">
+      <div class="small" style="color: var(--muted); font-size: 12px; font-weight: 600;">MOVEMENT POWER</div>
+      <div id="liveVel" class="hero-vel">-- m/s</div>
+      <div id="liveWatts" class="hero-watts">-- W</div>
+
+      <div class="sub-metrics">
+        <div>
+          <div class="small" style="font-size: 11px; color: var(--muted);">CONTROLLED LOWERING</div>
+          <div id="liveLowering" class="sub-metric-val">-- m/s</div>
+        </div>
+        <div>
+          <div class="small" style="font-size: 11px; color: var(--muted);">AVG ROM</div>
+          <div id="liveRom" class="sub-metric-val">-- cm</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card progress-wrap">
+      <div class="row">
+        <span id="repProgressLabel" style="font-weight: 700;">Toistot: 0 / 10</span>
+        <button id="clearRepsBtn" style="padding: 4px 8px; font-size: 12px;">Tyhjennä</button>
+      </div>
+      <div class="progress-bar">
+        <div id="repProgressFill" class="progress-fill"></div>
+      </div>
+      <div id="repList" class="rep-list"></div>
+    </div>
+
+    <div class="action-bar">
+      <button id="rezeroBtn" disabled>Nollaa Pin</button>
+      <button id="saveSetBtn" class="success" disabled>Tallenna sarja</button>
+    </div>
+  </main>
+
+  <!-- TAB 2: CALENDAR & CSV -->
+  <main id="tabHistory" class="hidden">
+    <div class="card">
+      <div class="cal-header">
+        <button id="calPrevBtn">&larr;</button>
+        <span id="calMonthLabel"></span>
+        <button id="calNextBtn">&rarr;</button>
+      </div>
+      <div class="cal-grid" id="calDow">
+        <div class="cal-dow">Ma</div><div class="cal-dow">Ti</div><div class="cal-dow">Ke</div>
+        <div class="cal-dow">To</div><div class="cal-dow">Pe</div><div class="cal-dow">La</div><div class="cal-dow">Su</div>
+      </div>
+      <div class="cal-grid" id="calDays"></div>
+
+      <div class="row" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);">
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 14px;">
+          <input type="checkbox" id="filterDateChk" checked />
+          Näytä vain valittu päivä
+        </label>
+        <div style="display: flex; gap: 6px;">
+          <button id="exportCsvBtn" class="primary">Vie CSV</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="historyContainer"></div>
+  </main>
+
+  <!-- EXERCISE MODAL -->
+  <div id="exerciseModal" class="modal-backdrop hidden">
+    <div class="modal">
+      <div class="row">
+        <strong>Valitse tai lisää liike</strong>
+        <button id="closeModalBtn">Sulje</button>
+      </div>
+      <div class="row">
+        <input type="text" id="newExerciseInput" placeholder="Uusi liike, esim. Ristikkäistalja" style="flex: 1;" />
+        <button id="addExerciseBtn" class="primary">Lisää</button>
+      </div>
+      <div id="modalExerciseList" class="ex-list"></div>
+    </div>
+  </div>
+
+  <nav class="tabs">
+    <button id="navLiftBtn" class="active">🏋️ Treeni</button>
+    <button id="navHistoryBtn">📅 Kalenteri &amp; CSV</button>
+  </nav>
+
+  <script>
+    // --- Gpath Pin BLE Constants ---
+    const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
+    const CHAR_UUID    = 'beb5483e-36e1-4688-b7f5-ea07361b2688';
+    const CMD_HELLO    = 0x06;
+    const CMD_BATTERY  = 0x01;
+    const CMD_START    = 0x03;
+    const CMD_STOP     = 0x04;
+
+    // --- Storage Keys ---
+    const KEY_EXERCISES = 'gpath_exercises_v1';
+    const KEY_WORKOUTS  = 'gpath_workouts_v1';
+
+    const DEFAULT_EXERCISES = [
+      'Ylätalja (Lat Pulldown)',
+      'Alatalja (Seated Row)',
+      'Rintaprässi (Chest Press)',
+      'Pystypunnerrus (Shoulder Press)',
+      'Ojentajat taljassa (Triceps Pushdown)',
+      'Hauiskääntö taljassa (Cable Curl)',
+      'Jalkaprässi (Leg Press)',
+      'Reiden ojennus (Leg Extension)',
+      'Reiden koukistus (Leg Curl)'
+    ];
+
+    // --- State ---
+    let bleDevice = null;
+    let dataChar = null;
+    let soundEnabled = true;
+    let audioCtx = null;
+
+    let pendingRep = { propVel: null, propAcc: null, romCm: null };
+    let currentReps = [];
+
+    let exercises = loadJSON(KEY_EXERCISES, DEFAULT_EXERCISES);
+    let workouts = loadJSON(KEY_WORKOUTS, []); // [{ date: 'YYYY-MM-DD', sets: [...] }]
+
+    let calYear = new Date().getFullYear();
+    let calMonth = new Date().getMonth();
+    let selectedHistoryDate = todayISO();
+
+    function todayISO() {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function loadJSON(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : fallback;
+      } catch {
+        return fallback;
+      }
+    }
+
+    function saveJSON(key, val) {
+      localStorage.setItem(key, JSON.stringify(val));
+    }
+
+    // --- Web Audio Synthesizer (works on iOS Bluefy & Android Chrome) ---
+    function ensureAudio() {
+      if (!audioCtx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx) audioCtx = new Ctx();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function playTone(freq, durationMs, delayMs = 0, type = 'sine') {
+      if (!soundEnabled) return;
+      ensureAudio();
+      if (!audioCtx) return;
+      setTimeout(() => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.22, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + durationMs / 1000);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + durationMs / 1000);
+      }, delayMs);
+    }
+
+    function soundReady() {
+      playTone(523.25, 110, 0);
+      playTone(783.99, 160, 120);
+    }
+    function soundRep() {
+      playTone(880, 120, 0);
+    }
+    function soundTargetReached() {
+      playTone(587.33, 110, 0);
+      playTone(783.99, 110, 120);
+      playTone(1046.5, 240, 240);
+    }
+    function soundLoweringWarn() {
+      playTone(240, 160, 0, 'sawtooth');
+    }
+
+    // --- BLE Communication ---
+    function setStatus(text, mode) {
+      document.getElementById('statusText').textContent = text;
+      const dot = document.getElementById('statusDot');
+      dot.className = 'dot' + (mode ? ' ' + mode : '');
+    }
+
+    async function writeByte(byte) {
+      if (!dataChar) return;
+      const arr = new Uint8Array([byte]);
+      if (dataChar.writeValueWithResponse) {
+        await dataChar.writeValueWithResponse(arr);
+      } else {
+        await dataChar.writeValue(arr);
+      }
+    }
+
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    async function connectPin() {
+      ensureAudio();
+      if (!navigator.bluetooth) {
+        alert('Selaimesi ei tue Web Bluetoothia. Avaa tämä sivu iPhonessa ilmaisella Bluefy-selaimella (App Store) tai Android/Windows Chrome-selaimella.');
+        return;
+      }
+      try {
+        setStatus('Etsitään Piniä...', 'busy');
+        bleDevice = await navigator.bluetooth.requestDevice({
+          filters: [
+            { namePrefix: 'GPATH' },
+            { namePrefix: 'Gpath' },
+            { services: [SERVICE_UUID] }
+          ],
+          optionalServices: [SERVICE_UUID]
+        });
+        bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+        await openGattSession();
+      } catch (err) {
+        setStatus('Ei yhdistetty', '');
+        console.error(err);
+      }
+    }
+
+    async function openGattSession() {
+      if (!bleDevice) return;
+      setStatus('Yhdistetään...', 'busy');
+      const server = await bleDevice.gatt.connect();
+      const service = await server.getPrimaryService(SERVICE_UUID);
+      dataChar = await service.getCharacteristic(CHAR_UUID);
+
+      // Mandatory 0x06 handshake before and after enabling notifications
+      await writeByte(CMD_HELLO);
+      await dataChar.startNotifications();
+      dataChar.addEventListener('characteristicvaluechanged', onNotification);
+      await sleep(80);
+      await writeByte(CMD_HELLO);
+      await sleep(80);
+      await writeByte(CMD_BATTERY);
+      await sleep(80);
+      await startSetOnPin();
+
+      document.getElementById('rezeroBtn').disabled = false;
+      document.getElementById('connectBtn').textContent = 'Yhdistetty';
+    }
+
+    async function startSetOnPin() {
+      if (!dataChar) return;
+      setStatus('Pidä Pin paikallaan (3 s)...', 'busy');
+      await writeByte(CMD_START);
+    }
+
+    function onDisconnected() {
+      dataChar = null;
+      document.getElementById('rezeroBtn').disabled = true;
+      document.getElementById('connectBtn').textContent = 'Yhdistä Pin';
+      setStatus('Yhteys katkesi – yhdistetään...', 'busy');
+      setTimeout(async () => {
+        if (bleDevice) {
+          try { await openGattSession(); } catch { setStatus('Ei yhdistetty', ''); }
+        }
+      }, 1200);
+    }
+
+    function onNotification(event) {
+      const dv = event.target.value;
+      if (!dv || dv.byteLength === 0) return;
+      const type = dv.getUint8(0);
+
+      if (dv.byteLength === 1 && type >= 0x81 && type <= 0x86) {
+        if (type === 0x83) {
+          setStatus('Valmis – tee toistoja', 'ready');
+          soundReady();
+        }
+        return;
+      }
+
+      if (dv.byteLength !== 5) return;
+      const val = dv.getFloat32(1, true); // little-endian Float32
+
+      if (type === 0x81) {
+        document.getElementById('batteryText').textContent = `• ${Math.round(val)}%`;
+        return;
+      }
+
+      if (type === 0x03) {
+        pendingRep.propVel = val / 1000.0;
+      } else if (type === 0x05) {
+        pendingRep.romCm = val / 10.0;
+      } else if (type === 0x04) {
+        pendingRep.propAcc = val / 1000.0;
+      } else if (type === 0x02) {
+        const meanVel = val / 1000.0;
+        const propVel = pendingRep.propVel ?? meanVel;
+        const propAcc = pendingRep.propAcc ?? 0;
+        const romCm   = pendingRep.romCm ?? 0;
+        pendingRep = { propVel: null, propAcc: null, romCm: null };
+
+        const weightKg = parseFloat(document.getElementById('weightInput').value) || 0;
+        // Verified 8 kg power formula: P = m * (g + 0.58 * a_prop) * v
+        const power = weightKg * (9.80665 + 0.58 * propAcc) * meanVel;
+
+        currentReps.push({
+          meanVelocity: meanVel,
+          propulsiveVelocity: propVel,
+          propulsiveAcceleration: propAcc,
+          rangeOfMotionCm: romCm,
+          loweringVelocity: null,
+          power: power
+        });
+
+        const targetReps = parseInt(document.getElementById('targetRepsInput').value, 10) || 10;
+        if (currentReps.length === targetReps) {
+          soundTargetReached();
+        } else {
+          soundRep();
+        }
+        renderLiveSet();
+      } else if (type === 0x06) {
+        const eccVel = val / 1000.0;
+        if (currentReps.length > 0) {
+          const last = currentReps[currentReps.length - 1];
+          last.loweringVelocity = eccVel;
+          if (eccVel > 0.60) {
+            soundLoweringWarn();
+          }
+          renderLiveSet();
+        }
+      }
+    }
+
+    // --- UI Rendering (Live Set) ---
+    function isControlled(v) {
+      return v !== null && v !== undefined && v >= 0.20 && v <= 0.60;
+    }
+
+    function renderLiveSet() {
+      const target = parseInt(document.getElementById('targetRepsInput').value, 10) || 10;
+      const count = currentReps.length;
+      const last = currentReps[count - 1];
+
+      document.getElementById('liveVel').textContent = last ? `${last.meanVelocity.toFixed(2)} m/s` : '-- m/s';
+      document.getElementById('liveWatts').textContent = last ? `${last.power.toFixed(2)} W` : '-- W';
+
+      const lowEl = document.getElementById('liveLowering');
+      if (last && last.loweringVelocity !== null) {
+        lowEl.textContent = `${last.loweringVelocity.toFixed(2)} m/s`;
+        lowEl.className = 'sub-metric-val ' + (isControlled(last.loweringVelocity) ? 'green' : 'red');
+      } else {
+        lowEl.textContent = '-- m/s';
+        lowEl.className = 'sub-metric-val';
+      }
+
+      const romEl = document.getElementById('liveRom');
+      if (count > 0) {
+        const avgRom = currentReps.reduce((acc, r) => acc + r.rangeOfMotionCm, 0) / count;
+        romEl.textContent = `${avgRom.toFixed(0)} cm`;
+      } else {
+        romEl.textContent = '-- cm';
+      }
+
+      document.getElementById('repProgressLabel').textContent = `Toistot: ${count} / ${target}`;
+      const fill = document.getElementById('repProgressFill');
+      const pct = Math.min(100, (count / Math.max(1, target)) * 100);
+      fill.style.width = `${pct}%`;
+      fill.className = 'progress-fill' + (count >= target ? ' done' : '');
+
+      const listEl = document.getElementById('repList');
+      listEl.innerHTML = '';
+      currentReps.forEach((r, idx) => {
+        const div = document.createElement('div');
+        div.className = 'rep-item';
+        const lowHtml = r.loweringVelocity !== null
+          ? `<span class="${isControlled(r.loweringVelocity) ? 'green' : 'red'}">↓ ${r.loweringVelocity.toFixed(2)} m/s</span>`
+          : `<span style="color:var(--muted)">↓ …</span>`;
+        div.innerHTML = `
+          <span class="rep-num">#${idx + 1}</span>
+          <span><strong>${r.meanVelocity.toFixed(2)} m/s</strong> (${r.power.toFixed(1)} W)</span>
+          ${lowHtml}
+          <span style="color:var(--muted)">${r.rangeOfMotionCm.toFixed(0)} cm</span>
+        `;
+        listEl.appendChild(div);
+      });
+
+      document.getElementById('saveSetBtn').disabled = count === 0;
+    }
+
+    function saveCurrentSet() {
+      if (currentReps.length === 0) return;
+      const dateStr = document.getElementById('workoutDate').value || todayISO();
+      const exercise = document.getElementById('exerciseSelect').value;
+      const weightKg = parseFloat(document.getElementById('weightInput').value) || 0;
+      const targetReps = parseInt(document.getElementById('targetRepsInput').value, 10) || 10;
+      const nowTime = new Date().toTimeString().slice(0, 8);
+
+      let workout = workouts.find((w) => w.date === dateStr);
+      if (!workout) {
+        workout = { date: dateStr, sets: [] };
+        workouts.push(workout);
+      }
+      workout.sets.push({
+        time: nowTime,
+        exercise,
+        weightKg,
+        targetReps,
+        reps: currentReps
+      });
+
+      saveJSON(KEY_WORKOUTS, workouts);
+      currentReps = [];
+      renderLiveSet();
+      selectedHistoryDate = dateStr;
+      renderCalendar();
+      renderHistoryList();
+    }
+
+    // --- Exercises Management ---
+    function renderExerciseSelect() {
+      const sel = document.getElementById('exerciseSelect');
+      const current = sel.value;
+      sel.innerHTML = '';
+      exercises.forEach((ex) => {
+        const opt = document.createElement('option');
+        opt.value = ex;
+        opt.textContent = ex;
+        sel.appendChild(opt);
+      });
+      if (exercises.includes(current)) sel.value = current;
+    }
+
+    function renderExerciseModal() {
+      const container = document.getElementById('modalExerciseList');
+      container.innerHTML = '';
+      exercises.forEach((ex, i) => {
+        const row = document.createElement('div');
+        row.className = 'ex-row';
+        row.innerHTML = `
+          <span style="cursor:pointer; flex:1;">${ex}</span>
+          <button class="danger" style="padding:4px 8px; font-size:12px;">Poista</button>
+        `;
+        row.querySelector('span').addEventListener('click', () => {
+          document.getElementById('exerciseSelect').value = ex;
+          document.getElementById('exerciseModal').classList.add('hidden');
+        });
+        row.querySelector('button').addEventListener('click', () => {
+          exercises.splice(i, 1);
+          if (exercises.length === 0) exercises.push(...DEFAULT_EXERCISES);
+          saveJSON(KEY_EXERCISES, exercises);
+          renderExerciseSelect();
+          renderExerciseModal();
+        });
+        container.appendChild(row);
+      });
+    }
+
+    // --- Calendar & History ---
+    function renderCalendar() {
+      const monthNames = [
+        'Tammikuu', 'Helmikuu', 'Maaliskuu', 'Huhtikuu', 'Toukokuu', 'Kesäkuu',
+        'Heinäkuu', 'Elokuu', 'Syyskuu', 'Lokakuu', 'Marraskuu', 'Joulukuu'
+      ];
+      document.getElementById('calMonthLabel').textContent = `${monthNames[calMonth]} ${calYear}`;
+      const grid = document.getElementById('calDays');
+      grid.innerHTML = '';
+
+      const firstDay = new Date(calYear, calMonth, 1);
+      const startOffset = (firstDay.getDay() + 6) % 7; // Monday = 0
+      const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+      const workoutDates = new Set(workouts.filter((w) => w.sets.length > 0).map((w) => w.date));
+
+      for (let i = 0; i < startOffset; i++) {
+        grid.appendChild(document.createElement('div'));
+      }
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const iso = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const cell = document.createElement('div');
+        cell.className = 'cal-day'
+          + (iso === selectedHistoryDate ? ' selected' : '')
+          + (workoutDates.has(iso) ? ' has-workout' : '');
+        cell.textContent = d;
+        cell.addEventListener('click', () => {
+          selectedHistoryDate = iso;
+          document.getElementById('filterDateChk').checked = true;
+          renderCalendar();
+          renderHistoryList();
+        });
+        grid.appendChild(cell);
+      }
+    }
+
+    function getFilteredWorkouts() {
+      const onlyDate = document.getElementById('filterDateChk').checked;
+      const sorted = [...workouts].sort((a, b) => b.date.localeCompare(a.date));
+      return onlyDate ? sorted.filter((w) => w.date === selectedHistoryDate) : sorted;
+    }
+
+    function renderHistoryList() {
+      const container = document.getElementById('historyContainer');
+      const list = getFilteredWorkouts();
+      if (list.length === 0) {
+        container.innerHTML = `<div class="card" style="text-align:center; color:var(--muted);">Ei tallennettuja sarjoja valitulle päivälle.</div>`;
+        return;
+      }
+      container.innerHTML = '';
+      list.forEach((w) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.style.marginBottom = '10px';
+        let html = `<div style="font-weight:700; margin-bottom:6px;">📅 ${w.date}</div>`;
+        w.sets.forEach((s, sIdx) => {
+          const bestVel = Math.max(0, ...s.reps.map((r) => r.meanVelocity));
+          const bestWatt = Math.max(0, ...s.reps.map((r) => r.power));
+          const avgRom = s.reps.length ? s.reps.reduce((a, r) => a + r.rangeOfMotionCm, 0) / s.reps.length : 0;
+          html += `
+            <div class="history-set">
+              <div class="row">
+                <strong>#${sIdx + 1} ${s.exercise}</strong>
+                <span style="color:var(--muted); font-size:13px;">${s.weightKg} kg • ${s.reps.length}/${s.targetReps} toistoa</span>
+              </div>
+              <div style="font-size:13px; color:var(--muted); margin-top:4px;">
+                Paras: ${bestVel.toFixed(2)} m/s (${bestWatt.toFixed(1)} W) • Avg ROM ${avgRom.toFixed(0)} cm
+              </div>
+            </div>
+          `;
+        });
+        card.innerHTML = html;
+        container.appendChild(card);
+      });
+    }
+
+    // --- CSV Export ---
+    function buildCSV() {
+      const list = getFilteredWorkouts();
+      const source = list.length > 0 ? list : workouts;
+      const rows = [
+        'date,time,exercise,set_number,weight_kg,target_reps,rep_number,movement_power_m_s,movement_power_w,controlled_lowering_m_s,lowering_status,rom_cm'
+      ];
+      source.forEach((w) => {
+        w.sets.forEach((s, sIdx) => {
+          const ex = `"${String(s.exercise).replace(/"/g, '""')}"`;
+          s.reps.forEach((r, rIdx) => {
+            const low = r.loweringVelocity !== null && r.loweringVelocity !== undefined ? r.loweringVelocity.toFixed(3) : '';
+            const status = r.loweringVelocity !== null && r.loweringVelocity !== undefined
+              ? (isControlled(r.loweringVelocity) ? 'GREEN' : 'RED')
+              : '';
+            rows.push([
+              w.date,
+              s.time || '',
+              ex,
+              sIdx + 1,
+              s.weightKg.toFixed(1),
+              s.targetReps,
+              rIdx + 1,
+              r.meanVelocity.toFixed(3),
+              r.power.toFixed(2),
+              low,
+              status,
+              r.rangeOfMotionCm.toFixed(1)
+            ].join(','));
+          });
+        });
+      });
+      return rows.join('\n');
+    }
+
+    async function exportCSV() {
+      const csv = buildCSV();
+      const filename = document.getElementById('filterDateChk').checked
+        ? `gpath_${selectedHistoryDate}.csv`
+        : 'gpath_workouts.csv';
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const file = new File([blob], filename, { type: 'text/csv' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: filename });
+          return;
+        } catch {}
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    // --- Event Listeners ---
+    document.getElementById('workoutDate').value = todayISO();
+    renderExerciseSelect();
+    renderLiveSet();
+    renderCalendar();
+    renderHistoryList();
+
+    document.getElementById('connectBtn').addEventListener('click', connectPin);
+    document.getElementById('rezeroBtn').addEventListener('click', startSetOnPin);
+    document.getElementById('saveSetBtn').addEventListener('click', saveCurrentSet);
+    document.getElementById('clearRepsBtn').addEventListener('click', () => {
+      currentReps = [];
+      renderLiveSet();
+    });
+
+    document.getElementById('soundBtn').addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      document.getElementById('soundBtn').textContent = soundEnabled ? '🔊' : '🔇';
+      if (soundEnabled) soundRep();
+    });
+
+    document.querySelectorAll('[data-weight-delta]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const input = document.getElementById('weightInput');
+        const delta = parseFloat(btn.getAttribute('data-weight-delta'));
+        input.value = Math.max(0, (parseFloat(input.value) || 0) + delta);
+      });
+    });
+
+    document.getElementById('repMinusBtn').addEventListener('click', () => {
+      const input = document.getElementById('targetRepsInput');
+      input.value = Math.max(1, (parseInt(input.value, 10) || 10) - 1);
+      renderLiveSet();
+    });
+    document.getElementById('repPlusBtn').addEventListener('click', () => {
+      const input = document.getElementById('targetRepsInput');
+      input.value = (parseInt(input.value, 10) || 10) + 1;
+      renderLiveSet();
+    });
+    document.getElementById('targetRepsInput').addEventListener('change', renderLiveSet);
+
+    document.getElementById('editExercisesBtn').addEventListener('click', () => {
+      renderExerciseModal();
+      document.getElementById('exerciseModal').classList.remove('hidden');
+    });
+    document.getElementById('closeModalBtn').addEventListener('click', () => {
+      document.getElementById('exerciseModal').classList.add('hidden');
+    });
+    document.getElementById('addExerciseBtn').addEventListener('click', () => {
+      const input = document.getElementById('newExerciseInput');
+      const val = input.value.trim();
+      if (!val) return;
+      if (!exercises.includes(val)) {
+        exercises.push(val);
+        saveJSON(KEY_EXERCISES, exercises);
+      }
+      renderExerciseSelect();
+      document.getElementById('exerciseSelect').value = val;
+      input.value = '';
+      renderExerciseModal();
+    });
+
+    document.getElementById('calPrevBtn').addEventListener('click', () => {
+      calMonth--;
+      if (calMonth < 0) { calMonth = 11; calYear--; }
+      renderCalendar();
+    });
+    document.getElementById('calNextBtn').addEventListener('click', () => {
+      calMonth++;
+      if (calMonth > 11) { calMonth = 0; calYear++; }
+      renderCalendar();
+    });
+    document.getElementById('filterDateChk').addEventListener('change', renderHistoryList);
+    document.getElementById('exportCsvBtn').addEventListener('click', exportCSV);
+
+    document.getElementById('navLiftBtn').addEventListener('click', () => {
+      document.getElementById('tabLift').classList.remove('hidden');
+      document.getElementById('tabHistory').classList.add('hidden');
+      document.getElementById('navLiftBtn').classList.add('active');
+      document.getElementById('navHistoryBtn').classList.remove('active');
+    });
+    document.getElementById('navHistoryBtn').addEventListener('click', () => {
+      document.getElementById('tabLift').classList.add('hidden');
+      document.getElementById('tabHistory').classList.remove('hidden');
+      document.getElementById('navLiftBtn').classList.remove('active');
+      document.getElementById('navHistoryBtn').classList.add('active');
+      renderCalendar();
+      renderHistoryList();
+    });
+  </script>
+</body>
+</html>
