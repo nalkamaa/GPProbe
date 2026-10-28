@@ -9,6 +9,7 @@ final class PinConnection: NSObject {
         case off = "Bluetooth Off"
         case scanning = "Scanning"
         case connecting = "Connecting"
+        case idle = "Connected – Press Aloita sarja"
         case zeroing = "Keep Pin Still..."
         case ready = "Ready"
     }
@@ -39,6 +40,9 @@ final class PinConnection: NSObject {
 
     func stopSet() {
         send(PinProtocol.Command.stopSet)
+        if pin?.state == .connected {
+            state = .idle
+        }
     }
 
     private func send(_ command: Data) {
@@ -126,7 +130,8 @@ extension PinConnection: CBPeripheralDelegate {
         guard characteristic.uuid == PinProtocol.dataCharacteristic, characteristic.isNotifying else { return }
         send(PinProtocol.Command.hello)
         send(PinProtocol.Command.battery)
-        send(PinProtocol.Command.startSet)
+        send(PinProtocol.Command.stopSet)
+        state = .idle
     }
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic,
@@ -137,6 +142,8 @@ extension PinConnection: CBPeripheralDelegate {
             batteryPercent = pct
         case .ack(0x03):
             state = .ready
+        case .ack(0x04):
+            state = .idle
         default:
             break
         }

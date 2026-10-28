@@ -415,7 +415,7 @@
     </div>
 
     <div class="action-bar">
-      <button id="rezeroBtn" disabled>Nollaa Pin</button>
+      <button id="startSetBtn" class="primary" disabled>▶ Aloita sarja</button>
       <button id="saveSetBtn" class="success" disabled>Tallenna sarja</button>
     </div>
   </main>
@@ -498,6 +498,8 @@
     let dataChar = null;
     let soundEnabled = true;
     let audioCtx = null;
+    let setActive = false;
+    let zeroing = false;
 
     let pendingRep = { propVel: null, propAcc: null, romCm: null };
     let currentReps = [];
@@ -618,6 +620,21 @@
       }
     }
 
+    function updateSetButton() {
+      const btn = document.getElementById('startSetBtn');
+      btn.disabled = !dataChar;
+      if (zeroing) {
+        btn.textContent = '⏳ Nollataan (3 s)...';
+        btn.className = '';
+      } else if (setActive) {
+        btn.textContent = '⏹ Lopeta sarja';
+        btn.className = 'danger';
+      } else {
+        btn.textContent = '▶ Aloita sarja';
+        btn.className = 'primary';
+      }
+    }
+
     async function openGattSession() {
       if (!bleDevice) return;
       setStatus('Yhdistetään...', 'busy');
@@ -634,21 +651,52 @@
       await sleep(80);
       await writeByte(CMD_BATTERY);
       await sleep(80);
-      await startSetOnPin();
+      // Ensure Pin is idle until user explicitly presses "Aloita sarja"
+      setActive = false;
+      zeroing = false;
+      await writeByte(CMD_STOP);
 
-      document.getElementById('rezeroBtn').disabled = false;
       document.getElementById('connectBtn').textContent = 'Yhdistetty';
+      setStatus('Yhdistetty – paina Aloita sarja', '');
+      updateSetButton();
     }
 
     async function startSetOnPin() {
       if (!dataChar) return;
+      ensureAudio();
+      pendingRep = { propVel: null, propAcc: null, romCm: null };
+      zeroing = true;
+      setActive = false;
+      updateSetButton();
       setStatus('Pidä Pin paikallaan (3 s)...', 'busy');
       await writeByte(CMD_START);
     }
 
+    async function stopSetOnPin() {
+      setActive = false;
+      zeroing = false;
+      pendingRep = { propVel: null, propAcc: null, romCm: null };
+      updateSetButton();
+      if (dataChar) {
+        setStatus('Sarja pysäytetty – tallenna tai aloita uusi', '');
+        try { await writeByte(CMD_STOP); } catch {}
+      }
+    }
+
+    async function toggleSetOnPin() {
+      if (!dataChar) return;
+      if (setActive || zeroing) {
+        await stopSetOnPin();
+      } else {
+        await startSetOnPin();
+      }
+    }
+
     function onDisconnected() {
       dataChar = null;
-      document.getElementById('rezeroBtn').disabled = true;
+      setActive = false;
+      zeroing = false;
+      updateSetButton();
       document.getElementById('connectBtn').textContent = 'Yhdistä Pin';
       setStatus('Yhteys katkesi – yhdistetään...', 'busy');
       setTimeout(async () => {
@@ -665,8 +713,15 @@
 
       if (dv.byteLength === 1 && type >= 0x81 && type <= 0x86) {
         if (type === 0x83) {
-          setStatus('Valmis – tee toistoja', 'ready');
+          zeroing = false;
+          setActive = true;
+          updateSetButton();
+          setStatus('Sarja käynnissä – tee toistoja', 'ready');
           soundReady();
+        } else if (type === 0x84) {
+          zeroing = false;
+          setActive = false;
+          updateSetButton();
         }
         return;
       }
@@ -678,6 +733,9 @@
         document.getElementById('batteryText').textContent = `• ${Math.round(val)}%`;
         return;
       }
+
+      // Ignore movement packets unless a set has been explicitly started
+      if (!setActive) return;
 
       if (type === 0x03) {
         pendingRep.propVel = val / 1000.0;
@@ -781,8 +839,11 @@
       document.getElementById('saveSetBtn').disabled = count === 0;
     }
 
-    function saveCurrentSet() {
+    async function saveCurrentSet() {
       if (currentReps.length === 0) return;
+      if (setActive || zeroing) {
+        await stopSetOnPin();
+      }
       const dateStr = document.getElementById('workoutDate').value || todayISO();
       const exercise = document.getElementById('exerciseSelect').value;
       const weightKg = parseFloat(document.getElementById('weightInput').value) || 0;
@@ -993,7 +1054,7 @@
     renderHistoryList();
 
     document.getElementById('connectBtn').addEventListener('click', connectPin);
-    document.getElementById('rezeroBtn').addEventListener('click', startSetOnPin);
+    document.getElementById('startSetBtn').addEventListener('click', toggleSetOnPin);
     document.getElementById('saveSetBtn').addEventListener('click', saveCurrentSet);
     document.getElementById('clearRepsBtn').addEventListener('click', () => {
       currentReps = [];

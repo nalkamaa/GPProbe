@@ -237,13 +237,22 @@ struct LiveSetView: View {
 
                 // Action buttons
                 HStack(spacing: 12) {
-                    Button("Nollaa (Re-zero)") {
-                        pin.startSet()
+                    if pin.state == .ready || pin.state == .zeroing {
+                        Button("⏹ Lopeta sarja") {
+                            pin.stopSet()
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.red)
+                    } else {
+                        Button("▶ Aloita sarja") {
+                            pin.startSet()
+                        }
+                        .buttonStyle(.borderedProminent)
                     }
-                    .buttonStyle(.bordered)
 
                     Button("Tallenna sarja", action: finishSet)
                         .buttonStyle(.borderedProminent)
+                        .tint(.green)
                         .disabled(reps.isEmpty)
                 }
             }
@@ -258,6 +267,7 @@ struct LiveSetView: View {
                     if case .ack(0x03) = packet {
                         SoundFeedback.playReady(enabled: soundEnabled)
                     }
+                    guard pin.state == .ready else { return }
                     guard let event = assembler.ingest(packet, weightKg: weightKg) else { return }
                     switch event {
                     case .concentricCompleted(let rep):
@@ -299,7 +309,7 @@ struct LiveSetView: View {
         set.reps = reps
         workout.sets.append(set)
         reps = []
-        pin.startSet()
+        pin.stopSet()
     }
 }
 
