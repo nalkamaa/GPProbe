@@ -248,15 +248,15 @@ struct LiveSetView: View {
                         Text("Paino (kg)").font(.caption.bold()).foregroundStyle(.secondary)
                         Spacer()
                         HStack(spacing: 4) {
+                            Button("-5") { weightKg = max(0, weightKg - 5) }.buttonStyle(.bordered)
                             Button("-2.5") { weightKg = max(0, weightKg - 2.5) }.buttonStyle(.bordered)
-                            Button("-1") { weightKg = max(0, weightKg - 1) }.buttonStyle(.bordered)
                             TextField("kg", value: $weightKg, format: .number)
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.center)
                                 .frame(width: 56)
                                 .textFieldStyle(.roundedBorder)
-                            Button("+1") { weightKg += 1 }.buttonStyle(.bordered)
                             Button("+2.5") { weightKg += 2.5 }.buttonStyle(.bordered)
+                            Button("+5") { weightKg += 5 }.buttonStyle(.bordered)
                         }
                     }
 
@@ -281,38 +281,6 @@ struct LiveSetView: View {
                             Text("-- kg")
                                 .font(.subheadline.bold())
                                 .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    if let vbtProfile = VBTProfile.forExercise(selectedExercise) {
-                        Divider()
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text("🎯 Voiman osa-alueet (\(selectedExercise))")
-                                    .font(.caption.bold())
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                Text(vbtProfile.mvtText)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                            let activeZone = reps.last.flatMap { VBTProfile.classify(exercise: selectedExercise, velocity: $0.meanVelocity) }
-                            ForEach(vbtProfile.zones) { zone in
-                                let isHit = activeZone?.id == zone.id
-                                HStack {
-                                    Text("\(zone.icon) \(zone.label)\(isHit ? " ✓" : "")")
-                                        .font(.caption.bold())
-                                    Text("(\(zone.subLabel))")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                    Spacer()
-                                    Text(zone.rangeText)
-                                        .font(.caption.monospacedDigit().bold())
-                                }
-                                .padding(.vertical, 3)
-                                .padding(.horizontal, 6)
-                                .background(isHit ? Color.green.opacity(0.18) : Color(.systemBackground), in: RoundedRectangle(cornerRadius: 6))
-                            }
                         }
                     }
                 }
@@ -354,6 +322,40 @@ struct LiveSetView: View {
                         }
                     }
                     .padding(.top, 4)
+                }
+
+                // Exercise-specific VBT velocity zones right below live tracking
+                if let vbtProfile = VBTProfile.forExercise(selectedExercise) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("🎯 Voiman osa-alueet (\(selectedExercise))")
+                                .font(.caption.bold())
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text(vbtProfile.mvtText)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        let activeZone = reps.last.flatMap { VBTProfile.classify(exercise: selectedExercise, velocity: $0.meanVelocity) }
+                        ForEach(vbtProfile.zones) { zone in
+                            let isHit = activeZone?.id == zone.id
+                            HStack {
+                                Text("\(zone.icon) \(zone.label)\(isHit ? " ✓" : "")")
+                                    .font(.caption.bold())
+                                Text("(\(zone.subLabel))")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text(zone.rangeText)
+                                    .font(.caption.monospacedDigit().bold())
+                            }
+                            .padding(.vertical, 3)
+                            .padding(.horizontal, 6)
+                            .background(isHit ? Color.green.opacity(0.18) : Color(.systemBackground), in: RoundedRectangle(cornerRadius: 6))
+                        }
+                    }
+                    .padding(10)
+                    .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
                 }
 
                 // Rep counter & target progress

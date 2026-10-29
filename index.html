@@ -514,9 +514,6 @@
     }
     /* VBT Velocity Zones (Squat, Bench Press, Military Bench, Deadlift) */
     .vbt-box {
-      margin-top: 4px;
-      padding-top: 10px;
-      border-top: 1px solid var(--border);
       display: flex;
       flex-direction: column;
       gap: 6px;
@@ -647,15 +644,6 @@
         <span class="small">Arvioitu 1RM (Epley)</span>
         <span id="setupEpley1RM" style="font-size: 15px; font-weight: 700; color: #60a5fa; font-variant-numeric: tabular-nums;">-- kg</span>
       </div>
-
-      <!-- Exercise-specific VBT velocity zones (Jalkakyykky, Penkkipunnerrus, Sotilaspenkkipunnerrus, Maastaveto) -->
-      <div id="vbtZoneBox" class="vbt-box hidden">
-        <div class="vbt-header">
-          <span class="small" id="vbtTitleLabel">🎯 Liikenopeusalueet (VBT)</span>
-          <span id="vbtMvtLabel" style="font-size: 11px; color: var(--muted); font-weight: 600;"></span>
-        </div>
-        <div id="vbtZoneGrid" class="vbt-grid"></div>
-      </div>
     </div>
 
     <div id="heroCard" class="card hero">
@@ -688,6 +676,15 @@
           <div id="liveEpley1RM" class="sub-metric-val" style="color: #60a5fa;">-- kg</div>
         </div>
       </div>
+    </div>
+
+    <!-- Exercise-specific VBT velocity zones (Jalkakyykky, Penkkipunnerrus, Sotilaspenkkipunnerrus, Maastaveto) -->
+    <div id="vbtZoneBox" class="card vbt-box hidden">
+      <div class="vbt-header">
+        <span class="small" id="vbtTitleLabel">🎯 Liikenopeusalueet (VBT)</span>
+        <span id="vbtMvtLabel" style="font-size: 11px; color: var(--muted); font-weight: 600;"></span>
+      </div>
+      <div id="vbtZoneGrid" class="vbt-grid"></div>
     </div>
 
     <div class="action-bar">
