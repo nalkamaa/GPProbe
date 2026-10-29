@@ -319,12 +319,12 @@ struct LiveSetView: View {
                                     case "max": return .red
                                     case "acc": return .green
                                     case "str-spd": return .blue
-                                    case "spd-str": return Color(red: 0.38, green: 0.65, blue: 0.98)
+                                    case "spd-str": return .yellow
                                     default:
                                         if rep.meanVelocity < 0.50 { return .red }
                                         if rep.meanVelocity < 0.75 { return .green }
                                         if rep.meanVelocity < 1.00 { return .blue }
-                                        return Color(red: 0.38, green: 0.65, blue: 0.98)
+                                        return .yellow
                                     }
                                 }()
                                 VStack(spacing: 3) {
