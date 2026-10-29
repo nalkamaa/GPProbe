@@ -78,10 +78,81 @@ struct Rep: Codable, Hashable {
     }
 }
 
+// MARK: - VBT (Velocity-Based Training) Profiles (Squat, Bench Press, Military Bench, Deadlift)
+
+struct VBTZone: Identifiable, Hashable {
+    let id: String
+    let label: String
+    let subLabel: String
+    let rangeText: String
+    let minVel: Double
+    let maxVel: Double
+    let icon: String
+}
+
+struct VBTProfile {
+    let id: String
+    let mvt: Double
+    let mvtText: String
+    let zones: [VBTZone]
+
+    static let squat = VBTProfile(
+        id: "squat",
+        mvt: 0.23,
+        mvtText: "1RM kynnys (MVT): ~0.23 m/s",
+        zones: [
+            VBTZone(id: "max", label: "Maksimivoima", subLabel: "85–100% 1RM", rangeText: "0.23 – 0.50 m/s", minVel: 0.01, maxVel: 0.50, icon: "🔴"),
+            VBTZone(id: "acc", label: "Perus- / kiihdyttävä voima", subLabel: "65–85% 1RM", rangeText: "0.50 – 0.75 m/s", minVel: 0.50, maxVel: 0.75, icon: "🟠"),
+            VBTZone(id: "str-spd", label: "Nopeusvoima (Voimapainotteinen)", subLabel: "45–65% 1RM", rangeText: "0.75 – 1.00 m/s", minVel: 0.75, maxVel: 1.00, icon: "🟢"),
+            VBTZone(id: "spd-str", label: "Nopeusvoima (Räjähtävä)", subLabel: "30–45% 1RM", rangeText: "1.00 – 1.30+ m/s", minVel: 1.00, maxVel: 99.0, icon: "⚡")
+        ]
+    )
+
+    static let bench = VBTProfile(
+        id: "bench",
+        mvt: 0.15,
+        mvtText: "1RM kynnys (MVT): ~0.15 m/s",
+        zones: [
+            VBTZone(id: "max", label: "Maksimivoima", subLabel: "85–100% 1RM", rangeText: "0.15 – 0.45 m/s", minVel: 0.01, maxVel: 0.45, icon: "🔴"),
+            VBTZone(id: "acc", label: "Perus- / kiihdyttävä voima", subLabel: "65–85% 1RM", rangeText: "0.45 – 0.75 m/s", minVel: 0.45, maxVel: 0.75, icon: "🟠"),
+            VBTZone(id: "str-spd", label: "Nopeusvoima (Voimapainotteinen)", subLabel: "45–65% 1RM", rangeText: "0.75 – 0.95 m/s", minVel: 0.75, maxVel: 0.95, icon: "🟢"),
+            VBTZone(id: "spd-str", label: "Nopeusvoima (Räjähtävä)", subLabel: "30–45% 1RM", rangeText: "0.95 – 1.30+ m/s", minVel: 0.95, maxVel: 99.0, icon: "⚡")
+        ]
+    )
+
+    static let deadlift = VBTProfile(
+        id: "deadlift",
+        mvt: 0.14,
+        mvtText: "1RM kynnys (MVT): ~0.14 m/s",
+        zones: [
+            VBTZone(id: "max", label: "Maksimivoima", subLabel: "85–100% 1RM", rangeText: "0.14 – 0.45 m/s", minVel: 0.01, maxVel: 0.45, icon: "🔴"),
+            VBTZone(id: "acc", label: "Perus- / kiihdyttävä voima", subLabel: "65–85% 1RM", rangeText: "0.45 – 0.70 m/s", minVel: 0.45, maxVel: 0.70, icon: "🟠"),
+            VBTZone(id: "str-spd", label: "Nopeusvoima (Voimapainotteinen)", subLabel: "50–65% 1RM", rangeText: "0.70 – 0.90 m/s", minVel: 0.70, maxVel: 0.90, icon: "🟢"),
+            VBTZone(id: "spd-str", label: "Nopeusvoima (Räjähtävä)", subLabel: "30–50% 1RM", rangeText: "0.90 – 1.20+ m/s", minVel: 0.90, maxVel: 99.0, icon: "⚡")
+        ]
+    )
+
+    static func forExercise(_ exerciseName: String) -> VBTProfile? {
+        let s = exerciseName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.contains("kyykky") || s.contains("squat") { return .squat }
+        if s.contains("penkki") || s.contains("bench") { return .bench }
+        if s.contains("maastaveto") || s.contains("mave") || s.contains("deadlift") { return .deadlift }
+        return nil
+    }
+
+    static func classify(exercise: String, velocity: Double) -> VBTZone? {
+        guard let profile = forExercise(exercise), velocity > 0 else { return nil }
+        for z in profile.zones where velocity >= z.minVel && velocity < z.maxVel {
+            return z
+        }
+        return profile.zones.last
+    }
+}
+
 enum CSVExporter {
     static func export(workouts: [Workout]) -> String {
         var lines = [
-            "date,time,exercise,set_number,weight_kg,target_reps,rep_number,movement_power_m_s,movement_power_w,controlled_lowering_m_s,lowering_status,rom_cm,epley_1rm_kg"
+            "date,time,exercise,set_number,weight_kg,target_reps,rep_number,movement_power_m_s,movement_power_w,vbt_strength_zone,controlled_lowering_m_s,lowering_status,rom_cm,epley_1rm_kg"
         ]
         let dateFmt = ISO8601DateFormatter()
         dateFmt.formatOptions = [.withFullDate]
@@ -104,11 +175,13 @@ enum CSVExporter {
                     } else {
                         statusStr = ""
                     }
+                    let zoneStr = VBTProfile.classify(exercise: set.exercise, velocity: rep.meanVelocity)
+                        .map { "\"\($0.label)\"" } ?? ""
                     let line = String(
-                        format: "%@,%@,%@,%d,%.1f,%d,%d,%.3f,%.2f,%@,%@,%.1f,%@",
+                        format: "%@,%@,%@,%d,%.1f,%d,%d,%.3f,%.2f,%@,%@,%@,%.1f,%@",
                         dStr, tStr, escapedExercise,
                         setIdx + 1, set.weightKg, set.targetReps, repIdx + 1,
-                        rep.meanVelocity, rep.power, lowStr, statusStr, rep.rangeOfMotionCm, rmStr
+                        rep.meanVelocity, rep.power, zoneStr, lowStr, statusStr, rep.rangeOfMotionCm, rmStr
                     )
                     lines.append(line)
                 }

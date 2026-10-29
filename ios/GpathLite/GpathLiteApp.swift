@@ -283,12 +283,52 @@ struct LiveSetView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+
+                    if let vbtProfile = VBTProfile.forExercise(selectedExercise) {
+                        Divider()
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("🎯 Voiman osa-alueet (\(selectedExercise))")
+                                    .font(.caption.bold())
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text(vbtProfile.mvtText)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            let activeZone = reps.last.flatMap { VBTProfile.classify(exercise: selectedExercise, velocity: $0.meanVelocity) }
+                            ForEach(vbtProfile.zones) { zone in
+                                let isHit = activeZone?.id == zone.id
+                                HStack {
+                                    Text("\(zone.icon) \(zone.label)\(isHit ? " ✓" : "")")
+                                        .font(.caption.bold())
+                                    Text("(\(zone.subLabel))")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(zone.rangeText)
+                                        .font(.caption.monospacedDigit().bold())
+                                }
+                                .padding(.vertical, 3)
+                                .padding(.horizontal, 6)
+                                .background(isHit ? Color.green.opacity(0.18) : Color(.systemBackground), in: RoundedRectangle(cornerRadius: 6))
+                            }
+                        }
+                    }
                 }
                 .padding(10)
                 .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
 
                 // Live metrics card: Movement power (m/s & W), Controlled lowering, Avg ROM, 1RM (Epley)
                 VStack(spacing: 6) {
+                    if let lastRep = reps.last,
+                       let activeZone = VBTProfile.classify(exercise: selectedExercise, velocity: lastRep.meanVelocity) {
+                        Text("\(activeZone.icon) \(activeZone.label)")
+                            .font(.caption.bold())
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 3)
+                            .background(Color.accentColor.opacity(0.15), in: Capsule())
+                    }
                     Text(reps.last.map { String(format: "%.2f m/s", $0.meanVelocity) } ?? "-- m/s")
                         .font(.system(size: 54, weight: .bold, design: .rounded))
                     Text(reps.last.map { String(format: "%.2f W", $0.power) } ?? "-- W")
@@ -332,6 +372,11 @@ struct LiveSetView: View {
                 List(Array(reps.enumerated()), id: \.offset) { i, rep in
                     HStack {
                         Text(String(format: "#%d  %.2f m/s  %.1f W", i + 1, rep.meanVelocity, rep.power))
+                        if let z = VBTProfile.classify(exercise: selectedExercise, velocity: rep.meanVelocity) {
+                            Text("\(z.icon) \(z.label)")
+                                .font(.caption2.bold())
+                                .foregroundStyle(.secondary)
+                        }
                         Spacer()
                         if let low = rep.loweringVelocity {
                             Text(String(format: "↓ %.2f m/s", low))
