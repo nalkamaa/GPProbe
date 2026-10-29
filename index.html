@@ -332,6 +332,10 @@
     .vel-col-bar.good { background: var(--green); }
     .vel-col-bar.warn { background: var(--amber); }
     .vel-col-bar.high-drop { background: var(--red); }
+    .vel-col-bar.vbt-max, .rep-bar-fill.vbt-max { background: #ef4444 !important; }
+    .vel-col-bar.vbt-acc, .rep-bar-fill.vbt-acc { background: #f59e0b !important; }
+    .vel-col-bar.vbt-str-spd, .rep-bar-fill.vbt-str-spd { background: #22c55e !important; }
+    .vel-col-bar.vbt-spd-str, .rep-bar-fill.vbt-spd-str { background: #3b82f6 !important; }
     .vel-col-lbl {
       font-size: 10px;
       color: var(--muted);
@@ -646,45 +650,9 @@
       </div>
     </div>
 
-    <div id="heroCard" class="card hero">
-      <div id="readinessBanner" class="readiness-banner">
-        ⚪ Yhdistä Pin yläkulmasta aloittaaksesi
-      </div>
-      <div class="row" style="justify-content: center; margin-bottom: 6px; gap: 6px; flex-wrap: wrap;">
-        <span id="setNumberBadge" class="set-badge">Sarja #1</span>
-        <span id="liveVbtBadge" class="vbt-zone-badge hidden"></span>
-      </div>
-      <div class="small" style="color: var(--muted); font-size: 12px; font-weight: 600;">MOVEMENT POWER</div>
-      <div id="liveVel" class="hero-vel">-- m/s</div>
-      <div id="liveWatts" class="hero-watts">-- W</div>
-
-      <div class="sub-metrics">
-        <div>
-          <div class="small" style="font-size: 10px; color: var(--muted);">LOWERING</div>
-          <div id="liveLowering" class="sub-metric-val">-- m/s</div>
-        </div>
-        <div>
-          <div class="small" style="font-size: 10px; color: var(--muted);">AVG ROM</div>
-          <div id="liveRom" class="sub-metric-val">-- cm</div>
-        </div>
-        <div>
-          <div class="small" style="font-size: 10px; color: var(--muted);">PUDOTUS</div>
-          <div id="liveVelDrop" class="sub-metric-val">-- %</div>
-        </div>
-        <div>
-          <div class="small" style="font-size: 10px; color: var(--muted);">1RM (EPLEY)</div>
-          <div id="liveEpley1RM" class="sub-metric-val" style="color: #60a5fa;">-- kg</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Exercise-specific VBT velocity zones (Jalkakyykky, Penkkipunnerrus, Sotilaspenkkipunnerrus, Maastaveto) -->
-    <div id="vbtZoneBox" class="card vbt-box hidden">
-      <div class="vbt-header">
-        <span class="small" id="vbtTitleLabel">🎯 Liikenopeusalueet (VBT)</span>
-        <span id="vbtMvtLabel" style="font-size: 11px; color: var(--muted); font-weight: 600;"></span>
-      </div>
-      <div id="vbtZoneGrid" class="vbt-grid"></div>
+    <!-- Tilanseuranta ja ohjausnapit -->
+    <div id="readinessBanner" class="readiness-banner">
+      ⚪ Yhdistä Pin yläkulmasta aloittaaksesi
     </div>
 
     <div class="action-bar">
@@ -692,16 +660,38 @@
       <button type="button" id="stopSetBtn" class="danger" disabled>⏹ Lopeta sarja</button>
     </div>
 
-    <div class="card progress-wrap">
+    <!-- Sarjan palkkinäkymä tuotu suoraan Arvioitu 1RM alapuolelle -->
+    <div class="card progress-wrap" id="liveSetCard">
       <div class="row">
-        <span id="repProgressLabel" style="font-weight: 700;">Sarja #1 • Toistot: 0 / 5</span>
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+          <span id="setNumberBadge" class="set-badge">Sarja #1</span>
+          <span id="repProgressLabel" style="font-weight: 700;">Toistot: 0 / 5</span>
+          <span id="liveVbtBadge" class="vbt-zone-badge hidden"></span>
+        </div>
         <button type="button" id="clearRepsBtn" style="padding: 4px 8px; font-size: 12px;">Tyhjennä</button>
       </div>
+
+      <div id="liveMetricsRow" class="row hidden" style="font-size: 12px; color: var(--muted); padding: 2px 0;">
+        <span>Viimeisin: <strong id="liveLastVel" style="color: var(--text); font-size: 14px;">-- m/s</strong> (<span id="liveLastWatts">-- W</span>)</span>
+        <span>ROM: <strong id="liveLastRom" style="color: var(--text);">-- cm</strong> • Lasku: <span id="liveLastLowering">-- m/s</span></span>
+      </div>
+
       <div class="progress-bar">
         <div id="repProgressFill" class="progress-fill"></div>
       </div>
       <div id="velDropBanner" class="drop-banner hidden"></div>
-      <div id="velBarChart" class="vel-chart hidden"></div>
+      
+      <!-- Palkkinäkymä toistoille väritettynä voiman osa-alueen mukaan -->
+      <div id="velBarChart" class="vel-chart"></div>
+
+      <!-- Palkkinäkymän väriselite -->
+      <div class="vbt-legend" style="display: flex; justify-content: space-between; gap: 4px; font-size: 11px; color: var(--muted); padding-top: 2px; flex-wrap: wrap;">
+        <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 9px; height: 9px; border-radius: 2px; background: #ef4444; display: inline-block;"></span>Maksimivoima</span>
+        <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 9px; height: 9px; border-radius: 2px; background: #f59e0b; display: inline-block;"></span>Perusvoima</span>
+        <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 9px; height: 9px; border-radius: 2px; background: #22c55e; display: inline-block;"></span>Nopeusvoima (voima)</span>
+        <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 9px; height: 9px; border-radius: 2px; background: #3b82f6; display: inline-block;"></span>Nopeusvoima (räj.)</span>
+      </div>
+
       <div id="repList" class="rep-list"></div>
     </div>
 
@@ -715,6 +705,15 @@
     </div>
 
     <button type="button" id="finishWorkoutBtn" class="success finish-workout-btn">🏁 Lopeta treeni</button>
+
+    <!-- Exercise-specific VBT velocity zones (Jalkakyykky, Penkkipunnerrus, Sotilaspenkkipunnerrus, Maastaveto) SIIRRETTY ALIMMAKSI -->
+    <div id="vbtZoneBox" class="card vbt-box hidden">
+      <div class="vbt-header">
+        <span class="small" id="vbtTitleLabel">🎯 Liikenopeusalueet (VBT)</span>
+        <span id="vbtMvtLabel" style="font-size: 11px; color: var(--muted); font-weight: 600;"></span>
+      </div>
+      <div id="vbtZoneGrid" class="vbt-grid"></div>
+    </div>
   </main>
 
   <!-- TAB 2: CALENDAR & CSV -->
@@ -1946,18 +1945,39 @@
       return '0.0 %';
     }
 
-    function buildVelocityChartHTML(reps) {
-      if (!reps || reps.length === 0) return '';
-      const maxVel = Math.max(0.01, ...reps.map((r) => r.meanVelocity));
-      const firstVel = reps[0].meanVelocity || maxVel;
-      return reps.map((r, idx) => {
-        const heightPct = Math.max(8, Math.round((r.meanVelocity / maxVel) * 100));
-        const repDrop = firstVel > 0 ? ((firstVel - r.meanVelocity) / firstVel) * 100 : 0;
-        const zone = idx === 0 ? '' : barZoneClass(repDrop);
+    function getVbtZoneForVelocity(exerciseName, vel) {
+      if (!vel || vel <= 0) return null;
+      const profile = getVbtProfileForExercise(exerciseName);
+      if (profile) {
+        for (const z of profile.zones) {
+          if (vel >= z.minVel && vel < z.maxVel) return z;
+        }
+        return profile.zones[profile.zones.length - 1];
+      }
+      if (vel < 0.50) return { key: 'max', label: 'Maksimivoima', cssClass: 'zone-max', icon: '🔴' };
+      if (vel < 0.75) return { key: 'acc', label: 'Perusvoima', cssClass: 'zone-acc', icon: '🟠' };
+      if (vel < 1.00) return { key: 'str-spd', label: 'Nopeusvoima (voima)', cssClass: 'zone-str-spd', icon: '🟢' };
+      return { key: 'spd-str', label: 'Nopeusvoima (räjähtävä)', cssClass: 'zone-spd-str', icon: '⚡' };
+    }
+
+    function buildVelocityChartHTML(reps, exerciseName) {
+      if (!reps || reps.length === 0) {
         return `
-          <div class="vel-col">
+          <div style="width:100%; height:100%; min-height:80px; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:13px; text-align:center; padding: 12px 0;">
+            📊 Ei vielä toistoja nykyisessä sarjassa – aloita sarja ja tee toistoja!
+          </div>
+        `;
+      }
+      const maxVel = Math.max(0.01, ...reps.map((r) => r.meanVelocity));
+      return reps.map((r, idx) => {
+        const heightPct = Math.max(10, Math.round((r.meanVelocity / maxVel) * 100));
+        const zone = getVbtZoneForVelocity(exerciseName, r.meanVelocity);
+        const zoneClass = zone ? `vbt-${zone.key}` : '';
+        const zoneTitle = zone ? `${zone.label} (${r.meanVelocity.toFixed(2)} m/s)` : `${r.meanVelocity.toFixed(2)} m/s`;
+        return `
+          <div class="vel-col" title="${zoneTitle}">
             <span class="vel-col-val">${r.meanVelocity.toFixed(2)}</span>
-            <div class="vel-col-bar ${zone}" style="height: ${heightPct}%;"></div>
+            <div class="vel-col-bar ${zoneClass}" style="height: ${heightPct}%;"></div>
             <span class="vel-col-lbl">#${idx + 1}</span>
           </div>
         `;
@@ -2144,55 +2164,44 @@
       }
 
       const readinessEl = document.getElementById('readinessBanner');
-      const heroCardEl = document.getElementById('heroCard');
-      if (readinessEl && heroCardEl) {
+      if (readinessEl) {
         if (!dataChar) {
           readinessEl.className = 'readiness-banner';
           readinessEl.textContent = '⚪ Yhdistä Pin yläkulmasta aloittaaksesi';
-          heroCardEl.className = 'card hero';
         } else if (zeroing) {
           readinessEl.className = 'readiness-banner calibrating';
           readinessEl.textContent = `⏳ Kalibroidaan anturia (${zeroCountdownSec} s) – pidä painopakka paikallaan...`;
-          heroCardEl.className = 'card hero';
         } else if (setActive) {
           readinessEl.className = 'readiness-banner active-set';
           readinessEl.textContent = `🟢 SARJA #${displaySetNum} KÄYNNISSÄ – TEE TOISTOJA NYT!`;
-          heroCardEl.className = 'card hero active-glow';
         } else if (currentSetSaved && count > 0) {
           readinessEl.className = 'readiness-banner ready-to-start';
           readinessEl.textContent = `✅ Sarja #${displaySetNum} valmis! Paina "▶ Aloita sarja #${nextNum}" kun aloitat seuraavan`;
-          heroCardEl.className = 'card hero';
         } else {
           readinessEl.className = 'readiness-banner ready-to-start';
           readinessEl.textContent = `✅ PIN VALMIS – Paina "▶ Aloita sarja #${nextNum}" ja aloita nostaminen!`;
-          heroCardEl.className = 'card hero';
         }
       }
 
-      document.getElementById('liveVel').textContent = last ? `${last.meanVelocity.toFixed(2)} m/s` : '-- m/s';
-      document.getElementById('liveWatts').textContent = last ? `${last.power.toFixed(2)} W` : '-- W';
-
-      const lowEl = document.getElementById('liveLowering');
-      if (last && last.loweringVelocity !== null) {
-        lowEl.textContent = `${last.loweringVelocity.toFixed(2)} m/s`;
-        lowEl.className = 'sub-metric-val ' + (isControlled(last.loweringVelocity) ? 'green' : 'red');
-      } else {
-        lowEl.textContent = '-- m/s';
-        lowEl.className = 'sub-metric-val';
+      const metricsRow = document.getElementById('liveMetricsRow');
+      if (metricsRow) {
+        if (last) {
+          metricsRow.classList.remove('hidden');
+          const lastVelEl = document.getElementById('liveLastVel');
+          if (lastVelEl) lastVelEl.textContent = `${last.meanVelocity.toFixed(2)} m/s`;
+          const lastWattsEl = document.getElementById('liveLastWatts');
+          if (lastWattsEl) lastWattsEl.textContent = `${last.power.toFixed(0)} W`;
+          const lastRomEl = document.getElementById('liveLastRom');
+          if (lastRomEl) lastRomEl.textContent = `${last.rangeOfMotionCm.toFixed(0)} cm`;
+          const lastLowEl = document.getElementById('liveLastLowering');
+          if (lastLowEl) {
+            lastLowEl.textContent = last.loweringVelocity !== null ? `${last.loweringVelocity.toFixed(2)} m/s` : '-- m/s';
+            lastLowEl.className = isControlled(last.loweringVelocity) ? 'green' : (last.loweringVelocity !== null ? 'red' : '');
+          }
+        } else {
+          metricsRow.classList.add('hidden');
+        }
       }
-
-      const romEl = document.getElementById('liveRom');
-      if (count > 0) {
-        const avgRom = currentReps.reduce((acc, r) => acc + r.rangeOfMotionCm, 0) / count;
-        romEl.textContent = `${avgRom.toFixed(0)} cm`;
-      } else {
-        romEl.textContent = '-- cm';
-      }
-
-      const dropPct = calcVelocityDropPct(currentReps);
-      const dropEl = document.getElementById('liveVelDrop');
-      dropEl.textContent = formatDropBadge(dropPct);
-      dropEl.className = 'sub-metric-val ' + dropColorClass(dropPct);
 
       const bannerEl = document.getElementById('velDropBanner');
       if (count >= 2 && dropPct !== null) {
@@ -2212,15 +2221,11 @@
       }
 
       const chartEl = document.getElementById('velBarChart');
-      if (count > 0) {
-        chartEl.classList.remove('hidden');
-        chartEl.innerHTML = buildVelocityChartHTML(currentReps);
-      } else {
-        chartEl.classList.add('hidden');
-        chartEl.innerHTML = '';
+      if (chartEl) {
+        chartEl.innerHTML = buildVelocityChartHTML(currentReps, currentExercise);
       }
 
-      document.getElementById('repProgressLabel').textContent = `Sarja #${displaySetNum} • Toistot: ${count} / ${target}`;
+      document.getElementById('repProgressLabel').textContent = `Toistot: ${count} / ${target}`;
       const fill = document.getElementById('repProgressFill');
       const pct = Math.min(100, (count / Math.max(1, target)) * 100);
       fill.style.width = `${pct}%`;
@@ -2238,15 +2243,15 @@
           ? `<span class="${isControlled(r.loweringVelocity) ? 'green' : 'red'}">↓ ${r.loweringVelocity.toFixed(2)} m/s</span>`
           : `<span style="color:var(--muted)">↓ …</span>`;
         const repDrop = firstVel > 0 ? ((firstVel - r.meanVelocity) / firstVel) * 100 : 0;
-        const zone = idx === 0 ? '' : barZoneClass(repDrop);
         const widthPct = Math.max(6, Math.round((r.meanVelocity / maxVel) * 100));
         const vsFirstHtml = idx === 0
           ? `<span style="color:var(--muted); font-size:12px;">1. toisto</span>`
           : `<span class="${dropColorClass(repDrop)}" style="font-size:12px; font-weight:600;">${formatDropBadge(repDrop)}</span>`;
-        const repVbt = classifyVbtVelocity(currentExercise, r.meanVelocity);
+        const repVbt = getVbtZoneForVelocity(currentExercise, r.meanVelocity);
         const repVbtHtml = repVbt
-          ? `<span style="font-size:11px; color:var(--muted); font-weight:600;">${repVbt.icon} ${repVbt.label}</span>`
+          ? `<span style="font-size:11px; color:var(--muted); font-weight:600;">${repVbt.icon || ''} ${repVbt.label}</span>`
           : '';
+        const repZoneClass = repVbt ? `vbt-${repVbt.key}` : '';
 
         div.innerHTML = `
           <div class="rep-item-top" style="flex-wrap: wrap;">
@@ -2258,7 +2263,7 @@
             <span style="color:var(--muted)">${r.rangeOfMotionCm.toFixed(0)} cm</span>
           </div>
           <div class="rep-bar-track">
-            <div class="rep-bar-fill ${zone}" style="width: ${widthPct}%;"></div>
+            <div class="rep-bar-fill ${repZoneClass}" style="width: ${widthPct}%;"></div>
           </div>
         `;
         listEl.appendChild(div);
@@ -2440,7 +2445,7 @@
             ? ` • ${vbtZone.icon} <strong>${vbtZone.label}</strong>`
             : '';
           const chartHtml = s.reps.length > 0
-            ? `<div class="vel-chart" style="height:88px; margin-top:8px;">${buildVelocityChartHTML(s.reps)}</div>`
+            ? `<div class="vel-chart" style="height:88px; margin-top:8px;">${buildVelocityChartHTML(s.reps, s.exercise)}</div>`
             : '';
           html += `
             <div class="history-set">

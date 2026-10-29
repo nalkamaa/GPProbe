@@ -287,88 +287,69 @@ struct LiveSetView: View {
                 .padding(10)
                 .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
 
-                // Live metrics card: Movement power (m/s & W), Controlled lowering, Avg ROM, 1RM (Epley)
-                VStack(spacing: 6) {
-                    if let lastRep = reps.last,
-                       let activeZone = VBTProfile.classify(exercise: selectedExercise, velocity: lastRep.meanVelocity) {
-                        Text("\(activeZone.icon) \(activeZone.label)")
-                            .font(.caption.bold())
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 3)
-                            .background(Color.accentColor.opacity(0.15), in: Capsule())
-                    }
-                    Text(reps.last.map { String(format: "%.2f m/s", $0.meanVelocity) } ?? "-- m/s")
-                        .font(.system(size: 54, weight: .bold, design: .rounded))
-                    Text(reps.last.map { String(format: "%.2f W", $0.power) } ?? "-- W")
-                        .font(.title2.bold())
-
-                    HStack(spacing: 22) {
-                        VStack {
-                            Text("Controlled Lowering").font(.caption).foregroundStyle(.secondary)
-                            Text(reps.last?.loweringVelocity.map { String(format: "%.2f m/s", $0) } ?? "-- m/s")
-                                .font(.headline)
-                                .foregroundStyle(loweringColor(for: reps.last))
-                        }
-                        VStack {
-                            Text("Avg ROM").font(.caption).foregroundStyle(.secondary)
-                            Text(reps.isEmpty ? "-- cm" : String(format: "%.0f cm", avgRomCm))
-                                .font(.headline)
-                        }
-                        VStack {
-                            Text("1RM (Epley)").font(.caption).foregroundStyle(.secondary)
-                            Text(LiftSet.epley1RM(weightKg: weightKg, reps: reps.count).map { String(format: "%.1f kg", $0) } ?? "-- kg")
-                                .font(.headline)
-                                .foregroundStyle(.blue)
+                // Sarjan palkkinäkymä tuotu suoraan Arvioitu 1RM alapuolelle
+                VStack(spacing: 8) {
+                    HStack {
+                        Text("Sarja #\(activeSetNumber) • Toistot: \(reps.count) / \(targetReps)")
+                            .font(.headline)
+                            .foregroundStyle(reps.count >= targetReps ? .green : .primary)
+                        Spacer()
+                        if let lastRep = reps.last,
+                           let activeZone = VBTProfile.classify(exercise: selectedExercise, velocity: lastRep.meanVelocity) {
+                            Text("\(activeZone.icon) \(activeZone.label)")
+                                .font(.caption2.bold())
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Color.accentColor.opacity(0.15), in: Capsule())
                         }
                     }
-                    .padding(.top, 4)
-                }
 
-                // Exercise-specific VBT velocity zones right below live tracking
-                if let vbtProfile = VBTProfile.forExercise(selectedExercise) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("🎯 Voiman osa-alueet (\(selectedExercise))")
-                                .font(.caption.bold())
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Text(vbtProfile.mvtText)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                        let activeZone = reps.last.flatMap { VBTProfile.classify(exercise: selectedExercise, velocity: $0.meanVelocity) }
-                        ForEach(vbtProfile.zones) { zone in
-                            let isHit = activeZone?.id == zone.id
-                            HStack {
-                                Text("\(zone.icon) \(zone.label)\(isHit ? " ✓" : "")")
-                                    .font(.caption.bold())
-                                Text("(\(zone.subLabel))")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                Text(zone.rangeText)
-                                    .font(.caption.monospacedDigit().bold())
+                    if reps.isEmpty {
+                        Text("📊 Ei vielä toistoja – aloita sarja nähdäksesi liikenopeuspalkit")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, minHeight: 70)
+                    } else {
+                        let maxVel = max(0.01, reps.map(\.meanVelocity).max() ?? 1.0)
+                        HStack(alignment: .bottom, spacing: 6) {
+                            ForEach(Array(reps.enumerated()), id: \.offset) { idx, rep in
+                                let zone = VBTProfile.classify(exercise: selectedExercise, velocity: rep.meanVelocity)
+                                let barColor: Color = {
+                                    switch zone?.id {
+                                    case "max": return .red
+                                    case "acc": return .orange
+                                    case "str-spd": return .green
+                                    case "spd-str": return .blue
+                                    default:
+                                        if rep.meanVelocity < 0.50 { return .red }
+                                        if rep.meanVelocity < 0.75 { return .orange }
+                                        if rep.meanVelocity < 1.00 { return .green }
+                                        return .blue
+                                    }
+                                }()
+                                VStack(spacing: 3) {
+                                    Text(String(format: "%.2f", rep.meanVelocity))
+                                        .font(.system(size: 9, weight: .bold).monospacedDigit())
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(barColor)
+                                        .frame(height: max(10, CGFloat(rep.meanVelocity / maxVel) * 65))
+                                    Text("#\(idx + 1)")
+                                        .font(.system(size: 9, weight: .semibold))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(maxWidth: .infinity)
                             }
-                            .padding(.vertical, 3)
-                            .padding(.horizontal, 6)
-                            .background(isHit ? Color.green.opacity(0.18) : Color(.systemBackground), in: RoundedRectangle(cornerRadius: 6))
                         }
+                        .frame(height: 95)
+                        .padding(.vertical, 4)
                     }
-                    .padding(10)
-                    .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
-                }
 
-                // Rep counter & target progress
-                HStack {
-                    Text("Sarja #\(activeSetNumber) • Toistot: \(reps.count) / \(targetReps)")
-                        .font(.headline)
-                        .foregroundStyle(reps.count >= targetReps ? .green : .primary)
-                    Spacer()
                     ProgressView(value: min(Double(reps.count), Double(targetReps)),
                                  total: Double(max(targetReps, 1)))
-                        .frame(width: 110)
                         .tint(reps.count >= targetReps ? .green : .accentColor)
                 }
+                .padding(10)
+                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
 
                 // Per-rep list
                 List(Array(reps.enumerated()), id: \.offset) { i, rep in
@@ -413,6 +394,40 @@ struct LiveSetView: View {
                     .tint(.green)
                     .frame(maxWidth: .infinity)
                     .disabled(reps.isEmpty && completedSetsToday == 0)
+
+                // Exercise-specific VBT velocity zones siirretty ALIMMAKSI
+                if let vbtProfile = VBTProfile.forExercise(selectedExercise) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("🎯 Voiman osa-alueet (\(selectedExercise))")
+                                .font(.caption.bold())
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text(vbtProfile.mvtText)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        let activeZone = reps.last.flatMap { VBTProfile.classify(exercise: selectedExercise, velocity: $0.meanVelocity) }
+                        ForEach(vbtProfile.zones) { zone in
+                            let isHit = activeZone?.id == zone.id
+                            HStack {
+                                Text("\(zone.icon) \(zone.label)\(isHit ? " ✓" : "")")
+                                    .font(.caption.bold())
+                                Text("(\(zone.subLabel))")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text(zone.rangeText)
+                                    .font(.caption.monospacedDigit().bold())
+                            }
+                            .padding(.vertical, 3)
+                            .padding(.horizontal, 6)
+                            .background(isHit ? Color.green.opacity(0.18) : Color(.systemBackground), in: RoundedRectangle(cornerRadius: 6))
+                        }
+                    }
+                    .padding(10)
+                    .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                }
             }
             .padding()
             .navigationTitle("Gpath Lite")
