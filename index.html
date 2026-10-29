@@ -678,6 +678,11 @@
     .ana-table th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11px; padding: 4px 5px; border-bottom: 1px solid var(--border); }
     .ana-table td { padding: 5px; border-bottom: 1px solid rgba(51,65,85,0.45); }
     #vbtLiveCard { margin-top: 4px; }
+    .mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
+    .mode-switch button { background: transparent; border: none; color: var(--muted); padding: 7px 6px; font-size: 13px; border-radius: 8px; }
+    .mode-switch button.active { background: var(--card-alt); color: var(--text); font-weight: 700; }
+    body.free-mode .guided-only { display: none !important; }
+    body:not(.free-mode) .free-only { display: none !important; }
     .setup-vbt { font-size: 12px; line-height: 1.45; }
   </style>
 </head>
@@ -699,6 +704,10 @@
   <!-- TAB 1: LIVE TRAINING -->
   <main id="tabLift">
     <div class="card setup-grid">
+      <div class="mode-switch" role="tablist" aria-label="Treenitila">
+        <button type="button" id="modeGuidedBtn" class="active">🎯 Ohjattu (VBT)</button>
+        <button type="button" id="modeFreeBtn">📝 Vapaa treeni</button>
+      </div>
       <div class="row">
         <label class="small" for="workoutDate">Päivä</label>
         <input type="date" id="workoutDate" />
@@ -727,7 +736,7 @@
         </div>
       </div>
 
-      <div class="row">
+      <div class="row guided-only" id="targetRepsRow">
         <label class="small" for="targetRepsInput">Tavoitetoistot</label>
         <div class="stepper">
           <button type="button" id="repMinusBtn">−</button>
@@ -736,7 +745,7 @@
         </div>
       </div>
 
-      <div class="row">
+      <div class="row guided-only">
         <label class="small" for="goalSelect">Tavoite</label>
         <select id="goalSelect" aria-label="Harjoitustavoite">
           <option value="peaking">Piikkaus (85–95 %)</option>
@@ -744,16 +753,16 @@
           <option value="baseStrength">Perusvoima / hypertrofia (70–80 %)</option>
         </select>
       </div>
-      <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px;">
+      <div class="guided-only" style="background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px;">
+        <div id="setupCycleInfo" style="margin-bottom: 3px; font-size: 12px; font-weight: 700; color: #93c5fd;"></div>
         <div id="setupCutoffInfo" style="margin-bottom: 3px; color: #fcd34d; font-size: 12px; font-weight: 700;">VL-raja</div>
         <div id="setupVbtForecast" class="setup-vbt"></div>
       </div>
 
-      <div class="row" style="padding-top: 8px; border-top: 1px solid var(--border);">
-        <span class="small">Arvioitu 1RM (Epley)</span>
-        <span id="setupEpley1RM" style="font-size: 15px; font-weight: 700; color: #60a5fa; font-variant-numeric: tabular-nums;">-- kg</span>
-      </div>
     </div>
+
+    <!-- Päivän suositus (Prilepin + VBT) -->
+    <div id="dailyPlanCard" class="card hidden"></div>
 
     <!-- Tilanseuranta ja ohjausnapit -->
     <div id="readinessBanner" class="readiness-banner">
@@ -771,7 +780,6 @@
         <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
           <span id="setNumberBadge" class="set-badge">Sarja #1</span>
           <span id="repProgressLabel" style="font-weight: 700;">Toistot: 0 / 5</span>
-          <span id="liveVbtBadge" class="vbt-zone-badge hidden"></span>
         </div>
         <button type="button" id="clearRepsBtn" style="padding: 4px 8px; font-size: 12px;">Tyhjennä</button>
       </div>
@@ -781,22 +789,13 @@
         <span>ROM: <strong id="liveLastRom" style="color: var(--text);">-- cm</strong> • Lasku: <span id="liveLastLowering">-- m/s</span></span>
       </div>
 
-      <div class="progress-bar">
+      <div class="progress-bar guided-only">
         <div id="repProgressFill" class="progress-fill"></div>
       </div>
-      <div id="velDropBanner" class="drop-banner hidden"></div>
       <div id="vbtLiveCard" class="hidden"></div>
-      
-      <!-- Palkkinäkymä toistoille väritettynä voiman osa-alueen mukaan -->
-      <div id="velBarChart" class="vel-chart"></div>
 
-      <!-- Palkkinäkymän väriselite -->
-      <div class="vbt-legend" style="display: flex; justify-content: space-between; gap: 4px; font-size: 11px; color: var(--muted); padding-top: 2px; flex-wrap: wrap;">
-        <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 9px; height: 9px; border-radius: 2px; background: #ef4444; display: inline-block;"></span>Maksimivoima</span>
-        <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 9px; height: 9px; border-radius: 2px; background: #22c55e; display: inline-block;"></span>Voima-alue</span>
-        <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 9px; height: 9px; border-radius: 2px; background: #3b82f6; display: inline-block;"></span>Nopeusvoima (voima)</span>
-        <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 9px; height: 9px; border-radius: 2px; background: #eab308; display: inline-block;"></span>Nopeusvoima (räj.)</span>
-      </div>
+      <!-- Vapaa treeni: yksinkertainen palkkinäkymä -->
+      <div id="velBarChart" class="vel-chart free-only"></div>
 
       <div id="repList" class="rep-list"></div>
     </div>
@@ -811,15 +810,6 @@
         <span id="todaySetsCount" style="font-size: 12px; color: var(--muted);"></span>
       </div>
       <div id="todaySetsList"></div>
-    </div>
-
-    <!-- Exercise-specific VBT velocity zones (Jalkakyykky, Penkkipunnerrus, Sotilaspenkkipunnerrus, Maastaveto) -->
-    <div id="vbtZoneBox" class="card vbt-box hidden">
-      <div class="vbt-header">
-        <span class="small" id="vbtTitleLabel">🎯 Liikenopeusalueet (VBT)</span>
-        <span id="vbtMvtLabel" style="font-size: 11px; color: var(--muted); font-weight: 600;"></span>
-      </div>
-      <div id="vbtZoneGrid" class="vbt-grid"></div>
     </div>
 
     <!-- Lopeta treeni -painike sivun alimpana -->
@@ -866,7 +856,9 @@
         <select id="anaDateSelect"></select>
       </div>
     </div>
+    <div id="anaCycleCard" class="card"></div>
     <div id="anaSessionCard" class="card"></div>
+    <div id="anaPlanCard" class="card"></div>
     <div id="anaProfileCard" class="card"></div>
     <div id="anaTrendCard" class="card"></div>
     <div id="anaSettingsCard" class="card"></div>
@@ -1568,9 +1560,12 @@
         time: meta.time || new Date().toTimeString().slice(0, 8),
         exercise: meta.exercise,
         weightKg: meta.weightKg,
-        targetReps: meta.targetReps,
-        reps: currentReps.map((r) => ({ ...r }))
+        targetReps: isFreeMode() ? currentReps.length : meta.targetReps,
+        reps: currentReps.map((r) => ({ ...r })),
+        goal: getGoal().key
       };
+      if (isFreeMode()) setCopy.free = true;
+      { const cst = getCycleState(dateStr); if (cst && !cst.finished && !cst.notStarted) setCopy.cycle = { phase: cst.phase.key, week: cst.weekIdx + 1, wave: cst.wave }; }
       if (pendingTraceMeta) { setCopy.traceMeta = pendingTraceMeta; pendingTraceMeta = null; }
       workout.sets.push(setCopy);
       lastSavedSetRef = setCopy;
@@ -1863,10 +1858,10 @@
           pauseMs: pauseMs
         });
         lastRepAt = Date.now();
-        if (vbtOnNewRep()) return; // set auto-stopped at the velocity-loss cutoff
+        if (!isFreeMode() && vbtOnNewRep()) return; // set auto-stopped at the velocity-loss cutoff
 
         const targetReps = parseInt(document.getElementById('targetRepsInput').value, 10) || 5;
-        if (currentReps.length >= targetReps) {
+        if (!isFreeMode() && currentReps.length >= targetReps) {
           // Target reps reached: play fanfare and automatically complete & save this set!
           soundTargetReached();
           stopSetOnPin(true);
@@ -2715,7 +2710,7 @@
     const TNG_PAUSE_MS = 800;
 
     let vbtSettings = Object.assign(
-      { goal: 'maxStrength', velocityMetric: 'mv', autoStopOnCutoff: false, cutoffSound: true, mvtOverride: {}, barAxis: 'auto' },
+      { goal: 'maxStrength', velocityMetric: 'mv', autoStopOnCutoff: false, cutoffSound: true, mvtOverride: {}, barAxis: 'auto', mode: 'guided', cycle: null },
       loadJSON(KEY_VBT_SETTINGS, {}) || {}
     );
     if (!VBT_GOALS[vbtSettings.goal]) vbtSettings.goal = 'maxStrength';
@@ -2733,12 +2728,16 @@
       const k = getLiftKey(exerciseName);
       return k ? LIFT_ANALYSIS[k] : null;
     }
-    function getGoal() { return VBT_GOALS[vbtSettings.goal] || VBT_GOALS.maxStrength; }
+    function getGoal() {
+      const ck = (typeof cycleGoalKey === 'function') ? cycleGoalKey() : null;
+      return VBT_GOALS[ck || vbtSettings.goal] || VBT_GOALS.maxStrength;
+    }
     function getCutoffPct(exerciseName) {
       const g = getGoal();
       const k = getLiftKey(exerciseName);
-      return g.vl[k || 'generic'];
+      return Math.max(5, g.vl[k || 'generic'] + cutoffWaveDelta());
     }
+    function isFreeMode() { return vbtSettings.mode === 'free'; }
     function repV(r) {
       if (!r) return 0;
       if (vbtSettings.velocityMetric === 'mpv' && Number(r.propulsiveVelocity) > 0) return Number(r.propulsiveVelocity);
@@ -3317,7 +3316,7 @@
       if (!el) return;
       const exercise = (activeSetMeta && activeSetMeta.exercise) || getCurrentSelectedExerciseName();
       const weightKg = (activeSetMeta && activeSetMeta.weightKg) || parseFloat(document.getElementById('weightInput').value) || 0;
-      if (!currentReps.length) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+      if (!currentReps.length || isFreeMode()) { el.classList.add('hidden'); el.innerHTML = ''; return; }
       const prof = getLiftCfg(exercise) ? recentProfile(exercise, document.getElementById('workoutDate').value || todayISO()) : null;
       const a = analyzeSet(currentReps, exercise, weightKg, { profile: prof });
       el.classList.remove('hidden');
@@ -3370,7 +3369,19 @@
     function renderSetupVbtForecast() {
       const el = document.getElementById('setupVbtForecast');
       const goalSel = document.getElementById('goalSelect');
-      if (goalSel && goalSel.value !== vbtSettings.goal) goalSel.value = vbtSettings.goal;
+      const cycInfo = document.getElementById('setupCycleInfo');
+      const cycKey = cycleGoalKey();
+      if (goalSel) {
+        const want = cycKey || vbtSettings.goal;
+        if (goalSel.value !== want) goalSel.value = want;
+        goalSel.disabled = !!cycKey;
+        goalSel.title = cycKey ? 'Jaksosuunnittelija ohjaa tavoitetta (Analyysi → Jaksosuunnittelija)' : '';
+      }
+      if (cycInfo) {
+        const t = cycleBadgeText();
+        cycInfo.textContent = t;
+        cycInfo.style.display = t ? '' : 'none';
+      }
       const cutEl = document.getElementById('setupCutoffInfo');
       const exercise = getCurrentSelectedExerciseName();
       if (cutEl) {
@@ -3488,6 +3499,7 @@
         exSel.innerHTML = ''; dateSel.innerHTML = '';
         sessionEl.innerHTML = '<div style="color:var(--muted); text-align:center;">Ei vielä tallennettuja sarjoja analysoitavaksi.</div>';
         profEl.innerHTML = ''; trendEl.innerHTML = '';
+        renderCycleCard();
         renderVbtSettingsCard();
         return;
       }
@@ -3557,6 +3569,19 @@
         </div>
         <div style="font-size:11px; color:var(--muted); margin-top:6px; line-height:1.4;">LÄ = lämmittely (&lt; 65 % 1RM, ei laatuluokitusta). Suluissa VL-rajan jälkeen tehdyt toistot. Efektiiviset toistot = toistot, joissa RIR ≤ 4.</div>`;
 
+      // Daily plan (Prilepin + VBT)
+      const planEl = document.getElementById('anaPlanCard');
+      if (planEl) {
+        const plan = cfg ? computeDailyPlan(anaExercise, anaDate) : null;
+        planEl.classList.toggle('hidden', !plan);
+        planEl.innerHTML = plan ? buildDailyPlanHTML(plan) + `
+          <details style="margin-top:8px;"><summary style="font-size:12px; color:var(--muted); cursor:pointer;">Prilepinin taulukko</summary>
+            <table class="ana-table" style="margin-top:4px;"><thead><tr><th>%1RM</th><th>Toistot/sarja</th><th>Optimi</th><th>Väli</th></tr></thead>
+            <tbody>${PRILEPIN.map((r) => `<tr><td>${r.label}</td><td>${r.repsMin}–${r.repsMax}</td><td>${r.opt}</td><td>${r.rangeLo}–${r.rangeHi}</td></tr>`).join('')}</tbody></table>
+            <div style="font-size:11px; color:var(--muted); margin-top:4px; line-height:1.4;">%1RM lasketaan päivän nopeuspohjaisesta e1RM:stä, ei vanhasta testimaksimista. Toistot/sarja rajataan lisäksi VL-katkaisurajalla ja RIR-varmuudella, joten nopeasti väsyvä nostaja saa automaattisesti lyhyempiä sarjoja ja enemmän sarjoja.</div>
+          </details>` : '';
+      }
+
       // L–V profile
       if (cfg) {
         const sp = sessionProfile(anaExercise, anaDate);
@@ -3598,6 +3623,7 @@
         profEl.innerHTML = '<div style="font-size:12px; color:var(--muted);">Kuorma–nopeusprofiili, MVT ja e1RM ovat käytössä jalkakyykylle, penkkipunnerrukselle ja maastavedolle.</div>';
         trendEl.innerHTML = '';
       }
+      renderCycleCard();
       renderVbtSettingsCard();
     }
 
@@ -3663,6 +3689,512 @@
       });
     }
 
+
+    // =====================================================================
+    // ===  PÄIVÄN SUOSITUS: viitesarja (~70–80 %) → päivän e1RM →        ===
+    // ===  Prilepin-volyymi + progressio + VBT-toistomäärä                ===
+    // =====================================================================
+    // Prilepinin taulukko (A. S. Prilepin, 1974): toistot/sarja, optimaalinen kokonaistoistomäärä ja vaihteluväli
+    const PRILEPIN = [
+      { lo: 0,  hi: 70,  label: '55–65 %', repsMin: 3, repsMax: 6, opt: 24, rangeLo: 18, rangeHi: 30 },
+      { lo: 70, hi: 80,  label: '70–80 %', repsMin: 3, repsMax: 6, opt: 18, rangeLo: 12, rangeHi: 24 },
+      { lo: 80, hi: 90,  label: '80–90 %', repsMin: 2, repsMax: 4, opt: 15, rangeLo: 10, rangeHi: 20 },
+      { lo: 90, hi: 999, label: '90+ %',   repsMin: 1, repsMax: 2, opt: 7,  rangeLo: 4,  rangeHi: 10 }
+    ];
+    const REF_PCT_MIN = 65, REF_PCT_MAX = 88;   // viitesarjaksi kelpaava arvioitu %1RM
+    function prilepinRow(pct) { return PRILEPIN.find((r) => pct >= r.lo && pct < r.hi) || PRILEPIN[PRILEPIN.length - 1]; }
+    function plateRound(kg) { return Math.round(kg / 2.5) * 2.5; }
+    function liftIncrement(cfg) { return cfg.id === 'bench' ? 2.5 : 5; }
+    function addDaysIso(iso, d) {
+      const t = new Date(iso + 'T12:00:00');
+      t.setDate(t.getDate() + d);
+      return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+    }
+
+    function computeDailyPlan(exercise, dateStr) {
+      const cfg = getLiftCfg(exercise);
+      if (!cfg || !exercise) return null;
+      const g = getGoal();
+      const [pLo, pHi] = g.pctRange;
+      const mvt = getEffectiveMvt(exercise).value;
+      const cutoff = getCutoffPct(exercise);
+      const histProf = recentProfile(exercise, addDaysIso(dateStr, -1)); // vain aiemmat päivät
+      const shift = mvt - cfg.mvt;
+
+      // --- historia: e1RM-lähtötaso (42 pv) ja edellinen sessio ---
+      const trend = e1rmTrend(exercise).filter((t) => t.date < dateStr && t.date >= addDaysIso(dateStr, -42));
+      const baseline = trend.length ? vbtMedian(trend.slice(-3).map((t) => t.e1RM)) : null;
+      const prevDates = [...new Set(setsForExercise(exercise, (d) => d < dateStr).map((x) => x.date))].sort().reverse();
+      let last = null;
+      for (const d of prevDates.slice(0, 8)) {
+        const work = setsForExercise(exercise, (x) => x === d)
+          .map(({ set }) => ({ set, a: analyzeSet(set.reps, exercise, set.weightKg, { profile: recentProfile(exercise, d) }) }))
+          .filter((x) => !x.a.isWarmup && x.a.valid.length > 0 && x.a.pct1RM !== null && x.a.pct1RM >= pLo - 7.5);
+        if (work.length) { last = { date: d, work }; break; }
+      }
+      // tyypillinen nopeuskustannus / toisto omista sarjoista (42 pv)
+      const costsObs = setsForExercise(exercise, (d) => d <= dateStr && d >= addDaysIso(dateStr, -42))
+        .map(({ set }) => analyzeSet(set.reps, exercise, set.weightKg))
+        .filter((a) => a.costSource === 'set' && !a.isWarmup).map((a) => a.cost);
+
+      // --- tämän päivän sarjat & viitesarja ---
+      const today = setsForExercise(exercise, (d) => d === dateStr)
+        .map(({ set }) => ({ set, a: analyzeSet(set.reps, exercise, set.weightKg, { profile: histProf }) }))
+        .filter((x) => x.a.vBest);
+      const pointE1rm = (w, v) => {
+        if (histProf && histProf.valid && histProf.slope < 0) return w + (mvt - v) / histProf.slope;
+        const pct = pctFromVelocityTable(cfg, v - shift);
+        return pct ? w / (pct / 100) : null;
+      };
+      // viitesarjat = 65–82 % sarjat ennen ensimmäistä raskaampaa (työ)sarjaa; työsarjat eivät muuta päivän e1RM:ää
+      const refsAll = [];
+      for (const x of today) {
+        if (x.a.pct1RM === null) continue;
+        if (x.a.pct1RM > 82) { if (!refsAll.length && x.a.pct1RM <= REF_PCT_MAX) refsAll.push(x); break; }
+        if (x.a.pct1RM >= REF_PCT_MIN) refsAll.push(x);
+      }
+      const refs = refsAll.sort((x, y) => y.set.weightKg - x.set.weightKg);
+
+      const prevE1rm = (histProf && histProf.valid) ? histProf.e1RM : (trend.length ? trend[trend.length - 1].e1RM : null);
+      if (!refs.length) {
+        const plan = { stage: 'needRef', exercise, cfg, goal: g, prevE1rm, baseline, last, todayCount: today.length };
+        if (prevE1rm) {
+          plan.refLoad = plateRound(prevE1rm * 0.75);
+          plan.refRange = [plateRound(prevE1rm * 0.70), plateRound(prevE1rm * 0.80)];
+        }
+        plan.refVel = [velocityFromPctTable(cfg, 80) + shift, velocityFromPctTable(cfg, 70) + shift];
+        if (histProf && histProf.valid) plan.refVel = [histProf.intercept + histProf.slope * prevE1rm * 0.80, histProf.intercept + histProf.slope * prevE1rm * 0.70];
+        return plan;
+      }
+
+      // --- päivän e1RM: raskain viitesarja (+ toiseksi raskain) historiallisella L–V-kulmalla, + päivän profiili ---
+      const ests = refs.slice(0, 1).map((x) => pointE1rm(x.set.weightKg, x.a.vBest)).filter((e) => e && Number.isFinite(e));
+      let e1RM = ests.reduce((s, e) => s + e, 0) / ests.length;
+      let e1Src = histProf && histProf.valid ? 'viitesarja + oma L–V-kulma' : 'viitesarja + väestötaulukko';
+      const ref = refs[0];
+      // päivän L–V-profiili vain lämmittely- ja viitesarjoista (ei väsyneitä työsarjoja)
+      const sp = buildLVProfile(today.slice(0, today.indexOf(ref) + 1).map((x) => ({ load: x.set.weightKg, v: x.a.vBest, date: dateStr })), exercise);
+      if (sp.valid && sp.r2 >= 0.9 && sp.points.length >= 3) { e1RM = (e1RM + sp.e1RM) / 2; e1Src += ' + päivän profiili'; }
+      const slope = (histProf && histProf.valid && histProf.slope < 0) ? histProf.slope : null;
+      const predV = (L) => slope !== null ? ref.a.vBest + slope * (L - ref.set.weightKg) : velocityFromPctTable(cfg, L / e1RM * 100) + shift;
+
+      // --- valmius suhteessa aiempiin treeneihin ---
+      const readiness = baseline ? (e1RM - baseline) / baseline * 100 : null;
+      let targetPct = (pLo + pHi) / 2;
+      let hiPct = pHi;
+      const notes = [];
+      if (readiness !== null && readiness <= -5) {
+        targetPct -= 2.5; hiPct = (pLo + pHi) / 2;
+        notes.push(`Päivän e1RM on ${Math.abs(readiness).toFixed(1)} % alle viime treenien tason (${baseline.toFixed(0)} kg) → intensiteetti −2,5 %-yks. ja volyymi Prilepinin alarajalle.`);
+      } else if (readiness !== null && readiness >= 3) {
+        notes.push(`Päivän e1RM on +${readiness.toFixed(1)} % yli viime treenien tason (${baseline.toFixed(0)} kg) → hyvä päivä, kuormat lasketaan päivän tasosta.`);
+      } else if (readiness !== null) {
+        notes.push(`Valmius normaali (${readiness >= 0 ? '+' : ''}${readiness.toFixed(1)} % vs. ${baseline.toFixed(0)} kg).`);
+      } else {
+        notes.push('Ei aiempaa e1RM-tasoa vertailuun (alle 42 pv historiaa) – suositus perustuu pelkkään viitesarjaan.');
+      }
+
+      // --- kuorma: progressio edellisestä treenistä, rajattuna päivän tavoitealueeseen ---
+      const loLoad = plateRound(e1RM * pLo / 100);
+      const hiLoad = plateRound(e1RM * hiPct / 100);
+      const autoLoad = plateRound(e1RM * targetPct / 100);
+      let load = autoLoad;
+      let lastInfo = null;
+      if (last) {
+        const byLoad = new Map();
+        last.work.forEach(({ set, a }) => byLoad.set(set.weightKg, (byLoad.get(set.weightKg) || 0) + a.valid.length));
+        const lastLoad = [...byLoad.entries()].sort((x, y) => y[1] - x[1] || y[0] - x[0])[0][0];
+        const lastReps = last.work.reduce((s, x) => s + x.a.valid.length, 0);
+        const scores = last.work.map((x) => x.a.score);
+        const meanScore = scores.reduce((s, x) => s + x, 0) / scores.length;
+        const overVl = last.work.filter((x) => x.a.vlFinal !== null && x.a.vlFinal > x.a.cutoffPct + 2).length;
+        const tooFatigued = last.work.some((x) => x.a.vlFinal !== null && x.a.vlFinal > x.a.redVl) || meanScore < 50;
+        const ok = overVl === 0 && meanScore >= 65;
+        const inc = liftIncrement(cfg);
+        const progLoad = ok ? lastLoad + inc : (tooFatigued ? lastLoad - inc : lastLoad);
+        load = Math.min(hiLoad, Math.max(loLoad, progLoad));
+        lastInfo = { date: last.date, load: lastLoad, reps: lastReps, sets: last.work.length, meanScore, ok, tooFatigued, progLoad };
+        const why = ok ? `kaikki työsarjat VL-rajan sisällä ja RQI ka. ${meanScore.toFixed(0)} → +${inc} kg`
+          : tooFatigued ? `sarjat menivät liian väsyneiksi (RQI ka. ${meanScore.toFixed(0)}) → −${inc} kg`
+            : `${overVl} sarjaa ylitti VL-rajan → sama kuorma`;
+        let txt = `Edellinen treeni ${fmtDateFi(last.date)}: ${lastInfo.sets} työsarjaa @ ${lastLoad} kg (${lastReps} toistoa): ${why} = ${progLoad} kg.`;
+        if (progLoad > hiLoad) txt += ` Rajattu päivän tavoitealueen ylärajaan ${hiLoad} kg (${Math.round(hiPct)} % päivän e1RM:stä).`;
+        else if (progLoad < loLoad) txt += ` Nostettu päivän tavoitealueen alarajaan ${loLoad} kg (${pLo} %) – päivän taso on noussut.`;
+        notes.push(txt);
+      } else {
+        notes.push(`Ei aiempaa työsarjadataa → kuorma = ${Math.round(targetPct)} % päivän e1RM:stä.`);
+      }
+      const pct = load / e1RM * 100;
+      const row = prilepinRow(pct);
+
+      // --- volyymi (Prilepin) valmiuden mukaan ---
+      const cst = getCycleState(dateStr);
+      const wave = cst && !cst.finished && !cst.notStarted ? cst.wave : 'opt';
+      let volume = waveVolume(row, wave);
+      if (cst && !cst.finished && !cst.notStarted) notes.push(`Jakso: ${cst.phase.label}, viikko ${cst.weekInBlock}/${cst.weeks} → Prilepin-${WAVE_LABELS[wave]} = ${volume} toistoa.`);
+      if (readiness !== null && readiness <= -5) volume = Math.min(volume, row.rangeLo);
+      else if (readiness !== null && readiness < -2) volume = Math.min(volume, Math.round((row.rangeLo + row.opt) / 2));
+
+      // --- toistot / sarja: Prilepin ∩ VL-raja ∩ RIR-varmuus ---
+      const v0 = predV(load);
+      // nopeuskustannus/toisto: malli (v0 − MVT) / maksimitoistot (Epley-käänteis) ja omat sarjat
+      const maxReps = Math.max(1, 30 * (100 / pct - 1));
+      const costModel = Math.max(0.015, (v0 - mvt) / maxReps);
+      const costObs = costsObs.length >= 2 ? vbtMedian(costsObs) : null;
+      const cost = costObs !== null ? (costModel + costObs) / 2 : costModel;
+      const costSrc = costObs !== null ? `malli ${costModel.toFixed(3)} + omat sarjat ${costObs.toFixed(3)} (n=${costsObs.length})` : `malli: (V₀ − MVT) / ~${maxReps.toFixed(1)} maksimitoistoa`;
+      const vCut = v0 * (1 - cutoff / 100);
+      const repsVL = Math.max(1, Math.floor((v0 - vCut) / cost + 1e-9) + 1);
+      const rirMin = g.key === 'peaking' ? 1 : 2;
+      const repsRIR = Math.max(1, Math.floor((v0 - mvt) / cost + 1e-9) + 1 - rirMin);
+      let reps = Math.min(row.repsMax, repsVL, repsRIR);
+      reps = Math.max(1, reps);
+      if (reps < row.repsMin) notes.push(`VBT rajoittaa: ennuste ${repsVL} toistoa ennen VL ${cutoff} % -rajaa → ${reps} toistoa/sarja ja enemmän sarjoja (Prilepin ${row.repsMin}–${row.repsMax}).`);
+      let sets = Math.max(2, Math.min(10, Math.round(volume / reps)));
+
+      // --- tehty tänään ja sarjojen välinen väsymys ---
+      const refIdx = today.indexOf(ref);
+      const work = today.filter((x, i) => i > refIdx && x.set.weightKg >= load - 2.5);
+      const doneReps = work.reduce((s, x) => s + x.a.valid.length, 0);
+      const doneSets = work.length;
+      let adjust = null;
+      if (work.length) {
+        const lastW = work[work.length - 1];
+        const vExp = predV(lastW.set.weightKg);
+        if (lastW.a.vBest < vExp - 0.06) {
+          adjust = { type: 'down', load: plateRound(lastW.set.weightKg * 0.95), text: `Viimeisen työsarjan V<sub>best</sub> ${fmtV(lastW.a.vBest)} on > 0,06 m/s alle odotetun (${fmtV(vExp)}) → sarjojen välinen väsymys. Pudota ${plateRound(lastW.set.weightKg * 0.95)} kg:aan tai lopeta, jos Prilepinin alaraja (${row.rangeLo}) on täynnä.` };
+        } else if (lastW.a.vBest > vExp + 0.06 && lastW.set.weightKg + liftIncrement(cfg) <= plateRound(e1RM * pHi / 100)) {
+          adjust = { type: 'up', load: lastW.set.weightKg + liftIncrement(cfg), text: `Viimeinen työsarja kulki ${fmtV(lastW.a.vBest)} m/s (odotus ${fmtV(vExp)}) → voit nostaa ${lastW.set.weightKg + liftIncrement(cfg)} kg:aan.` };
+        }
+        if (lastW.a.vlFinal !== null && lastW.a.vlFinal > cutoff && lastW.a.valid.length < reps) {
+          notes.push(`Viimeisessä työsarjassa VL-raja tuli vastaan jo ${lastW.a.stopAfterRep !== null ? lastW.a.stopAfterRep : lastW.a.valid.length} toiston kohdalla → pidä ${Math.max(1, reps - 1)} toistoa/sarja.`);
+        }
+      }
+      const remainingSets = Math.max(0, sets - doneSets);
+      const remainingReps = Math.max(0, volume - doneReps);
+
+      return {
+        stage: 'plan', exercise, cfg, goal: g, e1RM, e1Src, baseline, readiness, ref, load, pct, row, volume,
+        reps, sets, v0, vCut, cutoff, mvt, cost, costSrc, repsVL, repsRIR, notes, lastInfo,
+        doneReps, doneSets, remainingSets, remainingReps, adjust, loLoad, hiLoad
+      };
+    }
+
+    function buildDailyPlanHTML(plan, opts = {}) {
+      if (!plan) return '';
+      const head = `<div class="row" style="margin-bottom:6px;"><strong style="font-size:14px;">🧠 Päivän suositus · ${plan.exercise}</strong><span style="font-size:11px; color:var(--muted);">${plan.goal.short} · Prilepin + VBT</span></div>`;
+      if (plan.stage === 'needRef') {
+        const vr = plan.refVel ? `${fmtV(Math.min(...plan.refVel))}–${fmtV(Math.max(...plan.refVel))} m/s` : '';
+        return `${head}
+          <div class="vbt-verdict" style="margin-top:0;">Tee ensin <strong>viitesarja</strong> nousevan lämmittelyn päätteeksi: ${plan.refLoad ? `<strong>${plan.refLoad} kg × 2</strong> (≈75 %, alue ${plan.refRange[0]}–${plan.refRange[1]} kg)` : '~70–80 % 1RM × 2'} maksimaalisella tahdolla. Tavoitenopeus noin ${vr}.
+          Sarjan jälkeen sovellus laskee päivän e1RM:n ja suosittelee työsarjat.</div>
+          ${plan.prevE1rm ? `<div style="font-size:11px; color:var(--muted);">Edellinen e1RM ${plan.prevE1rm.toFixed(0)} kg${plan.last ? ` · viimeisin treeni ${fmtDateFi(plan.last.date)}` : ''}${plan.todayCount ? ` · tänään ${plan.todayCount} sarjaa, ei vielä 65–88 % sarjaa` : ''}</div>` : `<div style="font-size:11px; color:var(--muted);">Ei aiempaa dataa: lämmittele nousevasti – ensimmäinen sarja, jonka nopeus osuu yllä olevaan väliin, toimii viitesarjana.</div>`}
+          ${opts.withButtons && plan.refLoad ? `<button type="button" class="primary" data-plan-apply="${plan.refLoad}|2" style="margin-top:8px; width:100%;">Käytä: ${plan.refLoad} kg × 2</button>` : ''}`;
+      }
+      const rd = plan.readiness;
+      const rdCls = rd === null ? '' : rd <= -5 ? 'red' : rd < -2 ? 'amber' : rd >= 3 ? 'green' : '';
+      const doneFrac = Math.min(1, plan.doneReps / Math.max(1, plan.volume));
+      const nextLoad = plan.adjust ? plan.adjust.load : plan.load;
+      return `${head}
+        <div class="vbt-kpi-grid">
+          <div class="vbt-kpi"><span class="vbt-kpi-l">Päivän e1RM</span><span class="vbt-kpi-v">${plan.e1RM.toFixed(0)}</span><span class="vbt-kpi-s ${rdCls}">${rd === null ? 'ei vertailua' : (rd >= 0 ? '+' : '') + rd.toFixed(1) + ' % vs. ' + plan.baseline.toFixed(0)}</span></div>
+          <div class="vbt-kpi" style="grid-column: span 2;"><span class="vbt-kpi-l">Työsarjat</span><span class="vbt-kpi-v" style="color:#60a5fa;">${plan.sets} × ${plan.reps} @ ${plan.load} kg</span><span class="vbt-kpi-s">${Math.round(plan.pct)} % päivän e1RM · ${plan.sets * plan.reps} toistoa</span></div>
+          <div class="vbt-kpi"><span class="vbt-kpi-l">Nopeusohje</span><span class="vbt-kpi-v" style="font-size:16px;">${fmtV(plan.v0)}</span><span class="vbt-kpi-s">±0.03 · stop ${fmtV(plan.vCut)} (VL ${plan.cutoff} %)</span></div>
+        </div>
+        <div style="font-size:11px; color:var(--muted); margin:4px 0;">Prilepin ${plan.row.label}: ${plan.row.repsMin}–${plan.row.repsMax} toistoa/sarja, optimi ${plan.row.opt} (${plan.row.rangeLo}–${plan.row.rangeHi}) → tavoite <strong style="color:var(--text);">${plan.volume}</strong> toistoa</div>
+        <div class="progress-bar" style="margin:4px 0;"><div class="progress-fill ${doneFrac >= 1 ? 'done' : ''}" style="width:${Math.round(doneFrac * 100)}%"></div></div>
+        <div style="font-size:12px; margin-bottom:4px;">Tehty: <strong>${plan.doneSets}</strong> sarjaa / <strong>${plan.doneReps}</strong> toistoa ≥ ${plan.load - 2.5} kg${plan.remainingReps > 0 ? ` · jäljellä ~${plan.remainingSets} × ${plan.reps}` : ' · <span class="green">volyymi täynnä ✓</span>'}</div>
+        ${plan.adjust ? `<div class="vbt-alert ${plan.adjust.type === 'down' ? 'amber' : ''}" style="${plan.adjust.type === 'up' ? 'background:rgba(34,197,94,0.14); border:1px solid rgba(34,197,94,0.5); color:#86efac;' : ''}">${plan.adjust.text}</div>` : ''}
+        <ul style="font-size:12px; line-height:1.45; margin:6px 0 0; padding-left:18px;">
+          <li>Päivän e1RM: viitesarja ${plan.ref.set.weightKg} kg @ ${fmtV(plan.ref.a.vBest)} m/s (${plan.e1Src}).</li>
+          ${plan.notes.map((n) => `<li>${n}</li>`).join('')}
+          <li>Toistot/sarja: min(Prilepin ${plan.row.repsMax}, VL-raja ${plan.repsVL}, RIR ≥ ${plan.goal.key === 'peaking' ? 1 : 2} → ${plan.repsRIR}) = ${plan.reps}. Nopeuskustannus ${plan.cost.toFixed(3)} m/s/toisto (${plan.costSrc}).</li>
+        </ul>
+        ${opts.withButtons ? `<button type="button" class="primary" data-plan-apply="${nextLoad}|${plan.reps}" style="margin-top:8px; width:100%;">Käytä: ${nextLoad} kg × ${plan.reps}</button>` : ''}`;
+    }
+
+    function renderDailyPlanCard() {
+      const el = document.getElementById('dailyPlanCard');
+      if (!el) return;
+      const ex = getCurrentSelectedExerciseName();
+      const plan = (getLiftCfg(ex) && !isFreeMode()) ? computeDailyPlan(ex, document.getElementById('workoutDate').value || todayISO()) : null;
+      if (!plan) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+      el.classList.remove('hidden');
+      el.innerHTML = buildDailyPlanHTML(plan, { withButtons: true });
+    }
+    function applyPlanToSetup(load, reps) {
+      const w = document.getElementById('weightInput');
+      const t = document.getElementById('targetRepsInput');
+      w.value = load;
+      t.value = reps;
+      handleWeightChanged();
+      handleTargetRepsChanged();
+    }
+    // =================== /PÄIVÄN SUOSITUS ===================
+
+
+    // =====================================================================
+    // ===  JAKSOSUUNNITTELIJA (blokkiperiodisaatio + viikkoaalto)        ===
+    // =====================================================================
+    const CYCLE_PHASES = {
+      accum:  { key: 'accum',  label: 'Kerääminen',       goal: 'baseStrength', color: '#22c55e' },
+      trans:  { key: 'trans',  label: 'Muuntaminen',      goal: 'maxStrength',  color: '#3b82f6' },
+      real:   { key: 'real',   label: 'Realisointi',      goal: 'peaking',      color: '#f59e0b' },
+      deload: { key: 'deload', label: 'Kevennys / testi', goal: 'maxStrength',  color: '#94a3b8' }
+    };
+    const WAVE_LABELS = {
+      low: 'alaraja', opt: 'optimi', high: 'yläraja', deload: 'kevennys', taper: 'piikkaus/tapering', test: 'testi'
+    };
+    const DEFAULT_CYCLE_BLOCKS = [
+      { phase: 'accum', weeks: 4 }, { phase: 'trans', weeks: 4 }, { phase: 'real', weeks: 2 }, { phase: 'deload', weeks: 1 }
+    ];
+
+    function mondayOf(iso) {
+      const d = new Date(iso + 'T12:00:00');
+      const dow = (d.getDay() + 6) % 7;
+      d.setDate(d.getDate() - dow);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    function weeksBetween(aIso, bIso) {
+      return Math.floor((new Date(mondayOf(bIso) + 'T12:00:00') - new Date(mondayOf(aIso) + 'T12:00:00')) / (7 * 864e5) + 0.5);
+    }
+    function waveFor(phase, weekInBlock, weeks) {
+      if (phase === 'deload') return weekInBlock === weeks ? 'test' : 'deload';
+      if (phase === 'real') return weekInBlock === weeks ? 'taper' : 'low';
+      if (weeks >= 4 && weekInBlock === weeks) return 'deload';
+      const n = weeks >= 4 ? weeks - 1 : weeks;
+      if (n <= 2) return weekInBlock === 1 ? 'opt' : 'high';
+      return ['low', 'opt', 'high'][Math.min(2, Math.floor((weekInBlock - 1) * 3 / n))];
+    }
+    function getCycle() { return vbtSettings.cycle && vbtSettings.cycle.active ? vbtSettings.cycle : null; }
+    function getContextDate() {
+      const el = document.getElementById('workoutDate');
+      return (el && el.value) || todayISO();
+    }
+
+    // Cycle state for a date
+    function getCycleState(dateStr) {
+      const c = getCycle();
+      if (!c) return null;
+      const d = dateStr || getContextDate();
+      const mon = mondayOf(d);
+      const inserts = (c.inserts || []).filter((x) => x <= mon);
+      const insertedNow = (c.inserts || []).includes(mon);
+      const raw = weeksBetween(c.startDate, d);
+      if (raw < 0) return { active: true, notStarted: true, startDate: c.startDate };
+      const idx = raw - inserts.filter((x) => x < mon).length - (insertedNow ? 0 : 0);
+      const totalWeeks = c.blocks.reduce((s, b) => s + b.weeks, 0);
+      if (insertedNow) {
+        // extra deload inserted for this week; block position = the week that was postponed
+        let acc = 0, bi = 0;
+        for (; bi < c.blocks.length; bi++) { if (idx < acc + c.blocks[bi].weeks) break; acc += c.blocks[bi].weeks; }
+        const blk = c.blocks[Math.min(bi, c.blocks.length - 1)];
+        return { active: true, blockIdx: bi, phase: CYCLE_PHASES[blk.phase], weekInBlock: idx - acc + 1, weeks: blk.weeks, wave: 'deload', inserted: true, weekIdx: idx, totalWeeks, monday: mon };
+      }
+      if (idx >= totalWeeks) return { active: true, finished: true, weekIdx: idx, totalWeeks, monday: mon };
+      let acc = 0;
+      for (let bi = 0; bi < c.blocks.length; bi++) {
+        const b = c.blocks[bi];
+        if (idx < acc + b.weeks) {
+          const wib = idx - acc + 1;
+          return { active: true, blockIdx: bi, phase: CYCLE_PHASES[b.phase], weekInBlock: wib, weeks: b.weeks, wave: waveFor(b.phase, wib, b.weeks), weekIdx: idx, totalWeeks, monday: mon };
+        }
+        acc += b.weeks;
+      }
+      return null;
+    }
+    function cycleGoalKey(dateStr) {
+      const st = getCycleState(dateStr);
+      if (!st || st.finished || st.notStarted) return null;
+      return st.phase.goal;
+    }
+    // Prilepin-volume for the wave
+    function waveVolume(row, wave) {
+      switch (wave) {
+        case 'low': return row.rangeLo;
+        case 'high': return row.rangeHi;
+        case 'deload': case 'taper': return Math.max(row.repsMin * 2, Math.round(row.rangeLo * 0.6));
+        case 'test': return Math.max(2, row.repsMin * 2);
+        default: return row.opt;
+      }
+    }
+    function cutoffWaveDelta(dateStr) {
+      const st = getCycleState(dateStr);
+      return st && !st.finished && !st.notStarted && (st.wave === 'deload' || st.wave === 'taper') ? -5 : 0;
+    }
+
+    // ---- weekly volume (work reps & tonnage, warm-ups excluded) ----
+    function weeklyVolume(exercise, mondayIso) {
+      const end = addDaysIso(mondayIso, 6);
+      let reps = 0, tonnage = 0, sets = 0, sessions = new Set();
+      workouts.forEach((w) => {
+        if (w.date < mondayIso || w.date > end) return;
+        (w.sets || []).forEach((s) => {
+          if (exercise && s.exercise !== exercise) return;
+          if (!s.reps || !s.reps.length) return;
+          const a = analyzeSet(s.reps, s.exercise, s.weightKg);
+          if (a.isWarmup) return;
+          reps += a.valid.length; tonnage += a.valid.length * (s.weightKg || 0); sets++;
+          sessions.add(w.date);
+        });
+      });
+      return { reps, tonnage, sets, sessions: sessions.size };
+    }
+
+    // ---- suggestions from data ----
+    function cycleSuggestions(dateStr) {
+      const out = [];
+      const st = getCycleState(dateStr);
+      const lifts = exercisesWithData().filter((e) => getLiftCfg(e));
+      lifts.forEach((ex) => {
+        const tr = e1rmTrend(ex).filter((t) => t.date <= dateStr && t.date >= addDaysIso(dateStr, -28));
+        if (tr.length >= 3) {
+          const first = tr[0], last = tr[tr.length - 1];
+          const days = (new Date(last.date) - new Date(first.date)) / 864e5;
+          const chg = (last.e1RM - first.e1RM) / first.e1RM * 100;
+          if (days >= 13 && chg < 0.5) out.push({ type: 'plateau', ex, text: `${ex}: e1RM ${chg <= -2 ? 'laskenut' : 'tasaantunut'} (${chg >= 0 ? '+' : ''}${chg.toFixed(1)} % / ${Math.round(days)} pv) → ${chg <= -2 ? 'tarkista palautuminen; kevennys tai ' : ''}siirry seuraavaan jaksoon tai muuta ärsykettä.` });
+          else if (chg >= 2) out.push({ type: 'progress', ex, text: `${ex}: e1RM nousee (+${chg.toFixed(1)} % / ${Math.round(days)} pv) → jatka nykyisellä jaksolla.` });
+        }
+        // readiness of the two latest sessions
+        const dates = [...new Set(setsForExercise(ex, (d) => d <= dateStr).map((x) => x.date))].sort().reverse().slice(0, 2);
+        const rds = dates.map((d) => { const p = computeDailyPlan(ex, d); return p && p.stage === 'plan' ? p.readiness : null; });
+        if (rds.length === 2 && rds.every((r) => r !== null && r <= -5)) {
+          out.push({ type: 'deload', ex, text: `${ex}: valmius alle −5 % kahdella perättäisellä kerralla (${rds.map((r) => r.toFixed(1) + ' %').join(', ')}) → pidä kevennysviikko etuajassa.` });
+        }
+        const thisW = weeklyVolume(ex, mondayOf(dateStr));
+        const prevW = weeklyVolume(ex, addDaysIso(mondayOf(dateStr), -7));
+        if (prevW.reps >= 10 && thisW.reps > prevW.reps * 1.3) {
+          out.push({ type: 'volume', ex, text: `${ex}: viikkovolyymi +${Math.round((thisW.reps / prevW.reps - 1) * 100)} % edelliseen viikkoon (${thisW.reps} vs ${prevW.reps} toistoa) – yli 30 %:n hypyt lisäävät väsymystä.` });
+        }
+      });
+      if (st && st.finished) out.unshift({ type: 'finished', text: 'Jakso on päättynyt. Testaa raskas yhden toiston nosto (kirjaa sen nopeus omaksi MVT:ksi) ja aloita uusi kierros korkeammalta tasolta.' });
+      return out;
+    }
+
+    function startCycle(startDate, blocks) {
+      vbtSettings.cycle = { active: true, startDate: mondayOf(startDate), blocks, inserts: [] };
+      saveVbtSettings(); onVbtSettingsChanged();
+    }
+    function stopCycle() {
+      if (vbtSettings.cycle) vbtSettings.cycle.active = false;
+      saveVbtSettings(); onVbtSettingsChanged();
+    }
+    function advanceToNextBlock() {
+      const c = getCycle(); const st = getCycleState(getContextDate());
+      if (!c || !st || st.finished || st.notStarted) return;
+      // move start so that the next block begins this week
+      let acc = 0; for (let i = 0; i <= st.blockIdx; i++) acc += c.blocks[i].weeks;
+      const shiftWeeks = acc - st.weekIdx;
+      c.startDate = addDaysIso(c.startDate, -7 * shiftWeeks);
+      saveVbtSettings(); onVbtSettingsChanged();
+    }
+    function insertDeloadThisWeek() {
+      const c = getCycle(); if (!c) return;
+      const mon = mondayOf(getContextDate());
+      c.inserts = c.inserts || [];
+      if (!c.inserts.includes(mon)) c.inserts.push(mon);
+      saveVbtSettings(); onVbtSettingsChanged();
+    }
+
+    function cycleBadgeText(dateStr) {
+      const st = getCycleState(dateStr);
+      if (!st) return '';
+      if (st.notStarted) return `📅 Jakso alkaa ${fmtDateFi(st.startDate)}`;
+      if (st.finished) return '📅 Jakso päättynyt – testaa ja aloita uusi';
+      return `📅 ${st.phase.label} · vk ${st.weekInBlock}/${st.weeks} (${WAVE_LABELS[st.wave]}${st.inserted ? ', lisätty' : ''}) · kokonaisvk ${st.weekIdx + 1}/${st.totalWeeks}`;
+    }
+
+    function buildCycleTimelineSVG(st) {
+      const c = getCycle(); if (!c) return '';
+      const total = c.blocks.reduce((s, b) => s + b.weeks, 0);
+      const W = 340, H = 46, pad = 4;
+      const wPx = (W - 2 * pad) / total;
+      let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;" role="img" aria-label="Jakson aikajana">`;
+      let x = pad, wk = 0;
+      c.blocks.forEach((b) => {
+        const ph = CYCLE_PHASES[b.phase];
+        for (let i = 1; i <= b.weeks; i++) {
+          const wave = waveFor(b.phase, i, b.weeks);
+          const h = { low: 14, opt: 18, high: 22, deload: 8, taper: 10, test: 12 }[wave] || 14;
+          const cur = st && !st.finished && !st.notStarted && st.weekIdx === wk;
+          s += `<rect x="${x + 1}" y="${28 - h}" width="${wPx - 2}" height="${h}" rx="2" fill="${ph.color}" opacity="${cur ? 1 : 0.45}" ${cur ? 'stroke="#f8fafc" stroke-width="1.5"' : ''}/>`;
+          x += wPx; wk++;
+        }
+      });
+      x = pad;
+      c.blocks.forEach((b) => {
+        s += `<text x="${x + 2}" y="${H - 4}" fill="#94a3b8" font-size="9">${CYCLE_PHASES[b.phase].label.split(' ')[0]}</text>`;
+        x += wPx * b.weeks;
+      });
+      return s + '</svg>';
+    }
+
+    function renderCycleCard() {
+      const el = document.getElementById('anaCycleCard');
+      if (!el) return;
+      const dateStr = anaDate || getContextDate();
+      const c = getCycle();
+      if (!c) {
+        const blocks = (vbtSettings.cycle && vbtSettings.cycle.blocks) || DEFAULT_CYCLE_BLOCKS;
+        el.innerHTML = `
+          <strong style="font-size:14px;">📅 Jaksosuunnittelija</strong>
+          <p class="vbt-verdict">Blokkiperiodisaatio: <strong>Kerääminen</strong> (perusvoima 70–80 %) → <strong>Muuntaminen</strong> (maksimivoima 80–90 %) → <strong>Realisointi</strong> (piikkaus 85–95 %) → <strong>Kevennys / testi</strong>. Jakso valitsee tavoitteen automaattisesti ja säätää Prilepin-volyymia viikoittain (alaraja → optimi → yläraja → kevennys).</p>
+          <div class="setup-grid" style="margin-top:6px;">
+            <div class="row"><label class="small" for="cycStart">Aloitusviikko</label><input type="date" id="cycStart" value="${mondayOf(todayISO())}"></div>
+            ${blocks.map((b, i) => `<div class="row"><label class="small">${CYCLE_PHASES[b.phase].label}</label>
+              <div class="stepper"><input type="number" min="0" max="8" step="1" data-cyc-weeks="${i}" data-cyc-phase="${b.phase}" value="${b.weeks}"> <span style="font-size:12px; color:var(--muted);">vk</span></div></div>`).join('')}
+            <button type="button" class="primary" id="cycStartBtn">▶ Aloita jakso</button>
+          </div>`;
+        el.querySelector('#cycStartBtn').addEventListener('click', () => {
+          const bl = [...el.querySelectorAll('[data-cyc-weeks]')].map((inp) => ({ phase: inp.getAttribute('data-cyc-phase'), weeks: Math.max(0, parseInt(inp.value, 10) || 0) })).filter((b) => b.weeks > 0);
+          if (!bl.length) return;
+          startCycle(el.querySelector('#cycStart').value || todayISO(), bl);
+        });
+        return;
+      }
+      const st = getCycleState(dateStr);
+      const lifts = exercisesWithData().filter((e) => getLiftCfg(e));
+      const mon = mondayOf(dateStr);
+      const volRows = lifts.map((ex) => {
+        const a = weeklyVolume(ex, mon), b = weeklyVolume(ex, addDaysIso(mon, -7));
+        const ongoing = mondayOf(todayISO()) === mon;
+        const chg = (b.reps && !ongoing) ? Math.round((a.reps / b.reps - 1) * 100) : null;
+        return `<tr><td>${ex}</td><td>${a.reps} <span style="color:var(--muted)">(${a.sets})</span></td><td>${b.reps}</td><td class="${chg === null ? '' : chg > 30 ? 'amber' : ''}">${chg === null ? (ongoing ? 'kesken' : '--') : (chg > 0 ? '+' : '') + chg + ' %'}</td><td>${Math.round(a.tonnage)}</td></tr>`;
+      }).join('');
+      const sugg = cycleSuggestions(dateStr);
+      let wavePlan = '';
+      if (st && !st.finished && !st.notStarted) {
+        const g = VBT_GOALS[st.phase.goal];
+        const mid = (g.pctRange[0] + g.pctRange[1]) / 2;
+        const row = prilepinRow(mid);
+        wavePlan = `<div class="vbt-kpi-grid">
+          <div class="vbt-kpi"><span class="vbt-kpi-l">Jakso</span><span class="vbt-kpi-v" style="font-size:13px; color:${st.phase.color}; white-space:normal; word-break:break-word;">${st.phase.label}</span><span class="vbt-kpi-s">vk ${st.weekInBlock}/${st.weeks}</span></div>
+          <div class="vbt-kpi"><span class="vbt-kpi-l">Viikkoaalto</span><span class="vbt-kpi-v" style="font-size:15px;">${WAVE_LABELS[st.wave]}</span><span class="vbt-kpi-s">${st.inserted ? 'lisätty kevennys' : 'kokonaisvk ' + (st.weekIdx + 1) + '/' + st.totalWeeks}</span></div>
+          <div class="vbt-kpi"><span class="vbt-kpi-l">Tavoite</span><span class="vbt-kpi-v" style="font-size:15px;">${g.pctRange[0]}–${g.pctRange[1]} %</span><span class="vbt-kpi-s">${g.short}</span></div>
+          <div class="vbt-kpi"><span class="vbt-kpi-l">Volyymi / liike</span><span class="vbt-kpi-v" style="font-size:15px;">${waveVolume(row, st.wave)}</span><span class="vbt-kpi-s">toistoa/treeni (Prilepin ${row.label})</span></div>
+        </div>
+        ${(st.wave === 'deload' || st.wave === 'taper') ? '<p class="vbt-verdict">Kevennysviikko: volyymi ~60 % Prilepinin alarajasta, intensiteetti ennallaan, VL-raja −5 %-yks.</p>' : ''}
+        ${st.wave === 'test' ? '<p class="vbt-verdict">Testiviikko: tee raskas yhden toiston nosto (~95–100 %) jokaisessa pääliikkeessä ja kirjaa sen nopeus Analyysi → VBT-asetukset → Oma MVT. Tarkista samalla kuorma–nopeusprofiili 3–4 kuormalla.</p>' : ''}`;
+      }
+      el.innerHTML = `
+        <div class="row" style="margin-bottom:4px;"><strong style="font-size:14px;">📅 Jaksosuunnittelija</strong><span style="font-size:11px; color:var(--muted);">alkoi ${fmtDateFi(c.startDate)}</span></div>
+        ${buildCycleTimelineSVG(st)}
+        <div style="font-size:12px; margin:4px 0;">${cycleBadgeText(dateStr)}</div>
+        ${wavePlan}
+        ${sugg.length ? `<div style="margin-top:6px;">${sugg.map((x) => `<div class="vbt-alert ${x.type === 'progress' ? '' : 'amber'}" style="${x.type === 'progress' ? 'background:rgba(34,197,94,0.14); border:1px solid rgba(34,197,94,0.5); color:#86efac;' : ''} font-weight:600; font-size:12px;">${x.text}</div>`).join('')}</div>` : ''}
+        <div style="font-size:12px; font-weight:700; margin:10px 0 4px;">Viikkovolyymi (työsarjat, lämmittely pois)</div>
+        <div style="overflow-x:auto;"><table class="ana-table"><thead><tr><th>Liike</th><th>Tämä vk</th><th>Ed. vk</th><th>Muutos</th><th>kg</th></tr></thead><tbody>${volRows || '<tr><td colspan="5" style="color:var(--muted)">Ei dataa</td></tr>'}</tbody></table></div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;">
+          <button type="button" id="cycNextBtn" style="flex:1; font-size:12px;">⏭ Seuraava jakso nyt</button>
+          <button type="button" id="cycDeloadBtn" style="flex:1; font-size:12px;">🛌 Kevennys tälle viikolle</button>
+          <button type="button" id="cycStopBtn" class="danger" style="flex:1; font-size:12px;">Lopeta jakso</button>
+        </div>`;
+      const nb = el.querySelector('#cycNextBtn'); if (nb) nb.addEventListener('click', advanceToNextBlock);
+      el.querySelector('#cycDeloadBtn').addEventListener('click', insertDeloadThisWeek);
+      el.querySelector('#cycStopBtn').addEventListener('click', stopCycle);
+    }
+    // =================== /JAKSOSUUNNITTELIJA ===================
+
     function onVbtSettingsChanged() {
       _mvtCache = { sig: '', map: {} };
       renderLiveSet();
@@ -3683,9 +4215,8 @@
       const maxVel = Math.max(0.01, ...reps.map((r) => r.meanVelocity));
       return reps.map((r, idx) => {
         const heightPct = Math.max(10, Math.round((r.meanVelocity / maxVel) * 100));
-        const zone = getVbtZoneForVelocity(exerciseName, r.meanVelocity);
-        const zoneClass = zone ? `vbt-${zone.key}` : '';
-        const zoneTitle = zone ? `${zone.label} (${r.meanVelocity.toFixed(2)} m/s)` : `${r.meanVelocity.toFixed(2)} m/s`;
+        const zoneClass = '';
+        const zoneTitle = `${r.meanVelocity.toFixed(2)} m/s`;
         return `
           <div class="vel-col" title="${zoneTitle}">
             <span class="vel-col-val">${r.meanVelocity.toFixed(2)}</span>
@@ -3822,7 +4353,7 @@
             <span style="color:var(--muted); font-size:11px;">${(r.power || 0).toFixed(0)} W</span>
             <span style="color:var(--muted); font-size:11px;">${(r.rangeOfMotionCm || 0).toFixed(0)} cm</span>
             <div>${dropHtml}</div>
-            <div style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${zoneBadge}</div>
+            ${pr && pr.rqi !== null && pr.rqi !== undefined ? `<span style="color:var(--muted); font-size:11px;">RQI ${Math.round(pr.rqi)}</span>` : ''}
           </div>
         `;
       }).join('');
@@ -3830,73 +4361,14 @@
       return `
         <div class="today-set-detail-content" style="display:flex; flex-direction:column; gap:10px; margin-top:8px; padding-top:10px; border-top:1px solid var(--border);">
           
-          <!-- Palkkinäkymä -->
-          <div>
-            <div class="row" style="margin-bottom:4px;">
-              <span style="font-size:12px; font-weight:700; color:var(--text); display:inline-flex; align-items:center; gap:5px;">
-                📊 Toistonopeudet (palkkinäkymä)
-              </span>
-              <span style="font-size:11px; color:var(--muted);">Keskinopeus ${avgVel.toFixed(2)} m/s</span>
-            </div>
-            <div class="vel-chart" style="height:92px;">
-              ${buildVelocityChartHTML(reps, s.exercise)}
-            </div>
-            <div class="vbt-legend" style="display:flex; justify-content:space-between; gap:4px; font-size:11px; color:var(--muted); padding-top:4px; flex-wrap:wrap;">
-              <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:8px; height:8px; border-radius:2px; background:#ef4444; display:inline-block;"></span>Maksimivoima</span>
-              <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:8px; height:8px; border-radius:2px; background:#22c55e; display:inline-block;"></span>Voima-alue</span>
-              <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:8px; height:8px; border-radius:2px; background:#3b82f6; display:inline-block;"></span>Nopeusvoima (voima)</span>
-              <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:8px; height:8px; border-radius:2px; background:#eab308; display:inline-block;"></span>Nopeusvoima (räj.)</span>
-            </div>
-          </div>
-
           <!-- Syvä VBT-laatuanalyysi -->
           ${buildVbtSetBlockHTML(s, s._date)}
-
-          <!-- Analyysi: Voiman osa-alue -->
-          <div class="analysis-card">
-            <div class="row" style="align-items:flex-start; gap:8px;">
-              <div>
-                <span style="font-size:11px; text-transform:uppercase; font-weight:700; color:var(--muted); letter-spacing:0.04em;">Voiman osa-alue -analyysi</span>
-                <div style="margin-top:4px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                  <span class="vbt-zone-badge ${zoneClass}" style="font-size:13px; padding:4px 10px;">${zoneIcon} ${zoneTitle}</span>
-                  ${zoneSub ? `<span style="font-size:12px; color:var(--muted); font-weight:600;">(${zoneSub})</span>` : ''}
-                </div>
-              </div>
-            </div>
-
-            <p style="font-size:12px; line-height:1.45; color:var(--text); margin:8px 0 6px;">
-              ${zoneDesc}
-            </p>
-
-            ${Object.keys(zoneCounts).length > 0 ? `
-              <div style="margin-top:6px; padding-top:6px; border-top:1px dashed rgba(148,163,184,0.25);">
-                <div style="font-size:11px; color:var(--muted); font-weight:600; margin-bottom:4px;">Toistojen jakautuminen alueille:</div>
-                <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                  ${zonePillsHtml}
-                </div>
-              </div>
-            ` : ''}
-
-            ${dropDesc ? `
-              <div style="margin-top:8px; padding-top:6px; border-top:1px dashed rgba(148,163,184,0.25); font-size:12px; line-height:1.4; color:var(--muted);">
-                <strong style="color:var(--text);">Väsymys (VL paras → viimeinen ${dropPct.toFixed(0)} %, raja ${setA.cutoffPct} %):</strong> ${dropDesc}
-              </div>
-            ` : ''}
-          </div>
 
           <!-- Tilastoruudukko -->
           <div class="stat-pill-grid">
             <div class="stat-pill">
               <span class="stat-pill-label">Keskinopeus</span>
               <span class="stat-pill-val">${avgVel.toFixed(2)} m/s</span>
-            </div>
-            <div class="stat-pill">
-              <span class="stat-pill-label">Paras nopeus</span>
-              <span class="stat-pill-val" style="color:#60a5fa;">${bestVel.toFixed(2)} m/s</span>
-            </div>
-            <div class="stat-pill">
-              <span class="stat-pill-label">VL (paras→viim.)</span>
-              <span class="stat-pill-val ${dropColorClass(dropPct)}">${dropPct === null ? '--' : dropPct.toFixed(1) + ' %'}</span>
             </div>
             <div class="stat-pill">
               <span class="stat-pill-label">Huipputeho</span>
@@ -3907,8 +4379,8 @@
               <span class="stat-pill-val">${avgRom.toFixed(0)} cm</span>
             </div>
             <div class="stat-pill">
-              <span class="stat-pill-label">Arvioitu 1RM</span>
-              <span class="stat-pill-val" style="color:#60a5fa;">${est1RM ? est1RM.toFixed(1) + ' kg' : '--'}</span>
+              <span class="stat-pill-label">Tonnimäärä</span>
+              <span class="stat-pill-val">${Math.round((s.weightKg || 0) * count)} kg</span>
             </div>
           </div>
 
@@ -3951,10 +4423,8 @@
         const dropText = (dropPct !== null ? ` • VL ${dropPct.toFixed(0)} %` : '')
           + (qa.n ? ` • ${qa.isWarmup ? 'Lämmittely' : `Laatu <strong class="${qa.gradeClass}">${qa.score}</strong>`}` : '')
           + (qa.rirEnd !== null ? ` • RIR ~${qa.rirEnd}` : '');
-        const est1RM = calcEpley1RM(s.weightKg, count);
-        const rmText = est1RM !== null ? ` • 1RM: <strong style="color:#60a5fa;">${est1RM.toFixed(1)} kg</strong>` : '';
-        const vbtZone = classifyVbtVelocity(s.exercise, avgVel) || getVbtZoneForVelocity(s.exercise, avgVel);
-        const vbtText = vbtZone ? ` • ${vbtZone.icon} <strong>${vbtZone.label}</strong>` : '';
+        const rmText = qa.e1RM ? ` • e1RM <strong style="color:#60a5fa;">${qa.e1RM.toFixed(0)} kg</strong>` : '';
+        const vbtText = (s.free ? ' • 📝 vapaa' : '') + (qa.pct1RM !== null ? ` • ~${Math.round(qa.pct1RM)} % 1RM` : '');
         const isOpen = openTodaySetIndices.has(idx);
 
         return `
@@ -4090,23 +4560,9 @@
       const displaySetNum = getActiveSetDisplayNumber();
       const currentExercise = getCurrentSelectedExerciseName();
 
-      renderVbtZoneBox(currentExercise, last ? last.meanVelocity : null);
-
-      // Update Setup Card Epley 1RM (based on chosen weight & target reps)
-      const setup1RM = calcEpley1RM(weightKg, target);
-      const setup1RMEl = document.getElementById('setupEpley1RM');
-      if (setup1RMEl) {
-        setup1RMEl.textContent = setup1RM !== null
-          ? `${setup1RM.toFixed(1)} kg (${weightKg} kg × ${target})`
-          : '-- kg';
-      }
-
-      // Update Live Set Epley 1RM (based on completed reps in the set, or -- kg before first rep)
-      const live1RMEl = document.getElementById('liveEpley1RM');
-      if (live1RMEl) {
-        const live1RM = calcEpley1RM(weightKg, count);
-        live1RMEl.textContent = live1RM !== null ? `${live1RM.toFixed(1)} kg` : '-- kg';
-      }
+      document.body.classList.toggle('free-mode', isFreeMode());
+      document.getElementById('modeGuidedBtn').classList.toggle('active', !isFreeMode());
+      document.getElementById('modeFreeBtn').classList.toggle('active', isFreeMode());
 
       const badge = document.getElementById('setNumberBadge');
       const nextNum = getCompletedSetsForCurrentDate().length + 1;
@@ -4180,7 +4636,7 @@
         chartEl.innerHTML = buildVelocityChartHTML(currentReps, currentExercise);
       }
 
-      document.getElementById('repProgressLabel').textContent = `Toistot: ${count} / ${target}`;
+      document.getElementById('repProgressLabel').textContent = isFreeMode() ? `Toistot: ${count}` : `Toistot: ${count} / ${target}`;
       const fill = document.getElementById('repProgressFill');
       const pct = Math.min(100, (count / Math.max(1, target)) * 100);
       fill.style.width = `${pct}%`;
@@ -4199,7 +4655,7 @@
         const pr = liveA ? liveA.perRep[idx] : null;
         const widthPct = Math.max(6, Math.round((r.meanVelocity / maxVel) * 100));
         const qDot = pr ? `<span class="q-dot" style="border-color:${Q_COLORS[pr.quality]}"></span>` : '';
-        const vsFirstHtml = (pr && pr.suspect)
+        const vsFirstHtml = isFreeMode() ? '' : (pr && pr.suspect)
           ? `<span style="color:#64748b; font-size:12px;">epäilyttävä</span>`
           : (!pr || pr.vl === null || idx === liveA.vBestIdx)
             ? `<span style="color:var(--muted); font-size:12px;">paras</span>`
@@ -4210,13 +4666,12 @@
         const repVbtHtml = repVbt
           ? `<span style="font-size:11px; color:var(--muted); font-weight:600;">${repVbt.icon || ''} ${repVbt.label}</span>`
           : '';
-        const repZoneClass = repVbt ? `vbt-${repVbt.key}` : '';
+        const repZoneClass = '';
 
         div.innerHTML = `
           <div class="rep-item-top" style="flex-wrap: wrap;">
             <span class="rep-num">${qDot}#${idx + 1}</span>
             <span><strong>${r.meanVelocity.toFixed(2)} m/s</strong> (${r.power.toFixed(1)} W)</span>
-            ${repVbtHtml}
             ${vsFirstHtml}
             ${lowHtml}
             <span style="color:var(--muted)">${r.rangeOfMotionCm.toFixed(0)} cm</span>
@@ -4240,6 +4695,7 @@
       });
 
       renderSetupVbtForecast();
+      renderDailyPlanCard();
       renderTodaySetsOnLiftTab();
       updateSetButton();
     }
@@ -4414,10 +4870,7 @@
           const rmHtml = est1RM
             ? ` • e1RM${ha.e1RM ? ' (VBT)' : ' (Epley)'}: <strong style="color:#60a5fa;">${est1RM.toFixed(1)} kg</strong>`
             : '';
-          const vbtZone = classifyVbtVelocity(s.exercise, avgVel);
-          const vbtHtml = vbtZone
-            ? ` • ${vbtZone.icon} <strong>${vbtZone.label}</strong>`
-            : '';
+          const vbtHtml = (s.free ? ' • 📝 vapaa' : '') + (ha.pct1RM !== null ? ` • ~${Math.round(ha.pct1RM)} % 1RM` : '');
           const chartHtml = s.reps.length > 0
             ? `<div class="vel-chart" style="height:88px; margin-top:8px;">${buildVelocityChartHTML(s.reps, s.exercise)}</div>`
             : '';
@@ -4760,6 +5213,22 @@
     document.getElementById('navAnalysisBtn').addEventListener('click', () => showTab('analysis'));
     document.getElementById('anaExerciseSelect').addEventListener('change', (e) => { anaExercise = e.target.value; anaDate = null; renderAnalysisTab(); });
     document.getElementById('anaDateSelect').addEventListener('change', (e) => { anaDate = e.target.value; renderAnalysisTab(); });
+    document.getElementById('dailyPlanCard').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-plan-apply]');
+      if (!b) return;
+      const [l, r] = b.getAttribute('data-plan-apply').split('|');
+      applyPlanToSetup(parseFloat(l), parseInt(r, 10));
+    });
+    function setTrainingMode(mode) {
+      if (setActive && mode !== vbtSettings.mode) {
+        // keep the running set but apply the new mode from now on
+      }
+      vbtSettings.mode = mode;
+      saveVbtSettings();
+      renderLiveSet();
+    }
+    document.getElementById('modeGuidedBtn').addEventListener('click', () => setTrainingMode('guided'));
+    document.getElementById('modeFreeBtn').addEventListener('click', () => setTrainingMode('free'));
     document.getElementById('goalSelect').value = vbtSettings.goal;
     document.getElementById('goalSelect').addEventListener('change', (e) => {
       vbtSettings.goal = e.target.value;

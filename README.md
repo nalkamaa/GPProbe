@@ -57,3 +57,35 @@ Anturimalli (validoitu btsnoop-kaappauksista, fuusio toistaa firmwaren pystykiih
 ## Käänteismallinnettu BLE-protokolla
 
 Täydellinen protokollakuvaus löytyy tiedostosta [`tools/PROTOCOL.md`](tools/PROTOCOL.md).
+
+
+### Päivän suositus (Prilepin + VBT)
+
+Kun päivän aikana on tehty **viitesarja ~65–82 % 1RM** (nousevan lämmittelyn raskain sarja ennen työsarjoja, maksimaalisella tahdolla), sovellus laskee:
+
+1. **Päivän e1RM**: viitesarjan V_best ja oma kuorma–nopeuskulma aiemmista treeneistä (tai väestötaulukko), + päivän profiili jos ≥ 3 kuormaa (R² ≥ 0,9).
+2. **Valmius**: päivän e1RM vs. 3 viimeisimmän treenin mediaani (42 pv). ≤ −5 % ⇒ intensiteetti −2,5 %-yks. ja volyymi Prilepinin alarajalle.
+3. **Kuorma**: progressio edellisestä treenistä (onnistunut = työsarjat VL-rajan sisällä ja RQI ≥ 65 ⇒ +5 kg kyykky/mave, +2,5 kg penkki; liian väsyneet ⇒ −1 askel), rajattuna päivän tavoitealueeseen (esim. 80–90 % päivän e1RM:stä).
+4. **Volyymi**: Prilepinin taulukko (70–80 %: 3–6 / 18; 80–90 %: 2–4 / 15; 90+ %: 1–2 / 7).
+5. **Toistot/sarja** = min(Prilepin, ennuste VL-rajaan, RIR ≥ 2). Nopeuskustannus/toisto = (V₀ − MVT) / maksimitoistot (Epley-käänteis), keskiarvoistettuna omien sarjojen kanssa.
+6. **Sarjojen välinen säätö**: jos työsarjan V_best on > 0,06 m/s alle ennusteen ⇒ −5 %; yli ennusteen ⇒ +1 askel.
+
+Työsarjat eivät muuta päivän e1RM:ää, joten suositus pysyy vakaana harjoituksen ajan. "Käytä"-painike täyttää kuorman ja toistot.
+
+### Jaksosuunnittelija (Analyysi-välilehti)
+
+Blokkiperiodisaatio: **Kerääminen** (perusvoima 70–80 %) → **Muuntaminen** (maksimivoima 80–90 %) → **Realisointi** (piikkaus 85–95 %) → **Kevennys / testi**. Oletuspituudet 4 + 4 + 2 + 1 viikkoa, muokattavissa.
+
+- Jakso valitsee tavoitteen automaattisesti (tavoitevalikko lukittuu) ja tallentaa jokaiseen sarjaan jakson, viikon ja aallon.
+- Viikkoaalto: alaraja → optimi → yläraja → kevennys (Prilepinin vaihteluväli). Kevennysviikolla volyymi ~60 % alarajasta ja VL-raja −5 %-yks.
+- Viikkovolyymi liikkeittäin (työsarjat, lämmittely pois) vs. edellinen viikko.
+- Ehdotukset datasta: e1RM tasaantunut ≥ 2 vk → seuraava jakso; valmius ≤ −5 % kahdesti → kevennys etuajassa; viikkovolyymin hyppy > 30 %.
+- Painikkeet: *Seuraava jakso nyt*, *Kevennys tälle viikolle* (siirtää loppua viikolla), *Lopeta jakso*.
+
+### Vapaa treeni
+
+Treeni-välilehden yläosan valinnalla. Pin kirjaa toistot normaalisti, mutta tavoitetoistoja, automaattista lopetusta, VL-hälytyksiä ja päivän suositusta ei käytetä. Sarja tallennetaan merkinnällä *vapaa*, ja se on analysoitavissa jälkikäteen kuten muutkin.
+
+### Poistetut näkymät (korvattu uusilla)
+
+Epley-1RM asetuksissa, liikkeen voiman osa-alue -laatikko ja -merkinnät, live-palkkikaavion väriselite, "1. → viimeinen" -pudotusbanneri sekä tallennetun sarjan palkkikaavio ja osa-alueanalyysi. Tilalla: päivän VBT-e1RM ja %1RM, toistokäyrä VL-raja- ja MVT-viivoineen, RQI ja raakadata-analyysi.
