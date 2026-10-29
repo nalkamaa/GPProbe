@@ -344,26 +344,28 @@ struct LiveSetView: View {
                 }
                 .listStyle(.plain)
 
-                // Action buttons
+                // Set action buttons: Aloita sarja & Lopeta sarja
                 HStack(spacing: 12) {
-                    if pin.state == .ready || pin.state == .zeroing {
-                        Button("⏹ Lopeta sarja #\(completedSetsToday + 1)") {
-                            stopAndSaveCurrentSet()
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(.red)
-                    } else {
-                        Button("▶ Aloita sarja #\(completedSetsToday + 1)") {
-                            beginNewSet()
-                        }
-                        .buttonStyle(.borderedProminent)
+                    Button("▶ Aloita sarja #\(completedSetsToday + 1)") {
+                        beginNewSet()
                     }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(pin.state == .ready || pin.state == .zeroing)
 
-                    Button("🏁 Lopeta treeni", action: finishSet)
-                        .buttonStyle(.borderedProminent)
-                        .tint(.green)
-                        .disabled(reps.isEmpty && completedSetsToday == 0)
+                    Button("⏹ Lopeta sarja") {
+                        stopAndSaveCurrentSet()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                    .disabled(pin.state != .ready && pin.state != .zeroing)
                 }
+
+                // Bottom button: Lopeta treeni
+                Button("🏁 Lopeta treeni", action: finishSet)
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
+                    .frame(maxWidth: .infinity)
+                    .disabled(reps.isEmpty && completedSetsToday == 0)
             }
             .padding()
             .navigationTitle("Gpath Lite")
@@ -381,8 +383,9 @@ struct LiveSetView: View {
                     switch event {
                     case .concentricCompleted(let rep):
                         reps.append(rep)
-                        if reps.count == targetReps {
+                        if reps.count >= targetReps {
                             SoundFeedback.playTargetReached(enabled: soundEnabled)
+                            stopAndSaveCurrentSet()
                         } else {
                             SoundFeedback.playRep(enabled: soundEnabled)
                         }

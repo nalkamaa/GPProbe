@@ -382,11 +382,16 @@
     }
     .action-bar {
       display: grid;
-      grid-template-columns: 1fr 1.4fr;
+      grid-template-columns: 1fr 1fr;
       gap: 10px;
     }
     .action-bar button {
-      padding: 13px;
+      padding: 13px 10px;
+      font-size: 16px;
+    }
+    .finish-workout-btn {
+      width: 100%;
+      padding: 14px;
       font-size: 16px;
     }
     /* Bottom navigation */
@@ -602,8 +607,8 @@
     </div>
 
     <div class="action-bar">
-      <button type="button" id="startSetBtn" class="primary" disabled>▶ Aloita sarja #1</button>
-      <button type="button" id="saveSetBtn" class="success">🏁 Lopeta treeni</button>
+      <button type="button" id="startSetBtn" class="primary" disabled>▶ Aloita sarja</button>
+      <button type="button" id="stopSetBtn" class="danger" disabled>⏹ Lopeta sarja</button>
     </div>
 
     <div class="card progress-wrap">
@@ -627,6 +632,8 @@
       </div>
       <div id="todaySetsList"></div>
     </div>
+
+    <button type="button" id="finishWorkoutBtn" class="success finish-workout-btn">🏁 Lopeta treeni</button>
   </main>
 
   <!-- TAB 2: CALENDAR & CSV -->
@@ -1163,23 +1170,26 @@
     }
 
     function updateSetButton() {
-      const btn = document.getElementById('startSetBtn');
-      const finishBtn = document.getElementById('saveSetBtn');
+      const startBtn = document.getElementById('startSetBtn');
+      const stopBtn = document.getElementById('stopSetBtn');
+      const finishBtn = document.getElementById('finishWorkoutBtn');
       const completedCount = getCompletedSetsForCurrentDate().length;
       const nextSetNum = completedCount + 1;
 
-      btn.disabled = !dataChar;
-      if (zeroing) {
-        btn.textContent = autoStartAfterZero
-          ? `⏳ Kalibroidaan (${zeroCountdownSec} s)...`
-          : `▶ Aloita sarja #${nextSetNum} (${zeroCountdownSec} s)`;
-        btn.className = 'primary';
-      } else if (setActive) {
-        btn.textContent = `⏹ Lopeta sarja #${nextSetNum}`;
-        btn.className = 'danger';
-      } else {
-        btn.textContent = `▶ Aloita sarja #${nextSetNum}`;
-        btn.className = 'primary';
+      if (startBtn) {
+        startBtn.disabled = !dataChar || setActive || (zeroing && autoStartAfterZero);
+        if (zeroing) {
+          startBtn.textContent = autoStartAfterZero
+            ? `⏳ Kalibroidaan (${zeroCountdownSec} s)...`
+            : `▶ Aloita sarja #${nextSetNum}`;
+        } else {
+          startBtn.textContent = `▶ Aloita sarja #${nextSetNum}`;
+        }
+      }
+
+      if (stopBtn) {
+        stopBtn.disabled = !setActive && !(zeroing && autoStartAfterZero);
+        stopBtn.textContent = '⏹ Lopeta sarja';
       }
 
       if (finishBtn) {
@@ -1409,9 +1419,9 @@
         return;
       }
 
-      // Allow final rep's eccentric lowering packet (0x06) within 1.5s of stopping the set
+      // Allow final rep's eccentric lowering packet (0x06) within 4s of stopping the set (auto or manual)
       if (!setActive) {
-        if (type === 0x06 && currentReps.length > 0 && (Date.now() - lastSetStoppedAt) < 1500) {
+        if (type === 0x06 && currentReps.length > 0 && (Date.now() - lastSetStoppedAt) < 4000) {
           const eccVel = val / 1000.0;
           const last = currentReps[currentReps.length - 1];
           if (last.loweringVelocity === null) {
@@ -1454,13 +1464,15 @@
         });
 
         const targetReps = parseInt(document.getElementById('targetRepsInput').value, 10) || 10;
-        if (currentReps.length === targetReps) {
+        if (currentReps.length >= targetReps) {
+          // Target reps reached: play fanfare and automatically complete & save this set!
           soundTargetReached();
+          stopSetOnPin(true);
         } else {
           soundRep();
+          renderLiveSet();
+          updateSetButton();
         }
-        renderLiveSet();
-        updateSetButton();
       } else if (type === 0x06) {
         const eccVel = val / 1000.0;
         if (currentReps.length > 0) {
@@ -1981,8 +1993,9 @@
     renderHistoryList();
 
     document.getElementById('connectBtn').addEventListener('click', connectPin);
-    document.getElementById('startSetBtn').addEventListener('click', toggleSetOnPin);
-    document.getElementById('saveSetBtn').addEventListener('click', finishWorkout);
+    document.getElementById('startSetBtn').addEventListener('click', startSetOnPin);
+    document.getElementById('stopSetBtn').addEventListener('click', () => stopSetOnPin(true));
+    document.getElementById('finishWorkoutBtn').addEventListener('click', finishWorkout);
     document.getElementById('reloadAppBtn').addEventListener('click', () => {
       location.replace(location.pathname + '?v=' + Date.now());
     });
