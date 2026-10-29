@@ -198,9 +198,42 @@
       border-color: var(--green);
       color: #86efac;
     }
+    .readiness-banner {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 800;
+      text-align: center;
+      margin-bottom: 10px;
+      border: 2px solid var(--border);
+      background: var(--bg);
+      color: var(--muted);
+      transition: all 0.2s ease;
+    }
+    .readiness-banner.calibrating {
+      background: rgba(245, 158, 11, 0.18);
+      border-color: var(--amber);
+      color: #fde68a;
+    }
+    .readiness-banner.ready-to-start {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: var(--accent);
+      color: #bfdbfe;
+    }
+    .readiness-banner.active-set {
+      background: rgba(34, 197, 94, 0.25);
+      border-color: var(--green);
+      color: #bbf7d0;
+      box-shadow: 0 0 14px rgba(34, 197, 94, 0.35);
+    }
+    .card.hero.active-glow {
+      border-color: var(--green);
+      box-shadow: 0 0 16px rgba(34, 197, 94, 0.22);
+    }
     .hero {
       text-align: center;
-      padding: 16px 12px;
+      padding: 14px 12px;
     }
     .hero-vel {
       font-size: 56px;
@@ -537,7 +570,10 @@
       </div>
     </div>
 
-    <div class="card hero">
+    <div id="heroCard" class="card hero">
+      <div id="readinessBanner" class="readiness-banner">
+        ⚪ Yhdistä Pin yläkulmasta aloittaaksesi
+      </div>
       <div class="row" style="justify-content: center; margin-bottom: 6px;">
         <span id="setNumberBadge" class="set-badge">Sarja #1</span>
       </div>
@@ -590,7 +626,6 @@
         <span id="todaySetsCount" style="font-size: 12px; color: var(--muted);"></span>
       </div>
       <div id="todaySetsList"></div>
-      <button type="button" id="finishWorkoutBottomBtn" class="success" style="width: 100%; margin-top: 10px; padding: 12px; font-size: 15px;">🏁 Lopeta treeni &amp; katso yhteenveto</button>
     </div>
   </main>
 
@@ -987,10 +1022,18 @@
       return writeChain;
     }
 
+    let zeroInterval = null;
+    let zeroCountdownSec = 0;
+    let autoStartAfterZero = false;
+
     function clearZeroTimer() {
       if (zeroTimer) {
         clearTimeout(zeroTimer);
         zeroTimer = null;
+      }
+      if (zeroInterval) {
+        clearInterval(zeroInterval);
+        zeroInterval = null;
       }
     }
 
@@ -1003,32 +1046,39 @@
 
     function getActiveSetDisplayNumber() {
       const completedCount = getCompletedSetsForCurrentDate().length;
-      // If currentReps has already been saved into workouts (while resting after Lopeta sarja),
-      // the displayed set is that just-saved set (#completedCount). Otherwise it is the next set (#completedCount + 1).
       if (currentSetSaved && currentReps.length > 0) {
         return Math.max(1, completedCount);
       }
       return completedCount + 1;
     }
 
-    function activateSet(expectedToken) {
+    function finishCalibrationAndActivate(expectedToken) {
       if (expectedToken !== undefined && expectedToken !== activeSetToken) return;
       clearZeroTimer();
-      // Only transition to active if we are actually zeroing a newly started set!
       if (!zeroing) return;
       pinStarted = true;
       zeroing = false;
-      setActive = true;
-      const setNum = getActiveSetDisplayNumber();
+
+      if (autoStartAfterZero) {
+        autoStartAfterZero = false;
+        setActive = true;
+        const setNum = getActiveSetDisplayNumber();
+        setStatus(`🟢 Sarja #${setNum} käynnissä – tee toistoja!`, 'ready');
+        soundReady();
+      } else {
+        const nextNum = getCompletedSetsForCurrentDate().length + 1;
+        setStatus(`✅ Pin valmis – paina Aloita sarja #${nextNum}`, 'ready');
+        soundReady();
+      }
+      renderLiveSet();
       updateSetButton();
-      setStatus(`Sarja #${setNum} käynnissä – tee toistoja`, 'ready');
-      soundReady();
     }
 
     async function disconnectPin() {
       manualDisconnect = true;
       activeSetToken++;
       clearZeroTimer();
+      autoStartAfterZero = false;
       setActive = false;
       zeroing = false;
       pinStarted = false;
@@ -1045,6 +1095,7 @@
         }
       } catch {}
       dataChar = null;
+      renderLiveSet();
       updateSetButton();
       document.getElementById('connectBtn').textContent = 'Yhdistä Pin';
       setStatus('Ei yhdistetty', '');
@@ -1119,8 +1170,10 @@
 
       btn.disabled = !dataChar;
       if (zeroing) {
-        btn.textContent = '⏳ Nollataan...';
-        btn.className = '';
+        btn.textContent = autoStartAfterZero
+          ? `⏳ Kalibroidaan (${zeroCountdownSec} s)...`
+          : `▶ Aloita sarja #${nextSetNum} (${zeroCountdownSec} s)`;
+        btn.className = 'primary';
       } else if (setActive) {
         btn.textContent = `⏹ Lopeta sarja #${nextSetNum}`;
         btn.className = 'danger';
@@ -1135,6 +1188,27 @@
       }
     }
 
+    function beginZeroCountdown(token, autoStart) {
+      clearZeroTimer();
+      zeroing = true;
+      autoStartAfterZero = Boolean(autoStart);
+      zeroCountdownSec = 3;
+      renderLiveSet();
+      updateSetButton();
+
+      zeroInterval = setInterval(() => {
+        if (!zeroing || token !== activeSetToken) {
+          clearZeroTimer();
+          return;
+        }
+        zeroCountdownSec = Math.max(1, zeroCountdownSec - 1);
+        renderLiveSet();
+        updateSetButton();
+      }, 1000);
+
+      zeroTimer = setTimeout(() => finishCalibrationAndActivate(token), 3000);
+    }
+
     async function openGattSession() {
       if (!bleDevice) return;
       setStatus('Yhdistetään...', 'busy');
@@ -1142,23 +1216,24 @@
       const service = await server.getPrimaryService(SERVICE_UUID);
       dataChar = await service.getCharacteristic(CHAR_UUID);
 
-      // Mandatory 0x06 handshake before and after enabling notifications
+      // Mandatory 0x06 handshake before and after enabling notifications + calibrate (0x03) on connect
       await writeByte(CMD_HELLO);
       await dataChar.startNotifications();
       dataChar.removeEventListener('characteristicvaluechanged', onNotification);
       dataChar.addEventListener('characteristicvaluechanged', onNotification);
-      await sleep(60);
+      await sleep(50);
       await writeByte(CMD_HELLO);
-      await sleep(60);
+      await sleep(50);
       await writeByte(CMD_BATTERY);
 
       pinStarted = false;
       setActive = false;
-      zeroing = false;
-      activeSetToken++;
+      const token = ++activeSetToken;
       document.getElementById('connectBtn').textContent = 'Katkaise';
-      setStatus('Yhdistetty – paina Aloita sarja', '');
-      updateSetButton();
+      setStatus('Kalibroidaan Pin (3 s) – pidä paikallaan...', 'busy');
+      beginZeroCountdown(token, false);
+      await sleep(50);
+      await writeByte(CMD_START);
     }
 
     function commitCurrentSetToWorkouts() {
@@ -1196,7 +1271,6 @@
     async function startSetOnPin() {
       if (!dataChar) return;
       ensureAudio();
-      clearZeroTimer();
 
       // If previous set had reps, ensure it is saved before starting the new set, then clear currentReps!
       if (currentReps.length > 0) {
@@ -1209,23 +1283,35 @@
       }
 
       pendingRep = { propVel: null, propAcc: null, romCm: null };
-      const token = ++activeSetToken;
-      zeroing = true;
-      setActive = false;
-      renderLiveSet();
-      updateSetButton();
+
+      // If initial 3s calibration on connect is still running, queue auto-start as soon as it finishes
+      if (zeroing) {
+        autoStartAfterZero = true;
+        renderLiveSet();
+        updateSetButton();
+        return;
+      }
 
       if (!pinStarted) {
-        setStatus('Pidä Pin paikallaan (3 s)...', 'busy');
-        zeroTimer = setTimeout(() => activateSet(token), 3200);
+        const token = ++activeSetToken;
+        setActive = false;
+        setStatus('Kalibroidaan Pin (3 s) – pidä paikallaan...', 'busy');
+        beginZeroCountdown(token, true);
         await writeByte(CMD_HELLO);
         await sleep(50);
         await writeByte(CMD_BATTERY);
         await sleep(50);
         await writeByte(CMD_START);
       } else {
-        // Pin is already running its IMU session in 0x03 mode; activate new set immediately
-        activateSet(token);
+        // Pin is already calibrated and running in 0x03 mode -> start set IMMEDIATELY with zero delay!
+        clearZeroTimer();
+        zeroing = false;
+        setActive = true;
+        const setNum = getActiveSetDisplayNumber();
+        setStatus(`🟢 Sarja #${setNum} käynnissä – tee toistoja!`, 'ready');
+        soundReady();
+        renderLiveSet();
+        updateSetButton();
         writeByte(CMD_HELLO);
       }
     }
@@ -1233,6 +1319,7 @@
     async function stopSetOnPin(autoSave = true) {
       activeSetToken++;
       clearZeroTimer();
+      autoStartAfterZero = false;
       setActive = false;
       zeroing = false;
       lastSetStoppedAt = Date.now();
@@ -1248,16 +1335,16 @@
       if (dataChar) {
         const nextNum = getCompletedSetsForCurrentDate().length + 1;
         if (currentSetSaved && currentReps.length > 0) {
-          setStatus(`Sarja tallennettu – valmis sarjaan #${nextNum}`, '');
+          setStatus(`✓ Sarja tallennettu – valmis sarjaan #${nextNum}`, 'ready');
         } else {
-          setStatus(`Sarja pysäytetty – valmis sarjaan #${nextNum}`, '');
+          setStatus(`✅ Valmis – paina Aloita sarja #${nextNum}`, 'ready');
         }
       }
     }
 
     async function toggleSetOnPin() {
       if (!dataChar) return;
-      if (setActive || zeroing) {
+      if (setActive || (zeroing && autoStartAfterZero)) {
         await stopSetOnPin(true);
       } else {
         await startSetOnPin();
@@ -1267,10 +1354,12 @@
     function onDisconnected() {
       activeSetToken++;
       clearZeroTimer();
+      autoStartAfterZero = false;
       dataChar = null;
       pinStarted = false;
       setActive = false;
       zeroing = false;
+      renderLiveSet();
       updateSetButton();
       document.getElementById('connectBtn').textContent = 'Yhdistä Pin';
       if (manualDisconnect) {
@@ -1307,7 +1396,7 @@
 
       if (dv.byteLength === 1 && type >= 0x81 && type <= 0x86) {
         if (type === 0x83 && zeroing) {
-          activateSet(activeSetToken);
+          finishCalibrationAndActivate(activeSetToken);
         }
         return;
       }
@@ -1503,13 +1592,39 @@
       }
 
       const badge = document.getElementById('setNumberBadge');
+      const nextNum = getCompletedSetsForCurrentDate().length + 1;
       if (currentSetSaved && count > 0) {
-        const nextNum = getCompletedSetsForCurrentDate().length + 1;
         badge.textContent = `✓ Sarja #${displaySetNum} tallennettu (Seuraava: #${nextNum})`;
         badge.className = 'set-badge saved';
       } else {
         badge.textContent = setActive ? `● Sarja #${displaySetNum} käynnissä` : `Sarja #${displaySetNum}`;
         badge.className = 'set-badge';
+      }
+
+      const readinessEl = document.getElementById('readinessBanner');
+      const heroCardEl = document.getElementById('heroCard');
+      if (readinessEl && heroCardEl) {
+        if (!dataChar) {
+          readinessEl.className = 'readiness-banner';
+          readinessEl.textContent = '⚪ Yhdistä Pin yläkulmasta aloittaaksesi';
+          heroCardEl.className = 'card hero';
+        } else if (zeroing) {
+          readinessEl.className = 'readiness-banner calibrating';
+          readinessEl.textContent = `⏳ Kalibroidaan anturia (${zeroCountdownSec} s) – pidä painopakka paikallaan...`;
+          heroCardEl.className = 'card hero';
+        } else if (setActive) {
+          readinessEl.className = 'readiness-banner active-set';
+          readinessEl.textContent = `🟢 SARJA #${displaySetNum} KÄYNNISSÄ – TEE TOISTOJA NYT!`;
+          heroCardEl.className = 'card hero active-glow';
+        } else if (currentSetSaved && count > 0) {
+          readinessEl.className = 'readiness-banner ready-to-start';
+          readinessEl.textContent = `✅ Sarja #${displaySetNum} valmis! Paina "▶ Aloita sarja #${nextNum}" kun aloitat seuraavan`;
+          heroCardEl.className = 'card hero';
+        } else {
+          readinessEl.className = 'readiness-banner ready-to-start';
+          readinessEl.textContent = `✅ PIN VALMIS – Paina "▶ Aloita sarja #${nextNum}" ja aloita nostaminen!`;
+          heroCardEl.className = 'card hero';
+        }
       }
 
       document.getElementById('liveVel').textContent = last ? `${last.meanVelocity.toFixed(2)} m/s` : '-- m/s';
@@ -1868,7 +1983,6 @@
     document.getElementById('connectBtn').addEventListener('click', connectPin);
     document.getElementById('startSetBtn').addEventListener('click', toggleSetOnPin);
     document.getElementById('saveSetBtn').addEventListener('click', finishWorkout);
-    document.getElementById('finishWorkoutBottomBtn').addEventListener('click', finishWorkout);
     document.getElementById('reloadAppBtn').addEventListener('click', () => {
       location.replace(location.pathname + '?v=' + Date.now());
     });
