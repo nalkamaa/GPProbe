@@ -108,17 +108,27 @@ enum SoundFeedback {
     }
 }
 
-// MARK: - Transferable CSV Document for ShareLink
+// MARK: - CSV File Document for fileExporter (save to local Files only)
 
-struct CSVDocument: Transferable {
-    let text: String
-    let filename: String
+struct CSVDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.commaSeparatedText] }
 
-    static var transferRepresentation: some TransferRepresentation {
-        DataRepresentation(exportedContentType: .commaSeparatedText) { doc in
-            Data(doc.text.utf8)
-        }
-        .suggestedFileName { $0.filename }
+    var text: String
+    var filename: String
+
+    init(text: String, filename: String) {
+        self.text = text
+        self.filename = filename
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        let data = configuration.file.regularFileContents ?? Data()
+        self.text = String(decoding: data, as: UTF8.self)
+        self.filename = configuration.file.filename ?? "gpath.csv"
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: Data(text.utf8))
     }
 }
 
@@ -582,6 +592,8 @@ struct HistoryView: View {
     @Query(sort: \Workout.date, order: .reverse) private var workouts: [Workout]
     @State private var selectedDate: Date = .now
     @State private var filterByDate: Bool = true
+    @State private var showExporter = false
+    @State private var exportDocument: CSVDocument?
 
     private var filteredWorkouts: [Workout] {
         guard filterByDate else { return workouts }
@@ -664,14 +676,22 @@ struct HistoryView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    ShareLink(
-                        item: csvDocumentForSelection,
-                        preview: SharePreview(csvDocumentForSelection.filename)
-                    ) {
-                        Label("Vie CSV", systemImage: "square.and.arrow.up")
+                    Button {
+                        exportDocument = csvDocumentForSelection
+                        showExporter = true
+                    } label: {
+                        Label("Vie CSV", systemImage: "square.and.arrow.down")
                     }
                     .disabled(workouts.isEmpty)
                 }
+            }
+            .fileExporter(
+                isPresented: $showExporter,
+                document: exportDocument,
+                contentType: .commaSeparatedText,
+                defaultFilename: exportDocument?.filename ?? "gpath.csv"
+            ) { _ in
+                exportDocument = nil
             }
         }
     }

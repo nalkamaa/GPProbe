@@ -2832,14 +2832,25 @@
         : 'gpath_workouts.csv';
 
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const file = new File([blob], filename, { type: 'text/csv' });
 
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      // Save to local disk only (no share sheet / social apps).
+      // Prefer the native "Save as" dialog where supported (Chromium desktop).
+      if (window.showSaveFilePicker) {
         try {
-          await navigator.share({ files: [file], title: filename });
+          const handle = await window.showSaveFilePicker({
+            suggestedName: filename,
+            types: [{ description: 'CSV', accept: { 'text/csv': ['.csv'] } }],
+          });
+          const writable = await handle.createWritable();
+          await writable.write(blob);
+          await writable.close();
           return;
-        } catch {}
+        } catch (err) {
+          if (err && err.name === 'AbortError') return; // user cancelled
+          // otherwise fall through to plain download
+        }
       }
+      // Fallback: regular file download to the device's Downloads folder.
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -2847,7 +2858,7 @@
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
     // --- Event Listeners ---
