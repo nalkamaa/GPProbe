@@ -170,9 +170,9 @@ struct LiveSetView: View {
 
     @State private var workoutDate: Date = .now
     @State private var exercises: [String] = ExerciseStore.load()
-    @State private var selectedExercise: String = ExerciseStore.load().first ?? "Ylätalja (Lat Pulldown)"
-    @State private var weightKg: Double = 8.0
-    @State private var targetReps: Int = 10
+    @State private var selectedExercise: String = ExerciseStore.load().first ?? "Jalkakyykky"
+    @State private var weightKg: Double = 100.0
+    @State private var targetReps: Int = 5
     @State private var soundEnabled: Bool = true
     @State private var showingExerciseSheet: Bool = false
 
