@@ -881,11 +881,16 @@
     let zeroing = false;
     let activeSetToken = 0;
 
-    let pendingRep = { propVel: null, propAcc: null, romCm: null };
+    let pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: 0 };
     let currentReps = [];
     let currentSetSaved = false;
     let lastSavedSetRef = null;
     let lastSetStoppedAt = 0;
+    let setStartedAt = 0;
+    let lastRepAt = 0;
+    let activeSetMeta = null;
+    let keepWarmOsc = null;
+    let keepWarmGain = null;
 
     const memoryStore = {};
     let exercises = loadJSON(KEY_EXERCISES, [...DEFAULT_EXERCISES]);
@@ -951,206 +956,161 @@
       } catch {}
     }
 
-    // --- iOS + Android + Desktop Audio Engine (PCM WAV + Web Audio fallback) ---
-    // Generates an in-memory 16-bit mono 22050 Hz WAV data URI so HTMLAudioElement
-    // plays through the iOS Media channel even from async BLE notifications.
-    function createWavDataUri(notes) {
-      const sampleRate = 22050;
-      let totalMs = 0;
-      for (const n of notes) {
-        totalMs = Math.max(totalMs, (n.delayMs || 0) + n.durationMs + 20);
-      }
-      const numSamples = Math.max(1, Math.ceil((totalMs / 1000) * sampleRate));
-      const samples = new Float32Array(numSamples);
-
-      for (const n of notes) {
-        const startIdx = Math.floor(((n.delayMs || 0) / 1000) * sampleRate);
-        const len = Math.floor((n.durationMs / 1000) * sampleRate);
-        const freq = n.freq || 440;
-        const amp = n.gain || 0.38;
-        const wave = n.type || 'sine';
-
-        for (let i = 0; i < len && (startIdx + i) < numSamples; i++) {
-          const t = i / sampleRate;
-          // Smooth attack (8 ms) and exponential decay envelope
-          const attack = Math.min(1, i / (0.008 * sampleRate));
-          const decay = Math.exp(-3.2 * (i / len));
-          const phase = 2 * Math.PI * freq * t;
-          let s = 0;
-          if (wave === 'sawtooth') {
-            s = 2 * ((t * freq) - Math.floor(0.5 + t * freq));
-          } else if (wave === 'triangle') {
-            s = (2 / Math.PI) * Math.asin(Math.sin(phase));
-          } else {
-            s = Math.sin(phase) + 0.25 * Math.sin(2 * phase);
-          }
-          samples[startIdx + i] += s * amp * attack * decay;
-        }
-      }
-
-      const dataBytes = numSamples * 2;
-      const buf = new ArrayBuffer(44 + dataBytes);
-      const view = new DataView(buf);
-      const writeStr = (offset, str) => {
-        for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
-      };
-
-      writeStr(0, 'RIFF');
-      view.setUint32(4, 36 + dataBytes, true);
-      writeStr(8, 'WAVE');
-      writeStr(12, 'fmt ');
-      view.setUint32(16, 16, true);
-      view.setUint16(20, 1, true); // PCM
-      view.setUint16(22, 1, true); // Mono
-      view.setUint32(24, sampleRate, true);
-      view.setUint32(28, sampleRate * 2, true);
-      view.setUint16(32, 2, true);
-      view.setUint16(34, 16, true);
-      writeStr(36, 'data');
-      view.setUint32(40, dataBytes, true);
-
-      for (let i = 0; i < numSamples; i++) {
-        const clamped = Math.max(-1, Math.min(1, samples[i]));
-        view.setInt16(44 + i * 2, clamped < 0 ? clamped * 0x8000 : clamped * 0x7FFF, true);
-      }
-
-      const bytes = new Uint8Array(buf);
-      let binary = '';
-      for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      return 'data:audio/wav;base64,' + btoa(binary);
-    }
-
-    const SOUND_URIS = {
-      silence: createWavDataUri([{ freq: 440, durationMs: 15, delayMs: 0, gain: 0.0001 }]),
-      ready: createWavDataUri([
-        { freq: 523.25, durationMs: 120, delayMs: 0, gain: 0.45 },
-        { freq: 783.99, durationMs: 180, delayMs: 125, gain: 0.48 }
-      ]),
-      rep: createWavDataUri([
-        { freq: 880, durationMs: 135, delayMs: 0, gain: 0.48 }
-      ]),
-      target: createWavDataUri([
-        { freq: 587.33, durationMs: 115, delayMs: 0, gain: 0.45 },
-        { freq: 783.99, durationMs: 115, delayMs: 120, gain: 0.45 },
-        { freq: 1046.5, durationMs: 260, delayMs: 240, gain: 0.50 }
-      ]),
-      warn: createWavDataUri([
-        { freq: 240, durationMs: 150, delayMs: 0, type: 'sawtooth', gain: 0.45 },
-        { freq: 200, durationMs: 160, delayMs: 160, type: 'sawtooth', gain: 0.45 }
-      ])
-    };
-
-    const audioPool = {};
-    for (const [k, uri] of Object.entries(SOUND_URIS)) {
+    // --- Pure Web Audio API Engine (Bluetooth Music Safe + Zero-Clip Cue Synthesis) ---
+    // Uses ONLY Web Audio API (no <audio> or <video> elements) and sets
+    // navigator.audioSession.type = 'ambient' so iOS/Android Bluetooth music
+    // (Spotify, Apple Music) keeps playing without interruption.
+    function configureAmbientAudioSession() {
       try {
-        const a = new Audio(uri);
-        a.preload = 'auto';
-        a.playsInline = true;
-        audioPool[k] = a;
+        if ('audioSession' in navigator && navigator.audioSession) {
+          navigator.audioSession.type = 'ambient';
+        }
       } catch {}
     }
 
     function ensureAudio() {
+      configureAmbientAudioSession();
       try {
         if (!audioCtx) {
           const Ctx = window.AudioContext || window.webkitAudioContext;
-          if (Ctx) audioCtx = new Ctx();
+          if (Ctx) {
+            audioCtx = new Ctx({ latencyHint: 'interactive' });
+          }
         }
         if (audioCtx) {
           if (audioCtx.state === 'suspended' || audioCtx.state === 'interrupted') {
             audioCtx.resume().catch(() => {});
           }
-          if (!audioUnlocked) {
-            // Play 1-sample silent buffer to unlock iOS WebKit AudioContext inside user gesture
+          if (!audioUnlocked && audioCtx.state === 'running') {
+            // Play 1-sample silent buffer once to unlock WebKit AudioContext
             const buf = audioCtx.createBuffer(1, 1, 22050);
             const src = audioCtx.createBufferSource();
             src.buffer = buf;
             src.connect(audioCtx.destination);
             if (src.start) src.start(0);
+            audioUnlocked = true;
           }
         }
       } catch {}
+    }
 
-      if (!audioUnlocked && audioPool.silence) {
-        try {
-          const p = audioPool.silence.play();
-          if (p && p.then) {
-            p.then(() => { audioUnlocked = true; }).catch(() => {});
-          } else {
-            audioUnlocked = true;
-          }
-        } catch {}
+    // Keep Web Audio graph warm during active sets so Bluetooth A2DP never clips short beeps
+    function startAudioKeepWarm() {
+      ensureAudio();
+      if (!audioCtx || keepWarmOsc) return;
+      try {
+        keepWarmOsc = audioCtx.createOscillator();
+        keepWarmGain = audioCtx.createGain();
+        keepWarmOsc.type = 'sine';
+        keepWarmOsc.frequency.value = 60;
+        keepWarmGain.gain.value = 0.00001; // -100 dB: completely inaudible, keeps mixer & BT pipeline warm
+        keepWarmOsc.connect(keepWarmGain);
+        keepWarmGain.connect(audioCtx.destination);
+        keepWarmOsc.start();
+      } catch {
+        keepWarmOsc = null;
+        keepWarmGain = null;
       }
     }
 
-    // Unlock audio on any first user touch/click on iOS
-    ['touchstart', 'touchend', 'pointerdown', 'click'].forEach((evtName) => {
-      document.addEventListener(evtName, ensureAudio, { passive: true });
+    function stopAudioKeepWarm() {
+      try {
+        if (keepWarmOsc) {
+          keepWarmOsc.stop();
+          keepWarmOsc.disconnect();
+        }
+        if (keepWarmGain) {
+          keepWarmGain.disconnect();
+        }
+      } catch {}
+      keepWarmOsc = null;
+      keepWarmGain = null;
+    }
+
+    // Unlock AudioContext on user gesture only when needed (never interrupts Bluetooth music)
+    ['touchstart', 'pointerdown', 'click'].forEach((evtName) => {
+      document.addEventListener(evtName, () => {
+        if (!audioUnlocked || (audioCtx && audioCtx.state !== 'running')) {
+          ensureAudio();
+        }
+      }, { passive: true });
     });
 
-    function playOscillatorFallback(notes) {
+    function playCue(notes) {
+      if (!soundEnabled) return;
+      ensureAudio();
       if (!audioCtx) return;
       try {
         if (audioCtx.state === 'suspended' || audioCtx.state === 'interrupted') {
           audioCtx.resume().catch(() => {});
         }
-        const baseNow = audioCtx.currentTime;
+        const baseNow = audioCtx.currentTime + 0.005;
         for (const n of notes) {
+          const startAt = baseNow + (n.delayMs || 0) / 1000;
+          const durSec = Math.max(0.04, (n.durationMs || 140) / 1000);
+          const stopAt = startAt + durSec;
+          const peakGain = n.gain || 0.42;
+          const attackEnd = startAt + Math.min(0.012, durSec * 0.2);
+          const sustainEnd = startAt + durSec * 0.65;
+
+          // Fundamental oscillator
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
-          osc.type = n.type || 'sine';
-          osc.frequency.value = n.freq;
-          const startAt = baseNow + (n.delayMs || 0) / 1000;
-          const stopAt = startAt + n.durationMs / 1000;
-          gain.gain.setValueAtTime(0.28, startAt);
-          gain.gain.exponentialRampToValueAtTime(0.001, stopAt);
+          osc.type = n.type || 'triangle';
+          osc.frequency.setValueAtTime(n.freq || 880, startAt);
+
+          gain.gain.setValueAtTime(0.0001, startAt);
+          gain.gain.linearRampToValueAtTime(peakGain, attackEnd);
+          gain.gain.setValueAtTime(peakGain * 0.88, sustainEnd);
+          gain.gain.exponentialRampToValueAtTime(0.0001, stopAt);
+
           osc.connect(gain);
           gain.connect(audioCtx.destination);
           osc.start(startAt);
-          osc.stop(stopAt);
+          osc.stop(stopAt + 0.01);
+
+          // Harmonic overtone so beeps cut cleanly through Bluetooth music & gym noise
+          if ((n.type || 'triangle') !== 'sawtooth') {
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime((n.freq || 880) * 2, startAt);
+            gain2.gain.setValueAtTime(0.0001, startAt);
+            gain2.gain.linearRampToValueAtTime(peakGain * 0.32, attackEnd);
+            gain2.gain.exponentialRampToValueAtTime(0.0001, stopAt);
+            osc2.connect(gain2);
+            gain2.connect(audioCtx.destination);
+            osc2.start(startAt);
+            osc2.stop(stopAt + 0.01);
+          }
         }
       } catch {}
     }
 
-    function playCue(name, fallbackNotes) {
-      if (!soundEnabled) return;
-      ensureAudio();
-      const baseAudio = audioPool[name];
-      if (baseAudio) {
-        try {
-          baseAudio.currentTime = 0;
-          const playPromise = baseAudio.play();
-          if (playPromise && playPromise.catch) {
-            playPromise.catch(() => playOscillatorFallback(fallbackNotes));
-          }
-          return;
-        } catch {}
-      }
-      playOscillatorFallback(fallbackNotes);
-    }
-
     function soundReady() {
-      playCue('ready', [
-        { freq: 523.25, durationMs: 110, delayMs: 0 },
-        { freq: 783.99, durationMs: 160, delayMs: 120 }
+      playCue([
+        { freq: 523.25, durationMs: 130, delayMs: 0, gain: 0.38 },
+        { freq: 783.99, durationMs: 200, delayMs: 135, gain: 0.44 }
       ]);
     }
     function soundRep() {
-      playCue('rep', [{ freq: 880, durationMs: 120, delayMs: 0 }]);
+      // Crisp 2-tone upward chime (A5 -> D6, 255 ms total) so fast reps never get clipped over Bluetooth
+      playCue([
+        { freq: 880.0, durationMs: 105, delayMs: 0, gain: 0.42 },
+        { freq: 1174.66, durationMs: 150, delayMs: 105, gain: 0.46 }
+      ]);
     }
     function soundTargetReached() {
-      playCue('target', [
-        { freq: 587.33, durationMs: 110, delayMs: 0 },
-        { freq: 783.99, durationMs: 110, delayMs: 120 },
-        { freq: 1046.5, durationMs: 240, delayMs: 240 }
+      playCue([
+        { freq: 587.33, durationMs: 120, delayMs: 0, gain: 0.42 },
+        { freq: 783.99, durationMs: 120, delayMs: 125, gain: 0.44 },
+        { freq: 1046.5, durationMs: 280, delayMs: 250, gain: 0.48 }
       ]);
     }
     function soundLoweringWarn() {
-      playCue('warn', [
-        { freq: 240, durationMs: 150, delayMs: 0, type: 'sawtooth' },
-        { freq: 200, durationMs: 160, delayMs: 160, type: 'sawtooth' }
+      playCue([
+        { freq: 250, durationMs: 160, delayMs: 0, type: 'sawtooth', gain: 0.40 },
+        { freq: 195, durationMs: 190, delayMs: 170, type: 'sawtooth', gain: 0.40 }
       ]);
     }
 
@@ -1169,16 +1129,12 @@
     let lastBleActivityAt = 0;
     const BLE_KEEPALIVE_INTERVAL_MS = 15000;
 
-    // --- Screen Wake Lock (W3C Wake Lock API + iOS/Bluefy Media & Audio Keep-Awake Fallback) ---
+    // --- Screen Wake Lock (Standard W3C Wake Lock API Only – Never Hijacks Bluetooth Media) ---
     let keepAwakeWanted = false;
     let wakeLockSentinel = null;
-    let noSleepVideo = null;
-    let noSleepCanvas = null;
 
     async function requestScreenWakeLock() {
       keepAwakeWanted = true;
-
-      // 1. Standard Screen Wake Lock API (Android Chrome, iOS 16.4+ Safari/WebKit, Desktop)
       if ('wakeLock' in navigator && navigator.wakeLock && navigator.wakeLock.request) {
         try {
           if (!wakeLockSentinel || wakeLockSentinel.released) {
@@ -1192,47 +1148,9 @@
             });
           }
         } catch (err) {
-          console.debug('WakeLock API fallback used:', err);
+          console.debug('WakeLock API unavailable:', err);
         }
       }
-
-      // 2. Fallback for iOS WKWebView / Bluefy where navigator.wakeLock may be unavailable:
-      //    Play a tiny hidden muted canvas stream video so iOS treats the page as active media.
-      try {
-        if (!noSleepVideo) {
-          noSleepCanvas = document.createElement('canvas');
-          noSleepCanvas.width = 2;
-          noSleepCanvas.height = 2;
-          const ctx = noSleepCanvas.getContext('2d');
-          if (ctx) {
-            ctx.fillStyle = '#0f172a';
-            ctx.fillRect(0, 0, 2, 2);
-          }
-          if (noSleepCanvas.captureStream) {
-            noSleepVideo = document.createElement('video');
-            noSleepVideo.setAttribute('playsinline', '');
-            noSleepVideo.setAttribute('muted', '');
-            noSleepVideo.muted = true;
-            noSleepVideo.style.position = 'fixed';
-            noSleepVideo.style.width = '1px';
-            noSleepVideo.style.height = '1px';
-            noSleepVideo.style.opacity = '0.01';
-            noSleepVideo.style.pointerEvents = 'none';
-            noSleepVideo.style.bottom = '0';
-            noSleepVideo.style.right = '0';
-            noSleepVideo.srcObject = noSleepCanvas.captureStream(1);
-            document.body.appendChild(noSleepVideo);
-          }
-        }
-        if (noSleepVideo && noSleepVideo.paused) {
-          if (noSleepCanvas) {
-            const ctx = noSleepCanvas.getContext('2d');
-            if (ctx) ctx.fillRect(0, 0, 1, 1);
-          }
-          const p = noSleepVideo.play();
-          if (p && p.catch) p.catch(() => {});
-        }
-      } catch {}
     }
 
     async function releaseScreenWakeLock() {
@@ -1241,11 +1159,6 @@
         if (wakeLockSentinel) {
           await wakeLockSentinel.release();
           wakeLockSentinel = null;
-        }
-      } catch {}
-      try {
-        if (noSleepVideo && !noSleepVideo.paused) {
-          noSleepVideo.pause();
         }
       } catch {}
     }
@@ -1262,10 +1175,6 @@
           requestScreenWakeLock();
           if (audioCtx && (audioCtx.state === 'suspended' || audioCtx.state === 'interrupted')) {
             audioCtx.resume().catch(() => {});
-          }
-          if (noSleepCanvas) {
-            const ctx = noSleepCanvas.getContext('2d');
-            if (ctx) ctx.fillRect(0, 0, 1, 1);
           }
         }
         // Do not interrupt the 3-second initial sensor calibration (0x03)
@@ -1284,6 +1193,7 @@
     // Re-acquire Wake Lock and verify BLE connection if user switches back to the browser
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
+        configureAmbientAudioSession();
         if (keepAwakeWanted) {
           requestScreenWakeLock();
         }
@@ -1298,7 +1208,7 @@
       }
     });
 
-    // Also refresh Wake Lock on any touch while connected (handles browsers requiring user gesture after tab switch)
+    // Refresh Wake Lock on touch while connected
     ['touchstart', 'pointerdown', 'click'].forEach((evtName) => {
       document.addEventListener(evtName, () => {
         if (keepAwakeWanted) {
@@ -1353,16 +1263,33 @@
       return completedCount + 1;
     }
 
+    function snapshotCurrentSetMeta() {
+      const selVal = document.getElementById('exerciseSelect').value;
+      const exercise = (selVal && selVal !== ADD_NEW_EX_VALUE) ? selVal : (exercises[0] || DEFAULT_EXERCISES[0]);
+      const weightKg = parseFloat(document.getElementById('weightInput').value) || 0;
+      const targetReps = parseInt(document.getElementById('targetRepsInput').value, 10) || 5;
+      return {
+        exercise,
+        weightKg,
+        targetReps,
+        time: new Date().toTimeString().slice(0, 8)
+      };
+    }
+
     function finishCalibrationAndActivate(expectedToken) {
       if (expectedToken !== undefined && expectedToken !== activeSetToken) return;
       clearZeroTimer();
       if (!zeroing) return;
       pinStarted = true;
       zeroing = false;
+      pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: 0 };
 
       if (autoStartAfterZero) {
         autoStartAfterZero = false;
         setActive = true;
+        setStartedAt = Date.now();
+        activeSetMeta = snapshotCurrentSetMeta();
+        startAudioKeepWarm();
         const setNum = getActiveSetDisplayNumber();
         setStatus(`🟢 Sarja #${setNum} käynnissä – tee toistoja!`, 'ready');
         soundReady();
@@ -1380,6 +1307,7 @@
       activeSetToken++;
       clearZeroTimer();
       stopBleKeepAlive();
+      stopAudioKeepWarm();
       releaseScreenWakeLock();
       autoStartAfterZero = false;
       setActive = false;
@@ -1548,14 +1476,32 @@
       await writeByte(CMD_START);
     }
 
-    function commitCurrentSetToWorkouts() {
+    function recalculateRepsPower(reps, weightKg) {
+      const w = Number(weightKg) || 0;
+      reps.forEach((r) => {
+        const a = Number(r.propulsiveAcceleration) || 0;
+        const v = Number(r.meanVelocity) || 0;
+        r.power = w * (9.80665 + 0.58 * a) * v;
+      });
+    }
+
+    function commitCurrentSetToWorkouts(metaOverride = null) {
       if (currentReps.length === 0 || currentSetSaved) return false;
       const dateStr = document.getElementById('workoutDate').value || todayISO();
       const selVal = document.getElementById('exerciseSelect').value;
-      const exercise = (selVal && selVal !== ADD_NEW_EX_VALUE) ? selVal : (exercises[0] || DEFAULT_EXERCISES[0]);
-      const weightKg = parseFloat(document.getElementById('weightInput').value) || 0;
-      const targetReps = parseInt(document.getElementById('targetRepsInput').value, 10) || 5;
-      const nowTime = new Date().toTimeString().slice(0, 8);
+      const currentExercise = (selVal && selVal !== ADD_NEW_EX_VALUE) ? selVal : (exercises[0] || DEFAULT_EXERCISES[0]);
+      const currentWeightKg = parseFloat(document.getElementById('weightInput').value) || 0;
+      const currentTargetReps = parseInt(document.getElementById('targetRepsInput').value, 10) || 5;
+
+      const meta = metaOverride || activeSetMeta || {
+        exercise: currentExercise,
+        weightKg: currentWeightKg,
+        targetReps: currentTargetReps,
+        time: new Date().toTimeString().slice(0, 8)
+      };
+
+      // Ensure every rep's Watts matches the saved set weightKg
+      recalculateRepsPower(currentReps, meta.weightKg);
 
       let workout = workouts.find((w) => w.date === dateStr);
       if (!workout) {
@@ -1563,10 +1509,10 @@
         workouts.push(workout);
       }
       const setCopy = {
-        time: nowTime,
-        exercise,
-        weightKg,
-        targetReps,
+        time: meta.time || new Date().toTimeString().slice(0, 8),
+        exercise: meta.exercise,
+        weightKg: meta.weightKg,
+        targetReps: meta.targetReps,
         reps: currentReps.map((r) => ({ ...r }))
       };
       workout.sets.push(setCopy);
@@ -1583,19 +1529,23 @@
     async function startSetOnPin() {
       if (!dataChar) return;
       ensureAudio();
+      startAudioKeepWarm();
       requestScreenWakeLock();
 
       // If previous set had reps, ensure it is saved before starting the new set, then clear currentReps!
       if (currentReps.length > 0) {
         if (!currentSetSaved) {
-          commitCurrentSetToWorkouts();
+          commitCurrentSetToWorkouts(activeSetMeta);
         }
         currentReps = [];
         currentSetSaved = false;
         lastSavedSetRef = null;
       }
 
-      pendingRep = { propVel: null, propAcc: null, romCm: null };
+      pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: 0 };
+      activeSetMeta = snapshotCurrentSetMeta();
+      setStartedAt = Date.now();
+      lastRepAt = 0;
 
       // If initial 3s calibration on connect is still running, queue auto-start as soon as it finishes
       if (zeroing) {
@@ -1620,6 +1570,7 @@
         clearZeroTimer();
         zeroing = false;
         setActive = true;
+        setStartedAt = Date.now();
         const setNum = getActiveSetDisplayNumber();
         setStatus(`🟢 Sarja #${setNum} käynnissä – tee toistoja!`, 'ready');
         soundReady();
@@ -1632,15 +1583,16 @@
     async function stopSetOnPin(autoSave = true) {
       activeSetToken++;
       clearZeroTimer();
+      stopAudioKeepWarm();
       autoStartAfterZero = false;
       setActive = false;
       zeroing = false;
       lastSetStoppedAt = Date.now();
-      pendingRep = { propVel: null, propAcc: null, romCm: null };
+      pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: 0 };
 
       // Automatically save completed set when user ends the set so next set starts fresh
       if (autoSave && currentReps.length > 0 && !currentSetSaved) {
-        commitCurrentSetToWorkouts();
+        commitCurrentSetToWorkouts(activeSetMeta);
       }
 
       renderLiveSet();
@@ -1668,6 +1620,7 @@
       activeSetToken++;
       clearZeroTimer();
       stopBleKeepAlive();
+      stopAudioKeepWarm();
       autoStartAfterZero = false;
       dataChar = null;
       pinStarted = false;
@@ -1704,6 +1657,10 @@
       } catch {}
     });
 
+    // Minimum thresholds to filter out Pin handling, cable slack pull, and bar unrack/rack noise
+    const MIN_VALID_VEL_M_S = 0.12;
+    const MIN_VALID_ROM_CM  = 12.0;
+
     function onNotification(event) {
       const dv = event.target.value;
       if (!dv || dv.byteLength === 0) return;
@@ -1713,6 +1670,16 @@
       if (dv.byteLength === 1 && type >= 0x81 && type <= 0x86) {
         if (type === 0x83 && zeroing) {
           finishCalibrationAndActivate(activeSetToken);
+        }
+        return;
+      }
+
+      // Movement phase state machine (0x01 0x01 = concentric start, 0x01 0x02 = lowering, 0x01 0x03 = rest)
+      if (dv.byteLength === 2 && type === 0x01) {
+        const phase = dv.getUint8(1);
+        if (phase === 0x01) {
+          // Fresh upward movement started: clear any leftover partial packets from prior movements
+          pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: Date.now() };
         }
         return;
       }
@@ -1730,7 +1697,7 @@
         if (type === 0x06 && currentReps.length > 0 && (Date.now() - lastSetStoppedAt) < 4000) {
           const eccVel = val / 1000.0;
           const last = currentReps[currentReps.length - 1];
-          if (last.loweringVelocity === null) {
+          if (last.loweringVelocity === null && eccVel >= 0.08 && eccVel <= 3.5) {
             last.loweringVelocity = eccVel;
             if (lastSavedSetRef && lastSavedSetRef.reps && lastSavedSetRef.reps.length > 0) {
               lastSavedSetRef.reps[lastSavedSetRef.reps.length - 1].loweringVelocity = eccVel;
@@ -1751,13 +1718,56 @@
         pendingRep.propAcc = val / 1000.0;
       } else if (type === 0x02) {
         const meanVel = val / 1000.0;
+        const hasFullBurst = pendingRep.propVel !== null && pendingRep.romCm !== null && pendingRep.propAcc !== null;
         const propVel = pendingRep.propVel ?? meanVel;
         const propAcc = pendingRep.propAcc ?? 0;
         const romCm   = pendingRep.romCm ?? 0;
-        pendingRep = { propVel: null, propAcc: null, romCm: null };
+        pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: 0 };
+
+        // 1. Ignore incomplete packet bursts (e.g. movement started before "Aloita sarja" was tapped)
+        if (!hasFullBurst) {
+          console.debug('Ignored incomplete rep burst on 0x02:', { meanVel, propVel, propAcc, romCm });
+          return;
+        }
+
+        // 2. Reject non-lift ghost movements (cable slack pull, pin adjustment, <0.12 m/s or <12 cm ROM)
+        if (meanVel < MIN_VALID_VEL_M_S || romCm < MIN_VALID_ROM_CM || propAcc < 0 || !Number.isFinite(meanVel)) {
+          console.debug('Filtered ghost movement:', { meanVel, romCm, propAcc });
+          return;
+        }
+
+        // 3. Reject end-of-set bar-racking ghost movement (e.g., after >=2 consistent reps, a sudden <0.21 m/s
+        //    movement that is <40% of the previous rep's velocity when setting the bar into the rack)
+        if (currentReps.length >= 2) {
+          const prevRep = currentReps[currentReps.length - 1];
+          if (meanVel < 0.21 && prevRep.meanVelocity > 0.45 && meanVel < prevRep.meanVelocity * 0.40) {
+            console.debug('Filtered bar-racking movement at end of set:', { meanVel, prevVel: prevRep.meanVelocity });
+            return;
+          }
+        }
+
+        // 4. Auto-replace bogus 1st "unrack / positioning" movement if rep #1 was slow (<0.22 m/s, no lowering)
+        //    and the immediate next lift is >2.2x faster (the real 1st rep of the set)
+        if (
+          currentReps.length === 1 &&
+          currentReps[0].meanVelocity < 0.22 &&
+          currentReps[0].loweringVelocity === null &&
+          meanVel > currentReps[0].meanVelocity * 2.2
+        ) {
+          console.debug('Replaced initial unrack movement with real 1st rep:', {
+            unrackVel: currentReps[0].meanVelocity,
+            realFirstVel: meanVel
+          });
+          currentReps.pop();
+        }
 
         const weightKg = parseFloat(document.getElementById('weightInput').value) || 0;
-        // Verified 8 kg power formula: P = m * (g + 0.58 * a_prop) * v
+        if (!activeSetMeta) {
+          activeSetMeta = snapshotCurrentSetMeta();
+        } else if (currentReps.length === 0) {
+          activeSetMeta = snapshotCurrentSetMeta();
+        }
+        // Verified power formula: P = m * (g + 0.58 * a_prop) * v
         const power = weightKg * (9.80665 + 0.58 * propAcc) * meanVel;
 
         currentReps.push({
@@ -1768,6 +1778,7 @@
           loweringVelocity: null,
           power: power
         });
+        lastRepAt = Date.now();
 
         const targetReps = parseInt(document.getElementById('targetRepsInput').value, 10) || 5;
         if (currentReps.length >= targetReps) {
@@ -1781,7 +1792,7 @@
         }
       } else if (type === 0x06) {
         const eccVel = val / 1000.0;
-        if (currentReps.length > 0) {
+        if (currentReps.length > 0 && eccVel >= 0.08 && eccVel <= 3.5) {
           const last = currentReps[currentReps.length - 1];
           last.loweringVelocity = eccVel;
           if (eccVel > 0.60) {
@@ -2566,11 +2577,22 @@
             ${vsFirstHtml}
             ${lowHtml}
             <span style="color:var(--muted)">${r.rangeOfMotionCm.toFixed(0)} cm</span>
+            <button type="button" data-del-live-rep="${idx}" title="Poista toisto" style="padding: 2px 6px; font-size: 11px; border-radius: 6px; background: transparent; border: 1px solid var(--border); color: var(--muted);">✕</button>
           </div>
           <div class="rep-bar-track">
             <div class="rep-bar-fill ${repZoneClass}" style="width: ${widthPct}%;"></div>
           </div>
         `;
+        div.querySelector('[data-del-live-rep]').addEventListener('click', () => {
+          currentReps.splice(idx, 1);
+          if (lastSavedSetRef && Array.isArray(lastSavedSetRef.reps)) {
+            lastSavedSetRef.reps.splice(idx, 1);
+            saveJSON(KEY_WORKOUTS, workouts);
+            renderCalendar();
+            renderHistoryList();
+          }
+          renderLiveSet();
+        });
         listEl.appendChild(div);
       });
 
@@ -2913,29 +2935,54 @@
       }
     });
 
+    function handleWeightChanged() {
+      const newWeight = parseFloat(document.getElementById('weightInput').value) || 0;
+      if (!currentSetSaved && currentReps.length > 0) {
+        if (lastRepAt > 0 && (Date.now() - lastRepAt) > 10000) {
+          // User finished previous set (>10 s ago) and is now setting weight for the next set:
+          // auto-stop & save the completed set with its original weight!
+          stopSetOnPin(true);
+          return;
+        }
+        recalculateRepsPower(currentReps, newWeight);
+        if (activeSetMeta) activeSetMeta.weightKg = newWeight;
+      } else if (!currentSetSaved && activeSetMeta) {
+        activeSetMeta.weightKg = newWeight;
+      }
+      renderLiveSet();
+    }
+
     document.querySelectorAll('[data-weight-delta]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const input = document.getElementById('weightInput');
         const delta = parseFloat(btn.getAttribute('data-weight-delta'));
         input.value = Math.max(0, (parseFloat(input.value) || 0) + delta);
-        renderLiveSet();
+        handleWeightChanged();
       });
     });
-    document.getElementById('weightInput').addEventListener('input', renderLiveSet);
-    document.getElementById('weightInput').addEventListener('change', renderLiveSet);
+    document.getElementById('weightInput').addEventListener('input', handleWeightChanged);
+    document.getElementById('weightInput').addEventListener('change', handleWeightChanged);
+
+    function handleTargetRepsChanged() {
+      const newTarget = parseInt(document.getElementById('targetRepsInput').value, 10) || 5;
+      if (!currentSetSaved && currentReps.length === 0 && activeSetMeta) {
+        activeSetMeta.targetReps = newTarget;
+      }
+      renderLiveSet();
+    }
 
     document.getElementById('repMinusBtn').addEventListener('click', () => {
       const input = document.getElementById('targetRepsInput');
       input.value = Math.max(1, (parseInt(input.value, 10) || 5) - 1);
-      renderLiveSet();
+      handleTargetRepsChanged();
     });
     document.getElementById('repPlusBtn').addEventListener('click', () => {
       const input = document.getElementById('targetRepsInput');
       input.value = (parseInt(input.value, 10) || 5) + 1;
-      renderLiveSet();
+      handleTargetRepsChanged();
     });
-    document.getElementById('targetRepsInput').addEventListener('input', renderLiveSet);
-    document.getElementById('targetRepsInput').addEventListener('change', renderLiveSet);
+    document.getElementById('targetRepsInput').addEventListener('input', handleTargetRepsChanged);
+    document.getElementById('targetRepsInput').addEventListener('change', handleTargetRepsChanged);
 
     // Exercise selection & adding (both modal and inline on iOS)
     document.getElementById('exerciseSelect').addEventListener('change', (e) => {
@@ -2946,6 +2993,12 @@
         renderLiveSet();
         setTimeout(() => document.getElementById('inlineExerciseInput').focus(), 50);
       } else {
+        // If previous set has unsaved reps, save it under its original exercise before switching!
+        if (!currentSetSaved && currentReps.length > 0) {
+          stopSetOnPin(true);
+        } else if (activeSetMeta) {
+          activeSetMeta.exercise = e.target.value;
+        }
         renderLiveSet();
       }
     });

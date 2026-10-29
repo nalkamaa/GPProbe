@@ -76,6 +76,12 @@ enum PinProtocol {
 
         mutating func ingest(_ packet: Packet, weightKg: Double) -> Event? {
             switch packet {
+            case .phase(0x01):
+                // New upward movement phase started -> clear any partial packet state
+                propulsiveVelocity = nil
+                propulsiveAcceleration = nil
+                rangeOfMotionCm = nil
+                return nil
             case .propulsiveVelocity(let v):
                 propulsiveVelocity = v
                 return nil
@@ -86,12 +92,17 @@ enum PinProtocol {
                 propulsiveAcceleration = a
                 return nil
             case .meanVelocity(let meanV):
+                let hasFullBurst = propulsiveVelocity != nil && propulsiveAcceleration != nil && rangeOfMotionCm != nil
                 let propV = propulsiveVelocity ?? meanV
                 let propA = propulsiveAcceleration ?? 0
                 let romCm = rangeOfMotionCm ?? 0
                 propulsiveVelocity = nil
                 propulsiveAcceleration = nil
                 rangeOfMotionCm = nil
+                // Ignore incomplete packet bursts or non-lift handling / cable slack micro-movements
+                guard hasFullBurst, meanV >= 0.12, romCm >= 12.0, propA >= 0, meanV.isFinite else {
+                    return nil
+                }
                 return .concentricCompleted(Rep(
                     meanVelocity: meanV,
                     propulsiveVelocity: propV,
@@ -101,6 +112,7 @@ enum PinProtocol {
                     weightKg: weightKg
                 ))
             case .loweringVelocity(let eccV):
+                guard eccV >= 0.08, eccV <= 3.5 else { return nil }
                 return .loweringCompleted(eccV)
             default:
                 return nil

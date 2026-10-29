@@ -26,24 +26,41 @@ struct GpathLiteApp: App {
 // MARK: - Audio & Haptic Feedback (ignores iOS silent switch via AVAudioSession .playback)
 
 enum SoundFeedback {
-    private static var activePlayer: AVAudioPlayer?
+    private static var activePlayers: [AVAudioPlayer] = []
+    private static var sessionConfigured = false
 
-    private static func playTone(frequency: Double, durationMs: Int) {
+    private static func ensureAudioSession() {
+        guard !sessionConfigured else { return }
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
         try? session.setActive(true)
+        sessionConfigured = true
+    }
+
+    private static func playTone(frequencies: [(freq: Double, durationMs: Int)]) {
+        ensureAudioSession()
 
         let sampleRate = 22050
-        let numSamples = max(1, (sampleRate * durationMs) / 1000)
-        var pcm = [Int16](repeating: 0, count: numSamples)
-        for i in 0..<numSamples {
-            let t = Double(i) / Double(sampleRate)
-            let env = exp(-3.0 * Double(i) / Double(numSamples))
-            let val = sin(2.0 * .pi * frequency * t) * env * 0.45
-            pcm[i] = Int16(max(-1.0, min(1.0, val)) * Double(Int16.max))
+        let totalSamples = max(1, frequencies.reduce(0) { $0 + (sampleRate * $1.durationMs) / 1000 })
+        var pcm = [Int16](repeating: 0, count: totalSamples)
+        var offset = 0
+
+        for seg in frequencies {
+            let segSamples = max(1, (sampleRate * seg.durationMs) / 1000)
+            for i in 0..<segSamples where (offset + i) < totalSamples {
+                let t = Double(i) / Double(sampleRate)
+                let progress = Double(i) / Double(segSamples)
+                let attack = min(1.0, Double(i) / (0.008 * Double(sampleRate)))
+                let sustain = progress < 0.65 ? 1.0 : exp(-4.0 * (progress - 0.65) / 0.35)
+                let fundamental = sin(2.0 * .pi * seg.freq * t)
+                let overtone = 0.30 * sin(4.0 * .pi * seg.freq * t)
+                let val = (fundamental + overtone) * attack * sustain * 0.42
+                pcm[offset + i] = Int16(max(-1.0, min(1.0, val)) * Double(Int16.max))
+            }
+            offset += segSamples
         }
 
-        let dataSize = UInt32(numSamples * 2)
+        let dataSize = UInt32(totalSamples * 2)
         var wav = Data()
         wav.append("RIFF".data(using: .ascii)!)
         var chunkSize = (36 + dataSize).littleEndian
@@ -71,8 +88,9 @@ enum SoundFeedback {
                 .assumingMemoryBound(to: UInt8.self), count: Int(dataSize)))
         }
 
+        activePlayers.removeAll { !$0.isPlaying }
         if let player = try? AVAudioPlayer(data: wav) {
-            activePlayer = player
+            activePlayers.append(player)
             player.play()
         } else {
             AudioServicesPlaySystemSound(1057)
@@ -82,28 +100,28 @@ enum SoundFeedback {
     /// Short confirmation tone when sensor zeroing (`0x83`) completes.
     static func playReady(enabled: Bool) {
         guard enabled else { return }
-        playTone(frequency: 784.0, durationMs: 180)
+        playTone(frequencies: [(523.25, 130), (783.99, 200)])
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
-    /// Beep when a rep concentric phase completes.
+    /// Crisp 2-tone upward chime when a rep concentric phase completes.
     static func playRep(enabled: Bool) {
         guard enabled else { return }
-        playTone(frequency: 880.0, durationMs: 130)
+        playTone(frequencies: [(880.0, 105), (1174.66, 150)])
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 
     /// Distinct fanfare when the target rep count is reached.
     static func playTargetReached(enabled: Bool) {
         guard enabled else { return }
-        playTone(frequency: 1046.5, durationMs: 260)
+        playTone(frequencies: [(587.33, 120), (783.99, 120), (1046.5, 280)])
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     /// Warning feedback when controlled lowering is too fast (> 0.60 m/s).
     static func playLoweringWarning(enabled: Bool) {
         guard enabled else { return }
-        playTone(frequency: 240.0, durationMs: 220)
+        playTone(frequencies: [(250.0, 160), (195.0, 190)])
         UINotificationFeedbackGenerator().notificationOccurred(.warning)
     }
 }
@@ -454,6 +472,22 @@ struct LiveSetView: View {
                     guard let event = assembler.ingest(packet, weightKg: weightKg) else { return }
                     switch event {
                     case .concentricCompleted(let rep):
+                        // Filter end-of-set bar-racking ghost movement
+                        if reps.count >= 2,
+                           let prev = reps.last,
+                           rep.meanVelocity < 0.21,
+                           prev.meanVelocity > 0.45,
+                           rep.meanVelocity < prev.meanVelocity * 0.40 {
+                            return
+                        }
+                        // Replace initial unrack / positioning movement if rep #1 was slow (<0.22 m/s, no lowering)
+                        // and the immediate next lift is >2.2x faster
+                        if reps.count == 1,
+                           reps[0].meanVelocity < 0.22,
+                           reps[0].loweringVelocity == nil,
+                           rep.meanVelocity > reps[0].meanVelocity * 2.2 {
+                            reps.removeLast()
+                        }
                         reps.append(rep)
                         if reps.count >= targetReps {
                             SoundFeedback.playTargetReached(enabled: soundEnabled)
