@@ -4132,7 +4132,7 @@
     function renderCycleCard() {
       const el = document.getElementById('anaCycleCard');
       if (!el) return;
-      const dateStr = anaDate || getContextDate();
+      const dateStr = getContextDate(); // jakso näytetään aina treenipäivän (Treeni-välilehden päivä) mukaan
       const c = getCycle();
       if (!c) {
         const blocks = (vbtSettings.cycle && vbtSettings.cycle.blocks) || DEFAULT_CYCLE_BLOCKS;
@@ -4167,11 +4167,11 @@
         const g = VBT_GOALS[st.phase.goal];
         const mid = (g.pctRange[0] + g.pctRange[1]) / 2;
         const row = prilepinRow(mid);
-        wavePlan = `<div class="vbt-kpi-grid">
-          <div class="vbt-kpi"><span class="vbt-kpi-l">Jakso</span><span class="vbt-kpi-v" style="font-size:13px; color:${st.phase.color}; white-space:normal; word-break:break-word;">${st.phase.label}</span><span class="vbt-kpi-s">vk ${st.weekInBlock}/${st.weeks}</span></div>
+        wavePlan = `<div class="vbt-kpi-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr));">
+          <div class="vbt-kpi"><span class="vbt-kpi-l">Jakso</span><span class="vbt-kpi-v" style="font-size:17px; color:${st.phase.color};">${st.phase.label}</span><span class="vbt-kpi-s">vk ${st.weekInBlock}/${st.weeks}</span></div>
           <div class="vbt-kpi"><span class="vbt-kpi-l">Viikkoaalto</span><span class="vbt-kpi-v" style="font-size:15px;">${WAVE_LABELS[st.wave]}</span><span class="vbt-kpi-s">${st.inserted ? 'lisätty kevennys' : 'kokonaisvk ' + (st.weekIdx + 1) + '/' + st.totalWeeks}</span></div>
           <div class="vbt-kpi"><span class="vbt-kpi-l">Tavoite</span><span class="vbt-kpi-v" style="font-size:15px;">${g.pctRange[0]}–${g.pctRange[1]} %</span><span class="vbt-kpi-s">${g.short}</span></div>
-          <div class="vbt-kpi"><span class="vbt-kpi-l">Volyymi / liike</span><span class="vbt-kpi-v" style="font-size:15px;">${waveVolume(row, st.wave)}</span><span class="vbt-kpi-s">toistoa/treeni (Prilepin ${row.label})</span></div>
+          <div class="vbt-kpi"><span class="vbt-kpi-l">Volyymi / liike / treeni</span><span class="vbt-kpi-v" style="font-size:15px;">${waveVolume(row, st.wave)}</span><span class="vbt-kpi-s">toistoa (Prilepin ${row.label})</span></div>
         </div>
         ${(st.wave === 'deload' || st.wave === 'taper') ? '<p class="vbt-verdict">Kevennysviikko: volyymi ~60 % Prilepinin alarajasta, intensiteetti ennallaan, VL-raja −5 %-yks.</p>' : ''}
         ${st.wave === 'test' ? '<p class="vbt-verdict">Testiviikko: tee raskas yhden toiston nosto (~95–100 %) jokaisessa pääliikkeessä ja kirjaa sen nopeus Analyysi → VBT-asetukset → Oma MVT. Tarkista samalla kuorma–nopeusprofiili 3–4 kuormalla.</p>' : ''}`;
