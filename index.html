@@ -512,6 +512,80 @@
       padding: 10px;
       margin-top: 8px;
     }
+    /* VBT Velocity Zones (Squat, Bench Press, Military Bench, Deadlift) */
+    .vbt-box {
+      margin-top: 4px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .vbt-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .vbt-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 5px;
+    }
+    .vbt-zone-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 7px 9px;
+      border-radius: 9px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .vbt-zone-row.target-selected {
+      border-color: var(--accent);
+      background: rgba(59, 130, 246, 0.16);
+    }
+    .vbt-zone-row.active-hit {
+      border-color: var(--green);
+      box-shadow: 0 0 10px rgba(34, 197, 94, 0.28);
+    }
+    .vbt-zone-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .vbt-zone-badge.zone-max {
+      color: #fca5a5;
+      border-color: rgba(239, 68, 68, 0.55);
+      background: rgba(239, 68, 68, 0.16);
+    }
+    .vbt-zone-badge.zone-acc {
+      color: #fde68a;
+      border-color: rgba(245, 158, 11, 0.55);
+      background: rgba(245, 158, 11, 0.16);
+    }
+    .vbt-zone-badge.zone-str-spd {
+      color: #86efac;
+      border-color: rgba(34, 197, 94, 0.55);
+      background: rgba(34, 197, 94, 0.16);
+    }
+    .vbt-zone-badge.zone-spd-str {
+      color: #93c5fd;
+      border-color: rgba(59, 130, 246, 0.6);
+      background: rgba(59, 130, 246, 0.18);
+    }
   </style>
 </head>
 <body>
@@ -573,14 +647,24 @@
         <span class="small">Arvioitu 1RM (Epley)</span>
         <span id="setupEpley1RM" style="font-size: 15px; font-weight: 700; color: #60a5fa; font-variant-numeric: tabular-nums;">-- kg</span>
       </div>
+
+      <!-- Exercise-specific VBT velocity zones (Jalkakyykky, Penkkipunnerrus, Sotilaspenkkipunnerrus, Maastaveto) -->
+      <div id="vbtZoneBox" class="vbt-box hidden">
+        <div class="vbt-header">
+          <span class="small" id="vbtTitleLabel">🎯 Liikenopeusalueet (VBT)</span>
+          <span id="vbtMvtLabel" style="font-size: 11px; color: var(--muted); font-weight: 600;"></span>
+        </div>
+        <div id="vbtZoneGrid" class="vbt-grid"></div>
+      </div>
     </div>
 
     <div id="heroCard" class="card hero">
       <div id="readinessBanner" class="readiness-banner">
         ⚪ Yhdistä Pin yläkulmasta aloittaaksesi
       </div>
-      <div class="row" style="justify-content: center; margin-bottom: 6px;">
+      <div class="row" style="justify-content: center; margin-bottom: 6px; gap: 6px; flex-wrap: wrap;">
         <span id="setNumberBadge" class="set-badge">Sarja #1</span>
+        <span id="liveVbtBadge" class="vbt-zone-badge hidden"></span>
       </div>
       <div class="small" style="color: var(--muted); font-size: 12px; font-weight: 600;">MOVEMENT POWER</div>
       <div id="liveVel" class="hero-vel">-- m/s</div>
@@ -1491,6 +1575,190 @@
       return v !== null && v !== undefined && v >= 0.20 && v <= 0.60;
     }
 
+    // --- VBT (Velocity-Based Training) Profiles for Squat, Bench Press, Military Bench, Deadlift ---
+    // Based on established literature: González-Badillo & Sánchez-Medina (2010/2017), Bryan Mann (2016),
+    // Helms et al. (2017), and Ruf et al. (2018).
+    let selectedTargetVbtZoneKey = null;
+
+    const VBT_PROFILES = {
+      squat: {
+        id: 'squat',
+        name: 'Jalkakyykky',
+        mvt: 0.23,
+        mvtText: '1RM kynnys (MVT): ~0.23 m/s',
+        zones: [
+          {
+            key: 'max',
+            label: 'Maksimivoima',
+            subLabel: '85–100% 1RM',
+            rangeText: '0.23 – 0.50 m/s',
+            minVel: 0.01,
+            maxVel: 0.50,
+            cssClass: 'zone-max',
+            icon: '🔴'
+          },
+          {
+            key: 'acc',
+            label: 'Perus- / kiihdyttävä voima',
+            subLabel: '65–85% 1RM',
+            rangeText: '0.50 – 0.75 m/s',
+            minVel: 0.50,
+            maxVel: 0.75,
+            cssClass: 'zone-acc',
+            icon: '🟠'
+          },
+          {
+            key: 'str-spd',
+            label: 'Nopeusvoima (Voimapainotteinen)',
+            subLabel: '45–65% 1RM',
+            rangeText: '0.75 – 1.00 m/s',
+            minVel: 0.75,
+            maxVel: 1.00,
+            cssClass: 'zone-str-spd',
+            icon: '🟢'
+          },
+          {
+            key: 'spd-str',
+            label: 'Nopeusvoima (Räjähtävä)',
+            subLabel: '30–45% 1RM',
+            rangeText: '1.00 – 1.30+ m/s',
+            minVel: 1.00,
+            maxVel: 99.0,
+            cssClass: 'zone-spd-str',
+            icon: '⚡'
+          }
+        ]
+      },
+      bench: {
+        id: 'bench',
+        name: 'Penkkipunnerrus / Sotilaspenkki',
+        mvt: 0.15,
+        mvtText: '1RM kynnys (MVT): ~0.15 m/s',
+        zones: [
+          {
+            key: 'max',
+            label: 'Maksimivoima',
+            subLabel: '85–100% 1RM',
+            rangeText: '0.15 – 0.45 m/s',
+            minVel: 0.01,
+            maxVel: 0.45,
+            cssClass: 'zone-max',
+            icon: '🔴'
+          },
+          {
+            key: 'acc',
+            label: 'Perus- / kiihdyttävä voima',
+            subLabel: '65–85% 1RM',
+            rangeText: '0.45 – 0.75 m/s',
+            minVel: 0.45,
+            maxVel: 0.75,
+            cssClass: 'zone-acc',
+            icon: '🟠'
+          },
+          {
+            key: 'str-spd',
+            label: 'Nopeusvoima (Voimapainotteinen)',
+            subLabel: '45–65% 1RM',
+            rangeText: '0.75 – 0.95 m/s',
+            minVel: 0.75,
+            maxVel: 0.95,
+            cssClass: 'zone-str-spd',
+            icon: '🟢'
+          },
+          {
+            key: 'spd-str',
+            label: 'Nopeusvoima (Räjähtävä)',
+            subLabel: '30–45% 1RM',
+            rangeText: '0.95 – 1.30+ m/s',
+            minVel: 0.95,
+            maxVel: 99.0,
+            cssClass: 'zone-spd-str',
+            icon: '⚡'
+          }
+        ]
+      },
+      deadlift: {
+        id: 'deadlift',
+        name: 'Maastaveto',
+        mvt: 0.14,
+        mvtText: '1RM kynnys (MVT): ~0.14 m/s',
+        zones: [
+          {
+            key: 'max',
+            label: 'Maksimivoima',
+            subLabel: '85–100% 1RM',
+            rangeText: '0.14 – 0.45 m/s',
+            minVel: 0.01,
+            maxVel: 0.45,
+            cssClass: 'zone-max',
+            icon: '🔴'
+          },
+          {
+            key: 'acc',
+            label: 'Perus- / kiihdyttävä voima',
+            subLabel: '65–85% 1RM',
+            rangeText: '0.45 – 0.70 m/s',
+            minVel: 0.45,
+            maxVel: 0.70,
+            cssClass: 'zone-acc',
+            icon: '🟠'
+          },
+          {
+            key: 'str-spd',
+            label: 'Nopeusvoima (Voimapainotteinen)',
+            subLabel: '50–65% 1RM',
+            rangeText: '0.70 – 0.90 m/s',
+            minVel: 0.70,
+            maxVel: 0.90,
+            cssClass: 'zone-str-spd',
+            icon: '🟢'
+          },
+          {
+            key: 'spd-str',
+            label: 'Nopeusvoima (Räjähtävä)',
+            subLabel: '30–50% 1RM',
+            rangeText: '0.90 – 1.20+ m/s',
+            minVel: 0.90,
+            maxVel: 99.0,
+            cssClass: 'zone-spd-str',
+            icon: '⚡'
+          }
+        ]
+      }
+    };
+
+    function getVbtProfileForExercise(exerciseName) {
+      const s = String(exerciseName || '').toLowerCase().trim();
+      if (!s) return null;
+      if (s.includes('kyykky') || s.includes('squat')) {
+        return VBT_PROFILES.squat;
+      }
+      if (s.includes('penkki') || s.includes('bench')) {
+        return VBT_PROFILES.bench;
+      }
+      if (s.includes('maastaveto') || s.includes('mave') || s.includes('deadlift')) {
+        return VBT_PROFILES.deadlift;
+      }
+      return null;
+    }
+
+    function classifyVbtVelocity(exerciseName, velocity) {
+      const profile = getVbtProfileForExercise(exerciseName);
+      if (!profile || velocity === null || velocity === undefined || velocity <= 0) return null;
+      for (const z of profile.zones) {
+        if (velocity >= z.minVel && velocity < z.maxVel) {
+          return z;
+        }
+      }
+      return profile.zones[profile.zones.length - 1];
+    }
+
+    function getCurrentSelectedExerciseName() {
+      const sel = document.getElementById('exerciseSelect');
+      if (sel && sel.value && sel.value !== ADD_NEW_EX_VALUE) return sel.value;
+      return exercises[0] || DEFAULT_EXERCISES[0];
+    }
+
     // Epley 1RM formula: 1RM = w * (1 + r / 30) for r > 1, and w for r === 1
     function calcEpley1RM(weightKg, reps) {
       const w = Number(weightKg);
@@ -1546,10 +1814,31 @@
       }).join('');
     }
 
+    function deleteSavedSet(dateStr, setIdx) {
+      const wIdx = workouts.findIndex((w) => w.date === dateStr);
+      if (wIdx === -1) return;
+      const w = workouts[wIdx];
+      if (!w.sets || setIdx < 0 || setIdx >= w.sets.length) return;
+      const [removed] = w.sets.splice(setIdx, 1);
+      if (w.sets.length === 0) {
+        workouts.splice(wIdx, 1);
+      }
+      if (removed && lastSavedSetRef === removed) {
+        currentReps = [];
+        currentSetSaved = false;
+        lastSavedSetRef = null;
+      }
+      saveJSON(KEY_WORKOUTS, workouts);
+      renderLiveSet();
+      renderCalendar();
+      renderHistoryList();
+    }
+
     function renderTodaySetsOnLiftTab() {
       const card = document.getElementById('todaySetsCard');
       const listEl = document.getElementById('todaySetsList');
       const countEl = document.getElementById('todaySetsCount');
+      const dateStr = document.getElementById('workoutDate').value || todayISO();
       const sets = getCompletedSetsForCurrentDate();
 
       if (!sets || sets.length === 0) {
@@ -1562,22 +1851,110 @@
       countEl.textContent = `${sets.length} sarjaa valmiina`;
       listEl.innerHTML = sets.map((s, idx) => {
         const bestVel = Math.max(0, ...s.reps.map((r) => r.meanVelocity));
+        const avgVel = s.reps.length ? s.reps.reduce((a, r) => a + r.meanVelocity, 0) / s.reps.length : 0;
         const dropPct = calcVelocityDropPct(s.reps);
         const dropText = dropPct !== null ? ` • Pudotus ${formatDropBadge(dropPct)}` : '';
         const est1RM = calcEpley1RM(s.weightKg, s.reps.length);
         const rmText = est1RM !== null ? ` • 1RM: <strong style="color:#60a5fa;">${est1RM.toFixed(1)} kg</strong>` : '';
+        const vbtZone = classifyVbtVelocity(s.exercise, avgVel);
+        const vbtText = vbtZone ? ` • ${vbtZone.icon} <strong>${vbtZone.label}</strong>` : '';
         return `
           <div class="history-set" style="padding: 8px 10px; margin-top: 6px;">
-            <div class="row">
+            <div class="row" style="gap: 8px;">
               <strong style="font-size: 13px;">Sarja #${idx + 1}: ${s.exercise}</strong>
-              <span style="color: var(--muted); font-size: 12px;">${s.weightKg} kg • ${s.reps.length}/${s.targetReps} toistoa</span>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="color: var(--muted); font-size: 12px;">${s.weightKg} kg • ${s.reps.length}/${s.targetReps} toistoa</span>
+                <button type="button" class="danger" data-del-set-idx="${idx}" style="padding: 3px 8px; font-size: 11px; border-radius: 6px;">🗑 Poista</button>
+              </div>
             </div>
             <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">
-              Paras: ${bestVel.toFixed(2)} m/s${dropText}${rmText}
+              Paras: ${bestVel.toFixed(2)} m/s${vbtText}${dropText}${rmText}
             </div>
           </div>
         `;
       }).join('');
+
+      listEl.querySelectorAll('[data-del-set-idx]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.getAttribute('data-del-set-idx'), 10);
+          deleteSavedSet(dateStr, idx);
+        });
+      });
+    }
+
+    function renderVbtZoneBox(exerciseName, lastVel) {
+      const box = document.getElementById('vbtZoneBox');
+      const titleEl = document.getElementById('vbtTitleLabel');
+      const mvtEl = document.getElementById('vbtMvtLabel');
+      const gridEl = document.getElementById('vbtZoneGrid');
+      const liveBadge = document.getElementById('liveVbtBadge');
+      if (!box || !gridEl) return;
+
+      const profile = getVbtProfileForExercise(exerciseName);
+      if (!profile) {
+        box.classList.add('hidden');
+        gridEl.innerHTML = '';
+        if (liveBadge) {
+          liveBadge.classList.add('hidden');
+          liveBadge.textContent = '';
+        }
+        return;
+      }
+
+      box.classList.remove('hidden');
+      titleEl.textContent = `🎯 Voiman osa-alueet (${exerciseName})`;
+      mvtEl.textContent = profile.mvtText;
+
+      const activeZone = classifyVbtVelocity(exerciseName, lastVel);
+
+      gridEl.innerHTML = profile.zones.map((z) => {
+        const isSelected = selectedTargetVbtZoneKey === z.key;
+        const isHit = activeZone && activeZone.key === z.key;
+        const cls = 'vbt-zone-row'
+          + (isSelected ? ' target-selected' : '')
+          + (isHit ? ' active-hit' : '');
+        return `
+          <div class="${cls}" data-zone-key="${z.key}">
+            <div style="display:flex; align-items:center; gap:6px; min-width:0;">
+              <span>${z.icon}</span>
+              <div style="display:flex; flex-direction:column; min-width:0;">
+                <strong style="font-size:12px; color:var(--text);">${z.label}${isSelected ? ' (Tavoite)' : ''}${isHit ? ' ✓' : ''}</strong>
+                <span style="font-size:11px; color:var(--muted);">Kuorma: ${z.subLabel}</span>
+              </div>
+            </div>
+            <strong style="font-size:12px; white-space:nowrap;">${z.rangeText}</strong>
+          </div>
+        `;
+      }).join('');
+
+      gridEl.querySelectorAll('.vbt-zone-row').forEach((rowEl) => {
+        rowEl.addEventListener('click', () => {
+          const key = rowEl.getAttribute('data-zone-key');
+          selectedTargetVbtZoneKey = (selectedTargetVbtZoneKey === key) ? null : key;
+          renderLiveSet();
+        });
+      });
+
+      if (liveBadge) {
+        if (activeZone && lastVel !== null && lastVel !== undefined) {
+          liveBadge.className = `vbt-zone-badge ${activeZone.cssClass}`;
+          const mvtNote = lastVel < profile.mvt ? ' (alle 1RM MVT!)' : '';
+          liveBadge.textContent = `${activeZone.icon} ${activeZone.label}${mvtNote}`;
+          liveBadge.classList.remove('hidden');
+        } else if (selectedTargetVbtZoneKey) {
+          const targetZ = profile.zones.find((z) => z.key === selectedTargetVbtZoneKey);
+          if (targetZ) {
+            liveBadge.className = `vbt-zone-badge ${targetZ.cssClass}`;
+            liveBadge.textContent = `🎯 Tavoite: ${targetZ.label} (${targetZ.rangeText})`;
+            liveBadge.classList.remove('hidden');
+          } else {
+            liveBadge.classList.add('hidden');
+          }
+        } else {
+          liveBadge.classList.add('hidden');
+          liveBadge.textContent = '';
+        }
+      }
     }
 
     function renderLiveSet() {
@@ -1586,6 +1963,9 @@
       const count = currentReps.length;
       const last = currentReps[count - 1];
       const displaySetNum = getActiveSetDisplayNumber();
+      const currentExercise = getCurrentSelectedExerciseName();
+
+      renderVbtZoneBox(currentExercise, last ? last.meanVelocity : null);
 
       // Update Setup Card Epley 1RM (based on chosen weight & target reps)
       const setup1RM = calcEpley1RM(weightKg, target);
@@ -1713,11 +2093,16 @@
         const vsFirstHtml = idx === 0
           ? `<span style="color:var(--muted); font-size:12px;">1. toisto</span>`
           : `<span class="${dropColorClass(repDrop)}" style="font-size:12px; font-weight:600;">${formatDropBadge(repDrop)}</span>`;
+        const repVbt = classifyVbtVelocity(currentExercise, r.meanVelocity);
+        const repVbtHtml = repVbt
+          ? `<span style="font-size:11px; color:var(--muted); font-weight:600;">${repVbt.icon} ${repVbt.label}</span>`
+          : '';
 
         div.innerHTML = `
-          <div class="rep-item-top">
+          <div class="rep-item-top" style="flex-wrap: wrap;">
             <span class="rep-num">#${idx + 1}</span>
             <span><strong>${r.meanVelocity.toFixed(2)} m/s</strong> (${r.power.toFixed(1)} W)</span>
+            ${repVbtHtml}
             ${vsFirstHtml}
             ${lowHtml}
             <span style="color:var(--muted)">${r.rangeOfMotionCm.toFixed(0)} cm</span>
@@ -1813,6 +2198,7 @@
         `;
         row.querySelector('span').addEventListener('click', () => {
           renderExerciseSelect(ex);
+          renderLiveSet();
           document.getElementById('exerciseModal').classList.add('hidden');
         });
         row.querySelector('button').addEventListener('click', (e) => {
@@ -1821,6 +2207,7 @@
           if (exercises.length === 0) exercises.push(...DEFAULT_EXERCISES);
           saveJSON(KEY_EXERCISES, exercises);
           renderExerciseSelect();
+          renderLiveSet();
           renderExerciseModal();
         });
         container.appendChild(row);
@@ -1884,6 +2271,7 @@
         let html = `<div style="font-weight:700; margin-bottom:6px;">📅 ${w.date}</div>`;
         w.sets.forEach((s, sIdx) => {
           const bestVel = Math.max(0, ...s.reps.map((r) => r.meanVelocity));
+          const avgVel = s.reps.length ? s.reps.reduce((a, r) => a + r.meanVelocity, 0) / s.reps.length : 0;
           const bestWatt = Math.max(0, ...s.reps.map((r) => r.power));
           const avgRom = s.reps.length ? s.reps.reduce((a, r) => a + r.rangeOfMotionCm, 0) / s.reps.length : 0;
           const dropPct = calcVelocityDropPct(s.reps);
@@ -1894,23 +2282,37 @@
           const rmHtml = est1RM !== null
             ? ` • 1RM (Epley): <strong style="color:#60a5fa;">${est1RM.toFixed(1)} kg</strong>`
             : '';
+          const vbtZone = classifyVbtVelocity(s.exercise, avgVel);
+          const vbtHtml = vbtZone
+            ? ` • ${vbtZone.icon} <strong>${vbtZone.label}</strong>`
+            : '';
           const chartHtml = s.reps.length > 0
             ? `<div class="vel-chart" style="height:88px; margin-top:8px;">${buildVelocityChartHTML(s.reps)}</div>`
             : '';
           html += `
             <div class="history-set">
-              <div class="row">
+              <div class="row" style="gap: 8px;">
                 <strong>#${sIdx + 1} ${s.exercise}</strong>
-                <span style="color:var(--muted); font-size:13px;">${s.weightKg} kg • ${s.reps.length}/${s.targetReps} toistoa</span>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="color:var(--muted); font-size:13px;">${s.weightKg} kg • ${s.reps.length}/${s.targetReps} toistoa</span>
+                  <button type="button" class="danger" data-del-date="${w.date}" data-del-idx="${sIdx}" style="padding: 4px 8px; font-size: 11px; border-radius: 6px;">🗑 Poista</button>
+                </div>
               </div>
               <div style="font-size:13px; color:var(--muted); margin-top:4px;">
-                Paras: ${bestVel.toFixed(2)} m/s (${bestWatt.toFixed(1)} W) • Avg ROM ${avgRom.toFixed(0)} cm${dropHtml}${rmHtml}
+                Paras: ${bestVel.toFixed(2)} m/s (${bestWatt.toFixed(1)} W) • Avg ROM ${avgRom.toFixed(0)} cm${vbtHtml}${dropHtml}${rmHtml}
               </div>
               ${chartHtml}
             </div>
           `;
         });
         card.innerHTML = html;
+        card.querySelectorAll('[data-del-date]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const dStr = btn.getAttribute('data-del-date');
+            const idx = parseInt(btn.getAttribute('data-del-idx'), 10);
+            deleteSavedSet(dStr, idx);
+          });
+        });
         container.appendChild(card);
       });
     }
@@ -1920,7 +2322,7 @@
       const list = getFilteredWorkouts();
       const source = list.length > 0 ? list : workouts;
       const rows = [
-        'date,time,exercise,set_number,weight_kg,target_reps,rep_number,movement_power_m_s,movement_power_w,controlled_lowering_m_s,lowering_status,rom_cm,set_velocity_drop_1st_to_last_pct,epley_1rm_kg'
+        'date,time,exercise,set_number,weight_kg,target_reps,rep_number,movement_power_m_s,movement_power_w,vbt_strength_zone,controlled_lowering_m_s,lowering_status,rom_cm,set_velocity_drop_1st_to_last_pct,epley_1rm_kg'
       ];
       source.forEach((w) => {
         w.sets.forEach((s, sIdx) => {
@@ -1934,6 +2336,8 @@
             const status = r.loweringVelocity !== null && r.loweringVelocity !== undefined
               ? (isControlled(r.loweringVelocity) ? 'GREEN' : 'RED')
               : '';
+            const repZone = classifyVbtVelocity(s.exercise, r.meanVelocity);
+            const zoneStr = repZone ? `"${repZone.label}"` : '';
             rows.push([
               w.date,
               s.time || '',
@@ -1944,6 +2348,7 @@
               rIdx + 1,
               r.meanVelocity.toFixed(3),
               r.power.toFixed(2),
+              zoneStr,
               low,
               status,
               r.rangeOfMotionCm.toFixed(1),
@@ -2045,7 +2450,10 @@
         const inlineForm = document.getElementById('inlineExerciseForm');
         inlineForm.classList.remove('hidden');
         renderExerciseSelect(exercises[0]);
+        renderLiveSet();
         setTimeout(() => document.getElementById('inlineExerciseInput').focus(), 50);
+      } else {
+        renderLiveSet();
       }
     });
 
@@ -2056,6 +2464,7 @@
         input.value = '';
         input.blur();
         document.getElementById('inlineExerciseForm').classList.add('hidden');
+        renderLiveSet();
       }
     });
 
@@ -2085,6 +2494,7 @@
       const val = input.value.trim();
       if (!val) return;
       addNewExercise(val);
+      renderLiveSet();
       input.value = '';
       input.blur();
       const fb = document.getElementById('exerciseFeedback');

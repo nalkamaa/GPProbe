@@ -516,6 +516,7 @@ struct ExerciseManagerSheet: View {
 // MARK: - Calendar & CSV Export View
 
 struct HistoryView: View {
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \Workout.date, order: .reverse) private var workouts: [Workout]
     @State private var selectedDate: Date = .now
     @State private var filterByDate: Bool = true
@@ -532,6 +533,15 @@ struct HistoryView: View {
         fmt.formatOptions = [.withFullDate]
         let name = filterByDate ? "gpath_\(fmt.string(from: selectedDate)).csv" : "gpath_all_workouts.csv"
         return CSVDocument(text: CSVExporter.export(workouts: list), filename: name)
+    }
+
+    private func deleteSet(_ set: ExerciseSet, from workout: Workout) {
+        workout.sets.removeAll { $0.id == set.id }
+        modelContext.delete(set)
+        if workout.sets.isEmpty {
+            modelContext.delete(workout)
+        }
+        try? modelContext.save()
     }
 
     var body: some View {
@@ -552,8 +562,9 @@ struct HistoryView: View {
                 } else {
                     List {
                         ForEach(filteredWorkouts) { workout in
+                            let sortedSets = workout.sets.sorted(by: { $0.createdAt < $1.createdAt })
                             Section(workout.date.formatted(date: .abbreviated, time: .omitted)) {
-                                ForEach(workout.sets.sorted(by: { $0.createdAt < $1.createdAt })) { set in
+                                ForEach(sortedSets) { set in
                                     VStack(alignment: .leading, spacing: 4) {
                                         HStack {
                                             Text(set.exercise).font(.headline)
@@ -562,12 +573,24 @@ struct HistoryView: View {
                                                         set.weightKg, set.reps.count, set.targetReps))
                                                 .font(.subheadline)
                                                 .foregroundStyle(.secondary)
+                                            Button(role: .destructive) {
+                                                deleteSet(set, from: workout)
+                                            } label: {
+                                                Image(systemName: "trash")
+                                                    .font(.caption)
+                                            }
+                                            .buttonStyle(.borderless)
                                         }
                                         let rmText = set.estimated1RM.map { String(format: " • 1RM: %.1f kg", $0) } ?? ""
                                         Text(String(format: "Paras: %.2f m/s (%.1f W) • Avg ROM %.0f cm%@",
                                                     set.bestVelocity, set.bestPower, set.averageRangeOfMotionCm, rmText))
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .onDelete { offsets in
+                                    for idx in offsets {
+                                        deleteSet(sortedSets[idx], from: workout)
                                     }
                                 }
                             }
