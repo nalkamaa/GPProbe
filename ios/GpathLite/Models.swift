@@ -30,6 +30,17 @@ final class LiftSet {
         guard !reps.isEmpty else { return 0 }
         return reps.map(\.rangeOfMotionCm).reduce(0, +) / Double(reps.count)
     }
+
+    /// Theoretical 1RM using Epley's formula: 1RM = w * (1 + r / 30.0) for r > 1, and w for r == 1.
+    static func epley1RM(weightKg: Double, reps: Int) -> Double? {
+        guard weightKg > 0, reps > 0 else { return nil }
+        if reps == 1 { return weightKg }
+        return weightKg * (1.0 + Double(reps) / 30.0)
+    }
+
+    var estimated1RM: Double? {
+        Self.epley1RM(weightKg: weightKg, reps: reps.count)
+    }
 }
 
 struct Rep: Codable, Hashable {
@@ -70,7 +81,7 @@ struct Rep: Codable, Hashable {
 enum CSVExporter {
     static func export(workouts: [Workout]) -> String {
         var lines = [
-            "date,time,exercise,set_number,weight_kg,target_reps,rep_number,movement_power_m_s,movement_power_w,controlled_lowering_m_s,lowering_status,rom_cm"
+            "date,time,exercise,set_number,weight_kg,target_reps,rep_number,movement_power_m_s,movement_power_w,controlled_lowering_m_s,lowering_status,rom_cm,epley_1rm_kg"
         ]
         let dateFmt = ISO8601DateFormatter()
         dateFmt.formatOptions = [.withFullDate]
@@ -84,6 +95,7 @@ enum CSVExporter {
                 let dStr = dateFmt.string(from: workout.date)
                 let tStr = timeFmt.string(from: set.createdAt)
                 let escapedExercise = "\"\(set.exercise.replacingOccurrences(of: "\"", with: "\"\""))\""
+                let rmStr = set.estimated1RM.map { String(format: "%.1f", $0) } ?? ""
                 for (repIdx, rep) in set.reps.enumerated() {
                     let lowStr = rep.loweringVelocity.map { String(format: "%.3f", $0) } ?? ""
                     let statusStr: String
@@ -93,10 +105,10 @@ enum CSVExporter {
                         statusStr = ""
                     }
                     let line = String(
-                        format: "%@,%@,%@,%d,%.1f,%d,%d,%.3f,%.2f,%@,%@,%.1f",
+                        format: "%@,%@,%@,%d,%.1f,%d,%d,%.3f,%.2f,%@,%@,%.1f,%@",
                         dStr, tStr, escapedExercise,
                         setIdx + 1, set.weightKg, set.targetReps, repIdx + 1,
-                        rep.meanVelocity, rep.power, lowStr, statusStr, rep.rangeOfMotionCm
+                        rep.meanVelocity, rep.power, lowStr, statusStr, rep.rangeOfMotionCm, rmStr
                     )
                     lines.append(line)
                 }

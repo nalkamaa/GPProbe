@@ -218,14 +218,14 @@
     }
     .sub-metrics {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
       margin-top: 14px;
       padding-top: 12px;
       border-top: 1px solid var(--border);
     }
     .sub-metric-val {
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 700;
       margin-top: 2px;
       font-variant-numeric: tabular-nums;
@@ -530,6 +530,11 @@
           <button type="button" id="repPlusBtn">+</button>
         </div>
       </div>
+
+      <div class="row" style="padding-top: 8px; border-top: 1px solid var(--border);">
+        <span class="small">Arvioitu 1RM (Epley)</span>
+        <span id="setupEpley1RM" style="font-size: 15px; font-weight: 700; color: #60a5fa; font-variant-numeric: tabular-nums;">-- kg</span>
+      </div>
     </div>
 
     <div class="card hero">
@@ -542,16 +547,20 @@
 
       <div class="sub-metrics">
         <div>
-          <div class="small" style="font-size: 11px; color: var(--muted);">LOWERING</div>
+          <div class="small" style="font-size: 10px; color: var(--muted);">LOWERING</div>
           <div id="liveLowering" class="sub-metric-val">-- m/s</div>
         </div>
         <div>
-          <div class="small" style="font-size: 11px; color: var(--muted);">AVG ROM</div>
+          <div class="small" style="font-size: 10px; color: var(--muted);">AVG ROM</div>
           <div id="liveRom" class="sub-metric-val">-- cm</div>
         </div>
         <div>
-          <div class="small" style="font-size: 11px; color: var(--muted);">PUDOTUS 1.→VIIM.</div>
+          <div class="small" style="font-size: 10px; color: var(--muted);">PUDOTUS</div>
           <div id="liveVelDrop" class="sub-metric-val">-- %</div>
+        </div>
+        <div>
+          <div class="small" style="font-size: 10px; color: var(--muted);">1RM (EPLEY)</div>
+          <div id="liveEpley1RM" class="sub-metric-val" style="color: #60a5fa;">-- kg</div>
         </div>
       </div>
     </div>
@@ -1381,6 +1390,15 @@
       return v !== null && v !== undefined && v >= 0.20 && v <= 0.60;
     }
 
+    // Epley 1RM formula: 1RM = w * (1 + r / 30) for r > 1, and w for r === 1
+    function calcEpley1RM(weightKg, reps) {
+      const w = Number(weightKg);
+      const r = Number(reps);
+      if (!w || w <= 0 || !r || r <= 0) return null;
+      if (r === 1) return w;
+      return w * (1 + r / 30);
+    }
+
     function calcVelocityDropPct(reps) {
       if (!reps || reps.length < 2) return null;
       const first = reps[0].meanVelocity;
@@ -1445,6 +1463,8 @@
         const bestVel = Math.max(0, ...s.reps.map((r) => r.meanVelocity));
         const dropPct = calcVelocityDropPct(s.reps);
         const dropText = dropPct !== null ? ` • Pudotus ${formatDropBadge(dropPct)}` : '';
+        const est1RM = calcEpley1RM(s.weightKg, s.reps.length);
+        const rmText = est1RM !== null ? ` • 1RM: <strong style="color:#60a5fa;">${est1RM.toFixed(1)} kg</strong>` : '';
         return `
           <div class="history-set" style="padding: 8px 10px; margin-top: 6px;">
             <div class="row">
@@ -1452,7 +1472,7 @@
               <span style="color: var(--muted); font-size: 12px;">${s.weightKg} kg • ${s.reps.length}/${s.targetReps} toistoa</span>
             </div>
             <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">
-              Paras: ${bestVel.toFixed(2)} m/s${dropText}
+              Paras: ${bestVel.toFixed(2)} m/s${dropText}${rmText}
             </div>
           </div>
         `;
@@ -1460,10 +1480,27 @@
     }
 
     function renderLiveSet() {
+      const weightKg = parseFloat(document.getElementById('weightInput').value) || 0;
       const target = parseInt(document.getElementById('targetRepsInput').value, 10) || 10;
       const count = currentReps.length;
       const last = currentReps[count - 1];
       const displaySetNum = getActiveSetDisplayNumber();
+
+      // Update Setup Card Epley 1RM (based on chosen weight & target reps)
+      const setup1RM = calcEpley1RM(weightKg, target);
+      const setup1RMEl = document.getElementById('setupEpley1RM');
+      if (setup1RMEl) {
+        setup1RMEl.textContent = setup1RM !== null
+          ? `${setup1RM.toFixed(1)} kg (${weightKg} kg × ${target})`
+          : '-- kg';
+      }
+
+      // Update Live Set Epley 1RM (based on completed reps in the set, or -- kg before first rep)
+      const live1RMEl = document.getElementById('liveEpley1RM');
+      if (live1RMEl) {
+        const live1RM = calcEpley1RM(weightKg, count);
+        live1RMEl.textContent = live1RM !== null ? `${live1RM.toFixed(1)} kg` : '-- kg';
+      }
 
       const badge = document.getElementById('setNumberBadge');
       if (currentSetSaved && count > 0) {
@@ -1726,6 +1763,10 @@
           const dropHtml = dropPct !== null
             ? ` • Pudotus 1.→viim.: <strong class="${dropColorClass(dropPct)}">${formatDropBadge(dropPct)}</strong>`
             : '';
+          const est1RM = calcEpley1RM(s.weightKg, s.reps.length);
+          const rmHtml = est1RM !== null
+            ? ` • 1RM (Epley): <strong style="color:#60a5fa;">${est1RM.toFixed(1)} kg</strong>`
+            : '';
           const chartHtml = s.reps.length > 0
             ? `<div class="vel-chart" style="height:88px; margin-top:8px;">${buildVelocityChartHTML(s.reps)}</div>`
             : '';
@@ -1736,7 +1777,7 @@
                 <span style="color:var(--muted); font-size:13px;">${s.weightKg} kg • ${s.reps.length}/${s.targetReps} toistoa</span>
               </div>
               <div style="font-size:13px; color:var(--muted); margin-top:4px;">
-                Paras: ${bestVel.toFixed(2)} m/s (${bestWatt.toFixed(1)} W) • Avg ROM ${avgRom.toFixed(0)} cm${dropHtml}
+                Paras: ${bestVel.toFixed(2)} m/s (${bestWatt.toFixed(1)} W) • Avg ROM ${avgRom.toFixed(0)} cm${dropHtml}${rmHtml}
               </div>
               ${chartHtml}
             </div>
@@ -1752,13 +1793,15 @@
       const list = getFilteredWorkouts();
       const source = list.length > 0 ? list : workouts;
       const rows = [
-        'date,time,exercise,set_number,weight_kg,target_reps,rep_number,movement_power_m_s,movement_power_w,controlled_lowering_m_s,lowering_status,rom_cm,set_velocity_drop_1st_to_last_pct'
+        'date,time,exercise,set_number,weight_kg,target_reps,rep_number,movement_power_m_s,movement_power_w,controlled_lowering_m_s,lowering_status,rom_cm,set_velocity_drop_1st_to_last_pct,epley_1rm_kg'
       ];
       source.forEach((w) => {
         w.sets.forEach((s, sIdx) => {
           const ex = `"${String(s.exercise).replace(/"/g, '""')}"`;
           const setDrop = calcVelocityDropPct(s.reps);
           const setDropStr = setDrop !== null ? setDrop.toFixed(1) : '';
+          const set1RM = calcEpley1RM(s.weightKg, s.reps.length);
+          const set1RMStr = set1RM !== null ? set1RM.toFixed(1) : '';
           s.reps.forEach((r, rIdx) => {
             const low = r.loweringVelocity !== null && r.loweringVelocity !== undefined ? r.loweringVelocity.toFixed(3) : '';
             const status = r.loweringVelocity !== null && r.loweringVelocity !== undefined
@@ -1777,7 +1820,8 @@
               low,
               status,
               r.rangeOfMotionCm.toFixed(1),
-              setDropStr
+              setDropStr,
+              set1RMStr
             ].join(','));
           });
         });
@@ -1849,8 +1893,11 @@
         const input = document.getElementById('weightInput');
         const delta = parseFloat(btn.getAttribute('data-weight-delta'));
         input.value = Math.max(0, (parseFloat(input.value) || 0) + delta);
+        renderLiveSet();
       });
     });
+    document.getElementById('weightInput').addEventListener('input', renderLiveSet);
+    document.getElementById('weightInput').addEventListener('change', renderLiveSet);
 
     document.getElementById('repMinusBtn').addEventListener('click', () => {
       const input = document.getElementById('targetRepsInput');
@@ -1862,6 +1909,7 @@
       input.value = (parseInt(input.value, 10) || 10) + 1;
       renderLiveSet();
     });
+    document.getElementById('targetRepsInput').addEventListener('input', renderLiveSet);
     document.getElementById('targetRepsInput').addEventListener('change', renderLiveSet);
 
     // Exercise selection & adding (both modal and inline on iOS)

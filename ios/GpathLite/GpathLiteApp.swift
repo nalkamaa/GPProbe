@@ -267,18 +267,34 @@ struct LiveSetView: View {
                             .font(.subheadline.bold())
                             .fixedSize()
                     }
+
+                    Divider()
+
+                    HStack {
+                        Text("Arvioitu 1RM (Epley)").font(.caption.bold()).foregroundStyle(.secondary)
+                        Spacer()
+                        if let target1RM = LiftSet.epley1RM(weightKg: weightKg, reps: targetReps) {
+                            Text(String(format: "%.1f kg (%.1f kg × %d)", target1RM, weightKg, targetReps))
+                                .font(.subheadline.bold())
+                                .foregroundStyle(.blue)
+                        } else {
+                            Text("-- kg")
+                                .font(.subheadline.bold())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 .padding(10)
                 .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
 
-                // Live metrics card: Movement power (m/s & W), Controlled lowering, Avg ROM
+                // Live metrics card: Movement power (m/s & W), Controlled lowering, Avg ROM, 1RM (Epley)
                 VStack(spacing: 6) {
                     Text(reps.last.map { String(format: "%.2f m/s", $0.meanVelocity) } ?? "-- m/s")
                         .font(.system(size: 54, weight: .bold, design: .rounded))
                     Text(reps.last.map { String(format: "%.2f W", $0.power) } ?? "-- W")
                         .font(.title2.bold())
 
-                    HStack(spacing: 28) {
+                    HStack(spacing: 22) {
                         VStack {
                             Text("Controlled Lowering").font(.caption).foregroundStyle(.secondary)
                             Text(reps.last?.loweringVelocity.map { String(format: "%.2f m/s", $0) } ?? "-- m/s")
@@ -289,6 +305,12 @@ struct LiveSetView: View {
                             Text("Avg ROM").font(.caption).foregroundStyle(.secondary)
                             Text(reps.isEmpty ? "-- cm" : String(format: "%.0f cm", avgRomCm))
                                 .font(.headline)
+                        }
+                        VStack {
+                            Text("1RM (Epley)").font(.caption).foregroundStyle(.secondary)
+                            Text(LiftSet.epley1RM(weightKg: weightKg, reps: reps.count).map { String(format: "%.1f kg", $0) } ?? "-- kg")
+                                .font(.headline)
+                                .foregroundStyle(.blue)
                         }
                     }
                     .padding(.top, 4)
@@ -538,8 +560,9 @@ struct HistoryView: View {
                                                 .font(.subheadline)
                                                 .foregroundStyle(.secondary)
                                         }
-                                        Text(String(format: "Paras: %.2f m/s (%.1f W) • Avg ROM %.0f cm",
-                                                    set.bestVelocity, set.bestPower, set.averageRangeOfMotionCm))
+                                        let rmText = set.estimated1RM.map { String(format: " • 1RM: %.1f kg", $0) } ?? ""
+                                        Text(String(format: "Paras: %.2f m/s (%.1f W) • Avg ROM %.0f cm%@",
+                                                    set.bestVelocity, set.bestPower, set.averageRangeOfMotionCm, rmText))
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                     }
