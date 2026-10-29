@@ -626,11 +626,11 @@
       <div class="row">
         <label class="small" for="weightInput">Paino (kg)</label>
         <div class="stepper">
+          <button type="button" data-weight-delta="-5">-5</button>
           <button type="button" data-weight-delta="-2.5">-2.5</button>
-          <button type="button" data-weight-delta="-1">-1</button>
           <input type="number" id="weightInput" value="100" min="0" step="0.5" inputmode="decimal" />
-          <button type="button" data-weight-delta="1">+1</button>
           <button type="button" data-weight-delta="2.5">+2.5</button>
+          <button type="button" data-weight-delta="5">+5</button>
         </div>
       </div>
 
@@ -1085,7 +1085,7 @@
       ]);
     }
 
-    // --- BLE Communication ---
+    // --- BLE Communication, Screen Wake Lock & Keep-Alive ---
     function setStatus(text, mode) {
       document.getElementById('statusText').textContent = text;
       const dot = document.getElementById('statusDot');
@@ -1096,6 +1096,147 @@
     let writeChain = Promise.resolve();
     let pinStarted = false;
     let zeroTimer = null;
+    let bleKeepAliveTimer = null;
+    let lastBleActivityAt = 0;
+    const BLE_KEEPALIVE_INTERVAL_MS = 15000;
+
+    // --- Screen Wake Lock (W3C Wake Lock API + iOS/Bluefy Media & Audio Keep-Awake Fallback) ---
+    let keepAwakeWanted = false;
+    let wakeLockSentinel = null;
+    let noSleepVideo = null;
+    let noSleepCanvas = null;
+
+    async function requestScreenWakeLock() {
+      keepAwakeWanted = true;
+
+      // 1. Standard Screen Wake Lock API (Android Chrome, iOS 16.4+ Safari/WebKit, Desktop)
+      if ('wakeLock' in navigator && navigator.wakeLock && navigator.wakeLock.request) {
+        try {
+          if (!wakeLockSentinel || wakeLockSentinel.released) {
+            wakeLockSentinel = await navigator.wakeLock.request('screen');
+            wakeLockSentinel.addEventListener('release', () => {
+              if (keepAwakeWanted && document.visibilityState === 'visible') {
+                navigator.wakeLock.request('screen').then((s) => {
+                  wakeLockSentinel = s;
+                }).catch(() => {});
+              }
+            });
+          }
+        } catch (err) {
+          console.debug('WakeLock API fallback used:', err);
+        }
+      }
+
+      // 2. Fallback for iOS WKWebView / Bluefy where navigator.wakeLock may be unavailable:
+      //    Play a tiny hidden muted canvas stream video so iOS treats the page as active media.
+      try {
+        if (!noSleepVideo) {
+          noSleepCanvas = document.createElement('canvas');
+          noSleepCanvas.width = 2;
+          noSleepCanvas.height = 2;
+          const ctx = noSleepCanvas.getContext('2d');
+          if (ctx) {
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, 2, 2);
+          }
+          if (noSleepCanvas.captureStream) {
+            noSleepVideo = document.createElement('video');
+            noSleepVideo.setAttribute('playsinline', '');
+            noSleepVideo.setAttribute('muted', '');
+            noSleepVideo.muted = true;
+            noSleepVideo.style.position = 'fixed';
+            noSleepVideo.style.width = '1px';
+            noSleepVideo.style.height = '1px';
+            noSleepVideo.style.opacity = '0.01';
+            noSleepVideo.style.pointerEvents = 'none';
+            noSleepVideo.style.bottom = '0';
+            noSleepVideo.style.right = '0';
+            noSleepVideo.srcObject = noSleepCanvas.captureStream(1);
+            document.body.appendChild(noSleepVideo);
+          }
+        }
+        if (noSleepVideo && noSleepVideo.paused) {
+          if (noSleepCanvas) {
+            const ctx = noSleepCanvas.getContext('2d');
+            if (ctx) ctx.fillRect(0, 0, 1, 1);
+          }
+          const p = noSleepVideo.play();
+          if (p && p.catch) p.catch(() => {});
+        }
+      } catch {}
+    }
+
+    async function releaseScreenWakeLock() {
+      keepAwakeWanted = false;
+      try {
+        if (wakeLockSentinel) {
+          await wakeLockSentinel.release();
+          wakeLockSentinel = null;
+        }
+      } catch {}
+      try {
+        if (noSleepVideo && !noSleepVideo.paused) {
+          noSleepVideo.pause();
+        }
+      } catch {}
+    }
+
+    function startBleKeepAlive() {
+      stopBleKeepAlive();
+      lastBleActivityAt = Date.now();
+      bleKeepAliveTimer = setInterval(() => {
+        if (!dataChar || !bleDevice || !bleDevice.gatt || !bleDevice.gatt.connected) {
+          return;
+        }
+        // Keep AudioContext & WakeLock alive during multi-minute sets
+        if (keepAwakeWanted) {
+          requestScreenWakeLock();
+          if (audioCtx && (audioCtx.state === 'suspended' || audioCtx.state === 'interrupted')) {
+            audioCtx.resume().catch(() => {});
+          }
+          if (noSleepCanvas) {
+            const ctx = noSleepCanvas.getContext('2d');
+            if (ctx) ctx.fillRect(0, 0, 1, 1);
+          }
+        }
+        // Do not interrupt the 3-second initial sensor calibration (0x03)
+        if (zeroing) return;
+        writeByte(CMD_HELLO);
+      }, BLE_KEEPALIVE_INTERVAL_MS);
+    }
+
+    function stopBleKeepAlive() {
+      if (bleKeepAliveTimer) {
+        clearInterval(bleKeepAliveTimer);
+        bleKeepAliveTimer = null;
+      }
+    }
+
+    // Re-acquire Wake Lock and verify BLE connection if user switches back to the browser
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        if (keepAwakeWanted) {
+          requestScreenWakeLock();
+        }
+        if (audioCtx && (audioCtx.state === 'suspended' || audioCtx.state === 'interrupted')) {
+          audioCtx.resume().catch(() => {});
+        }
+        if (dataChar && bleDevice && bleDevice.gatt && bleDevice.gatt.connected) {
+          if (!zeroing) writeByte(CMD_HELLO);
+        } else if (bleDevice && !manualDisconnect) {
+          openGattSession().catch(() => {});
+        }
+      }
+    });
+
+    // Also refresh Wake Lock on any touch while connected (handles browsers requiring user gesture after tab switch)
+    ['touchstart', 'pointerdown', 'click'].forEach((evtName) => {
+      document.addEventListener(evtName, () => {
+        if (keepAwakeWanted) {
+          requestScreenWakeLock();
+        }
+      }, { passive: true });
+    });
 
     function writeByte(byte) {
       writeChain = writeChain.then(async () => {
@@ -1169,6 +1310,8 @@
       manualDisconnect = true;
       activeSetToken++;
       clearZeroTimer();
+      stopBleKeepAlive();
+      releaseScreenWakeLock();
       autoStartAfterZero = false;
       setActive = false;
       zeroing = false;
@@ -1211,6 +1354,7 @@
 
     async function connectPin() {
       ensureAudio();
+      requestScreenWakeLock();
       if (!navigator.bluetooth) {
         alert('Selaimesi ei tue Web Bluetoothia. Avaa tämä sivu iPhonessa ilmaisella Bluefy-selaimella (App Store) tai Android/Windows Chrome-selaimella.');
         return;
@@ -1248,6 +1392,7 @@
         bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
         await openGattSession();
       } catch (err) {
+        releaseScreenWakeLock();
         setStatus('Ei yhdistetty', '');
         console.error(err);
       }
@@ -1310,6 +1455,10 @@
       const service = await server.getPrimaryService(SERVICE_UUID);
       dataChar = await service.getCharacteristic(CHAR_UUID);
 
+      // Keep screen awake and start periodic BLE 0x06 keep-alive for multi-minute sets
+      requestScreenWakeLock();
+      startBleKeepAlive();
+
       // Mandatory 0x06 handshake before and after enabling notifications + calibrate (0x03) on connect
       await writeByte(CMD_HELLO);
       await dataChar.startNotifications();
@@ -1365,6 +1514,7 @@
     async function startSetOnPin() {
       if (!dataChar) return;
       ensureAudio();
+      requestScreenWakeLock();
 
       // If previous set had reps, ensure it is saved before starting the new set, then clear currentReps!
       if (currentReps.length > 0) {
@@ -1448,6 +1598,7 @@
     function onDisconnected() {
       activeSetToken++;
       clearZeroTimer();
+      stopBleKeepAlive();
       autoStartAfterZero = false;
       dataChar = null;
       pinStarted = false;
@@ -1457,6 +1608,7 @@
       updateSetButton();
       document.getElementById('connectBtn').textContent = 'Yhdistä Pin';
       if (manualDisconnect) {
+        releaseScreenWakeLock();
         setStatus('Ei yhdistetty', '');
         return;
       }
@@ -1486,6 +1638,7 @@
     function onNotification(event) {
       const dv = event.target.value;
       if (!dv || dv.byteLength === 0) return;
+      lastBleActivityAt = Date.now();
       const type = dv.getUint8(0);
 
       if (dv.byteLength === 1 && type >= 0x81 && type <= 0x86) {
@@ -2129,6 +2282,9 @@
       // 2. End Pin session cleanly (send 0x04 + 0x05 and disconnect) if connected
       if (dataChar || (bleDevice && bleDevice.gatt && bleDevice.gatt.connected)) {
         await disconnectPin();
+      } else {
+        stopBleKeepAlive();
+        releaseScreenWakeLock();
       }
 
       // 3. Reset live set view and open the Calendar & CSV workout summary tab

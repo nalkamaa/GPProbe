@@ -1,8 +1,10 @@
 import CoreBluetooth
 import Observation
+import UIKit
 
 /// Owns the BLE link. Performs the mandatory `0x06` handshake so the Pin does not
-/// drop the connection after 4 s, and reconnects automatically whenever the link drops.
+/// drop the connection after 4 s, sends periodic 15 s keep-alives, keeps the screen
+/// awake while connected, and reconnects automatically whenever the link drops.
 @Observable
 final class PinConnection: NSObject {
     enum State: String {
@@ -14,7 +16,11 @@ final class PinConnection: NSObject {
         case ready = "Ready"
     }
 
-    private(set) var state: State = .off
+    private(set) var state: State = .off {
+        didSet {
+            updateScreenAwakeState()
+        }
+    }
     private(set) var batteryPercent: Double?
     private(set) var lastPacket: PinProtocol.Packet?
     var onPacket: ((PinProtocol.Packet) -> Void)?
@@ -23,6 +29,8 @@ final class PinConnection: NSObject {
     private var pin: CBPeripheral?
     private var dataChar: CBCharacteristic?
     private var pinStarted: Bool = false
+    private var keepAliveTimer: Timer?
+    private let keepAliveInterval: TimeInterval = 15.0
     private let savedPinKey = "savedPinIdentifier"
 
     override init() {
@@ -51,6 +59,28 @@ final class PinConnection: NSObject {
         if pin?.state == .connected {
             state = .idle
         }
+    }
+
+    private func updateScreenAwakeState() {
+        let shouldKeepAwake = (state == .idle || state == .zeroing || state == .ready)
+        DispatchQueue.main.async {
+            UIApplication.shared.isIdleTimerDisabled = shouldKeepAwake
+        }
+    }
+
+    private func startKeepAliveTimer() {
+        stopKeepAliveTimer()
+        keepAliveTimer = Timer.scheduledTimer(withTimeInterval: keepAliveInterval, repeats: true) { [weak self] _ in
+            guard let self, self.pin?.state == .connected, self.dataChar != nil else { return }
+            // Skip sending during the 3-second initial sensor calibration (0x03)
+            guard self.state != .zeroing else { return }
+            self.send(PinProtocol.Command.hello)
+        }
+    }
+
+    private func stopKeepAliveTimer() {
+        keepAliveTimer?.invalidate()
+        keepAliveTimer = nil
     }
 
     private func send(_ command: Data) {
@@ -105,6 +135,7 @@ extension PinConnection: CBCentralManagerDelegate {
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral,
                         error: Error?) {
+        stopKeepAliveTimer()
         dataChar = nil
         pinStarted = false
         connect(peripheral)
@@ -112,6 +143,7 @@ extension PinConnection: CBCentralManagerDelegate {
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral,
                         error: Error?) {
+        stopKeepAliveTimer()
         dataChar = nil
         pinStarted = false
         connect(peripheral)
@@ -141,6 +173,7 @@ extension PinConnection: CBPeripheralDelegate {
         guard characteristic.uuid == PinProtocol.dataCharacteristic, characteristic.isNotifying else { return }
         send(PinProtocol.Command.hello)
         send(PinProtocol.Command.battery)
+        startKeepAliveTimer()
         state = .idle
     }
 
