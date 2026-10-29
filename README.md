@@ -32,6 +32,28 @@ Kevyt ja luotettava sovellus **Gpath Pin** (`GPATH_Sensor`) -anturille. Sisält�
   - Päiväkohtainen yhteenveto ja sarjojen tarkastelu
   - Koko treenihistorian vienti `.csv`-tiedostoon (Excel / Google Sheets -yhteensopiva)
 
+## Syvä VBT-analyysi (Analyysi-välilehti + live-sarja)
+
+- **Velocity Loss (VL %) parhaasta toistosta** (`V_best`), ei 1. toistosta → PAP, telineestä otto ja maastavedon kuollut lähtö eivät vääristä tulosta. Telineestä otto / vajaa liikerata tunnistetaan "epäilyttäväksi" ja jätetään laskennan ulkopuolelle.
+- **Harjoitustavoite → VL-katkaisuraja** (kyykky / penkki / maastaveto): Piikkaus 10/10/5 %, Kehittävä maksimivoima 15/15/10 % (oletus), Perusvoima 20/25/15 %. Äänimerkki ja valinnainen automaattinen sarjan lopetus rajalla.
+- **MVT (failure-raja) ja RIR-arvio**: oletus 0,30 / 0,165 / 0,155 m/s, opitaan automaattisesti hitaimmasta suoritetusta toistosta tai asetetaan käsin. RIR = (V − MVT) / nopeuskustannus per toisto (sarjan oma kulmakerroin tai 0,06 / 0,05 / 0,05 m/s).
+- **Laatupisteet 0–100**: laadukkaat toistot (50), intensiteetti tavoitteeseen (20), VL-hallinta (15), ROM-tasaisuus (10), hallittu lasku (5). Lämmittelysarjat (< 65 % 1RM) tunnistetaan.
+- **Kuorma–nopeusprofiili ja VBT-e1RM** (lineaarinen regressio, R²), tavoitenopeudet ja -kuormat, e1RM-trendi, päivän valmius samalla kuormalla aiempiin sessioihin verrattuna.
+- **Touch-and-go -tunnistus** maastavedossa (tauko < 0,8 s), **MV/MPV**-valinta.
+- CSV-vientiin lisätty toisto- ja sarjakohtaiset VBT-sarakkeet (vanhat sarakkeet ennallaan).
+
+### Gpath Pin -raakadata (80 Hz, `0xA4`)
+
+Pin lähettää jokaisen sarjan jälkeen automaattisesti (~5–10 s viimeisen toiston jälkeen) 80 Hz aikasarjan. Sovellus kokoaa sen, kohdistaa toistoihin ja laskee:
+
+- **Butterworth 4. aste, 8 Hz, nollavaiheinen** nopeuskäyrälle (tangon whip ja värinä pois).
+- **Kuolokohta**: V₁ → V_min → V₂ -kuvio, korkeus pohjasta (cm), miniminopeus ja kesto. V_min < 0,10 m/s ⇒ RIR 0.
+- **Tankoreitti (kokeellinen)**: gyro + kiihtyvyys -fuusio (Mahony), vaakakiihtyvyyden kaksoisintegrointi nousun yli nollanopeuskorjauksella. ΔX-rajat: kyykky 6 cm, maastaveto 3,5 cm; kaikissa liikkeissä vertailu sarjan parhaan toiston reittiin (> 3 cm ⇒ tekninen uupumus).
+- **Kallistus**: tangon akselin kulman muutos nousun aikana, > 4° ⇒ epäsymmetriavaroitus.
+- **RQI** = 0,40·intensiteetti + 0,40·väsymys + 0,20·tankoreitti (sarjatasolla väsymysosan määrää väsynein toisto).
+
+Anturimalli (validoitu btsnoop-kaappauksista, fuusio toistaa firmwaren pystykiihtyvyyden r = 0,99): kiihtyvyys = sarakkeet 0, 1, 5 (2048 LSB/g), gyro = sarakkeet 2–4 (16,4 LSB/°/s). Tangon akseli tunnistetaan automaattisesti lepoasentojen painovoimasta tai asetetaan käsin (Analyysi → VBT-asetukset). Viimeisimmät 5 raakadatasarjaa voi viedä CSV:nä.
+
 ## Käänteismallinnettu BLE-protokolla
 
 Täydellinen protokollakuvaus löytyy tiedostosta [`tools/PROTOCOL.md`](tools/PROTOCOL.md).

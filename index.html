@@ -408,8 +408,9 @@
       backdrop-filter: blur(10px);
       border-top: 1px solid var(--border);
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      padding: 6px 12px 14px;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 4px;
+      padding: 6px 8px 14px;
       z-index: 30;
     }
     nav.tabs button {
@@ -656,6 +657,28 @@
       border-color: rgba(234, 179, 8, 0.55);
       background: rgba(234, 179, 8, 0.16);
     }
+    /* --- Syvä VBT-analyysi --- */
+    .vbt-kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 8px 0 6px; }
+    .vbt-kpi { background: rgba(15,23,42,0.6); border: 1px solid rgba(51,65,85,0.6); border-radius: 10px; padding: 7px 8px; display: flex; flex-direction: column; min-width: 0; }
+    .vbt-kpi-l { font-size: 10px; color: var(--muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .vbt-kpi-v { font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.25; }
+    .vbt-kpi-s { font-size: 10px; color: var(--muted); line-height: 1.3; }
+    @media (max-width: 380px) { .vbt-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .vbt-verdict { font-size: 12px; line-height: 1.45; color: var(--text); margin: 6px 0 2px; }
+    .vbt-alert { font-size: 13px; font-weight: 700; padding: 8px 10px; border-radius: 10px; margin-top: 6px; }
+    .vbt-alert.amber { background: rgba(245,158,11,0.16); border: 1px solid rgba(245,158,11,0.55); color: #fcd34d; }
+    .vbt-alert.red { background: rgba(239,68,68,0.16); border: 1px solid rgba(239,68,68,0.6); color: #fca5a5; }
+    .q-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; border: 2.4px solid; margin-right: 4px; vertical-align: -1px; }
+    .score-break { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+    .score-row { display: grid; grid-template-columns: 1.5fr 1fr auto; gap: 8px; align-items: center; font-size: 11px; color: var(--muted); }
+    .score-row strong { color: var(--text); font-variant-numeric: tabular-nums; min-width: 38px; text-align: right; }
+    .score-track { height: 6px; background: rgba(51,65,85,0.7); border-radius: 4px; overflow: hidden; }
+    .score-fill { height: 100%; background: var(--accent); border-radius: 4px; }
+    .ana-table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+    .ana-table th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11px; padding: 4px 5px; border-bottom: 1px solid var(--border); }
+    .ana-table td { padding: 5px; border-bottom: 1px solid rgba(51,65,85,0.45); }
+    #vbtLiveCard { margin-top: 4px; }
+    .setup-vbt { font-size: 12px; line-height: 1.45; }
   </style>
 </head>
 <body>
@@ -713,6 +736,19 @@
         </div>
       </div>
 
+      <div class="row">
+        <label class="small" for="goalSelect">Tavoite</label>
+        <select id="goalSelect" aria-label="Harjoitustavoite">
+          <option value="peaking">Piikkaus (85–95 %)</option>
+          <option value="maxStrength">Kehittävä maksimivoima (80–90 %)</option>
+          <option value="baseStrength">Perusvoima / hypertrofia (70–80 %)</option>
+        </select>
+      </div>
+      <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px;">
+        <div id="setupCutoffInfo" style="margin-bottom: 3px; color: #fcd34d; font-size: 12px; font-weight: 700;">VL-raja</div>
+        <div id="setupVbtForecast" class="setup-vbt"></div>
+      </div>
+
       <div class="row" style="padding-top: 8px; border-top: 1px solid var(--border);">
         <span class="small">Arvioitu 1RM (Epley)</span>
         <span id="setupEpley1RM" style="font-size: 15px; font-weight: 700; color: #60a5fa; font-variant-numeric: tabular-nums;">-- kg</span>
@@ -749,6 +785,7 @@
         <div id="repProgressFill" class="progress-fill"></div>
       </div>
       <div id="velDropBanner" class="drop-banner hidden"></div>
+      <div id="vbtLiveCard" class="hidden"></div>
       
       <!-- Palkkinäkymä toistoille väritettynä voiman osa-alueen mukaan -->
       <div id="velBarChart" class="vel-chart"></div>
@@ -817,6 +854,24 @@
     <div id="historyContainer"></div>
   </main>
 
+  <!-- TAB 3: SYVÄ VBT-ANALYYSI -->
+  <main id="tabAnalysis" class="hidden">
+    <div class="card setup-grid">
+      <div class="row">
+        <label class="small" for="anaExerciseSelect">Liike</label>
+        <select id="anaExerciseSelect"></select>
+      </div>
+      <div class="row">
+        <label class="small" for="anaDateSelect">Päivä</label>
+        <select id="anaDateSelect"></select>
+      </div>
+    </div>
+    <div id="anaSessionCard" class="card"></div>
+    <div id="anaProfileCard" class="card"></div>
+    <div id="anaTrendCard" class="card"></div>
+    <div id="anaSettingsCard" class="card"></div>
+  </main>
+
   <!-- EXERCISE MODAL -->
   <div id="exerciseModal" class="modal-backdrop hidden">
     <div class="modal">
@@ -835,7 +890,8 @@
 
   <nav class="tabs">
     <button type="button" id="navLiftBtn" class="active">🏋️ Treeni</button>
-    <button type="button" id="navHistoryBtn">📅 Kalenteri &amp; CSV</button>
+    <button type="button" id="navAnalysisBtn">📈 Analyysi</button>
+    <button type="button" id="navHistoryBtn">📅 Kalenteri</button>
   </nav>
 
   <script>
@@ -1515,6 +1571,7 @@
         targetReps: meta.targetReps,
         reps: currentReps.map((r) => ({ ...r }))
       };
+      if (pendingTraceMeta) { setCopy.traceMeta = pendingTraceMeta; pendingTraceMeta = null; }
       workout.sets.push(setCopy);
       lastSavedSetRef = setCopy;
       currentSetSaved = true;
@@ -1544,6 +1601,9 @@
 
       pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: 0 };
       activeSetMeta = snapshotCurrentSetMeta();
+      vbtCutoffAlerted = false;
+      vbtFailureAlerted = false;
+      lastTraceStatus = '';
       setStartedAt = Date.now();
       lastRepAt = 0;
 
@@ -1659,6 +1719,8 @@
 
     // Minimum thresholds to filter out Pin handling, cable slack pull, and bar unrack/rack noise
     const MIN_VALID_VEL_M_S = 0.12;
+    let lastBottomAt = 0;
+    let lastEccEndAt = 0;
     const MIN_VALID_ROM_CM  = 12.0;
 
     function onNotification(event) {
@@ -1666,6 +1728,12 @@
       if (!dv || dv.byteLength === 0) return;
       lastBleActivityAt = Date.now();
       const type = dv.getUint8(0);
+
+      // Raw 80 Hz set trace dump & markers (0xA4 / 0xB0–0xB4)
+      if (type === 0xa4 || (type >= 0xb0 && type <= 0xb4)) {
+        handleTraceNotification(dv);
+        return;
+      }
 
       if (dv.byteLength === 1 && type >= 0x81 && type <= 0x86) {
         if (type === 0x83 && zeroing) {
@@ -1680,6 +1748,8 @@
         if (phase === 0x01) {
           // Fresh upward movement started: clear any leftover partial packets from prior movements
           pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: Date.now() };
+        } else if (phase === 0x03) {
+          lastBottomAt = Date.now(); // bottom / rest reached (used for touch-and-go detection)
         }
         return;
       }
@@ -1722,6 +1792,7 @@
         const propVel = pendingRep.propVel ?? meanVel;
         const propAcc = pendingRep.propAcc ?? 0;
         const romCm   = pendingRep.romCm ?? 0;
+        const liftStartAt = pendingRep.phaseStartedAt || 0;
         pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: 0 };
 
         // 1. Ignore incomplete packet bursts (e.g. movement started before "Aloita sarja" was tapped)
@@ -1770,15 +1841,29 @@
         // Verified power formula: P = m * (g + 0.58 * a_prop) * v
         const power = weightKg * (9.80665 + 0.58 * propAcc) * meanVel;
 
+        // Pause at the bottom before this rep (touch-and-go detection). Requires the previous rep's
+        // eccentric end (0x06) or bottom phase (0x01 0x03) after that rep, and this rep's lift start.
+        let pauseMs = null;
+        if (currentReps.length > 0 && liftStartAt > 0) {
+          const prevT = currentReps[currentReps.length - 1].t || 0;
+          const bottom = Math.max(lastBottomAt, lastEccEndAt);
+          if (bottom > prevT && liftStartAt >= bottom) pauseMs = liftStartAt - bottom;
+          else if (bottom <= prevT && liftStartAt > prevT) pauseMs = 0; // no rest phase seen between reps
+        }
+        if (currentReps.length === 0) { vbtCutoffAlerted = false; vbtFailureAlerted = false; }
+
         currentReps.push({
           meanVelocity: meanVel,
           propulsiveVelocity: propVel,
           propulsiveAcceleration: propAcc,
           rangeOfMotionCm: romCm,
           loweringVelocity: null,
-          power: power
+          power: power,
+          t: Date.now(),
+          pauseMs: pauseMs
         });
         lastRepAt = Date.now();
+        if (vbtOnNewRep()) return; // set auto-stopped at the velocity-loss cutoff
 
         const targetReps = parseInt(document.getElementById('targetRepsInput').value, 10) || 5;
         if (currentReps.length >= targetReps) {
@@ -1792,6 +1877,7 @@
         }
       } else if (type === 0x06) {
         const eccVel = val / 1000.0;
+        lastEccEndAt = Date.now();
         if (currentReps.length > 0 && eccVel >= 0.08 && eccVel <= 3.5) {
           const last = currentReps[currentReps.length - 1];
           last.loweringVelocity = eccVel;
@@ -2001,7 +2087,14 @@
       return w * (1 + r / 30);
     }
 
-    function calcVelocityDropPct(reps) {
+    // Velocity loss (VL%) = (V_best - V_last) / V_best, suspect reps excluded (see analyzeSet)
+    function calcVelocityDropPct(reps, exercise) {
+      if (!reps || reps.length < 2) return null;
+      const a = analyzeSet(reps, exercise || '', 0);
+      return a.vlFinal;
+    }
+    // Legacy metric kept for CSV compatibility: 1st rep -> last rep
+    function calcFirstToLastDropPct(reps) {
       if (!reps || reps.length < 2) return null;
       const first = reps[0].meanVelocity;
       const last = reps[reps.length - 1].meanVelocity;
@@ -2043,6 +2136,1541 @@
       if (vel < 1.00) return { key: 'str-spd', label: 'Nopeusvoima (voima)', cssClass: 'zone-str-spd', icon: '🔵' };
       return { key: 'spd-str', label: 'Nopeusvoima (räjähtävä)', cssClass: 'zone-spd-str', icon: '⚡' };
     }
+
+
+
+    // =====================================================================
+    // ===  GPATH PIN RAAKADATA (0xA4, 80 Hz) – tankoreitti, kuolokohta, ===
+    // ===  kallistus ja toistolaatuindeksi (RQI)                        ===
+    // =====================================================================
+    // Pin lähettää jokaisen sarjan jälkeen automaattisesti 80 Hz aikasarjan:
+    //   a4 + u16 seq + u16 total_pkts + u8 count + count × 34 B
+    //   näyte = u16 dt_us + 8 × int32:
+    //     c0 ax, c1 ay, c2 gx, c3 gy, c4 gz, c5 az  (kiihtyvyys 2048 LSB/g, gyro 16.4 LSB/(°/s))
+    //     c6 pystykiihtyvyys mm/s², c7 pystynopeus mm/s  (firmware-fuusio)
+    // Validoitu 28.10.2026 btsnoop-kaappauksista: oma gyro+kiihtyvyysfuusio toistaa firmwaren
+    // pystykiihtyvyyden korrelaatiolla r = 0.99 (akselit ja skaalat yllä).
+    const TRACE_ACC_LSB_PER_G = 2048;
+    const TRACE_GYRO_LSB_PER_DPS = 16.4;
+    const TRACE_FS = 80;
+    const G0 = 9.80665;
+    const TRACE_LIFT_RULES = {
+      // dxMax = suurin sallittu vaakasiirtymä lähtölinjasta (cm), null = vain vertailu parhaaseen toistoon
+      squat:    { dxMax: 6.0, templMax: 3.0, label: 'kyykyssä tanko kippaa eteen (good morning)' },
+      bench:    { dxMax: null, templMax: 3.0, label: 'penkissä J-käyrä hajoaa' },
+      deadlift: { dxMax: 3.5, templMax: 3.0, label: 'maastavedossa tanko karkaa irti kehosta' }
+    };
+    const TILT_WARN_DEG = 4.0;
+    const STICK_MIN_DROP = 0.03; // m/s
+
+    let traceBuf = null;           // { total, pkts: Map(seq -> samples[]), header, startedAt }
+    let traceHeader = null;        // last b1 header
+    const recentRawTraces = [];    // last 5 raw traces (memory only, for CSV export / debugging)
+    let lastTraceStatus = '';
+
+    function handleTraceNotification(dv) {
+      const type = dv.getUint8(0);
+      if (type === 0xb1 && dv.byteLength >= 15) {
+        traceHeader = {
+          startMs: dv.getUint32(1, true), endMs: dv.getUint32(5, true),
+          reps: dv.getUint16(9, true), samples: dv.getUint32(11, true)
+        };
+        if (traceBuf && !traceBuf.header) traceBuf.header = traceHeader;
+        return;
+      }
+      if (type === 0xa4 && dv.byteLength >= 6) {
+        const seq = dv.getUint16(1, true);
+        const total = dv.getUint16(3, true);
+        const count = dv.getUint8(5);
+        // a new dump starts (seq 0) while an old one is still open -> finalize old one first
+        if (traceBuf && seq === 0 && traceBuf.pkts.size > 0) finalizeTrace();
+        if (!traceBuf) traceBuf = { total, pkts: new Map(), header: traceHeader, startedAt: Date.now(), truncated: false };
+        traceBuf.total = total;
+        const fit = Math.min(count, Math.floor((dv.byteLength - 6) / 34));
+        if (fit < count) traceBuf.truncated = true; // BLE MTU too small for full packet
+        const samples = [];
+        for (let i = 0; i < fit; i++) {
+          const o = 6 + i * 34;
+          const row = new Array(9);
+          row[0] = dv.getUint16(o, true);
+          for (let c = 0; c < 8; c++) row[c + 1] = dv.getInt32(o + 2 + c * 4, true);
+          samples.push(row);
+        }
+        traceBuf.pkts.set(seq, samples);
+        if (traceBuf.pkts.size >= total) finalizeTrace();
+        return;
+      }
+      if (type === 0xb3) {
+        if (traceBuf && traceBuf.pkts.size > 0) finalizeTrace();
+        return;
+      }
+      // b0 / b2 / b4: markers, nothing to do
+    }
+
+    function finalizeTrace() {
+      const buf = traceBuf;
+      traceBuf = null;
+      if (!buf || !buf.pkts.size) return;
+      const seqs = [...buf.pkts.keys()].sort((a, b) => a - b);
+      const coverage = buf.total ? buf.pkts.size / buf.total : 1;
+      // use the longest run of consecutive packets (gaps would break integration)
+      let bestStart = 0, bestLen = 0, runStart = 0;
+      for (let i = 1; i <= seqs.length; i++) {
+        if (i === seqs.length || seqs[i] !== seqs[i - 1] + 1) {
+          if (i - runStart > bestLen) { bestLen = i - runStart; bestStart = runStart; }
+          runStart = i;
+        }
+      }
+      const rows = [];
+      for (let i = bestStart; i < bestStart + bestLen; i++) rows.push(...buf.pkts.get(seqs[i]));
+      const raw = { receivedAt: Date.now(), header: buf.header || traceHeader, coverage, truncated: buf.truncated, rows };
+      recentRawTraces.push(raw);
+      if (recentRawTraces.length > 5) recentRawTraces.shift();
+      if (rows.length < 160 || buf.truncated) {
+        lastTraceStatus = buf.truncated
+          ? '⚠️ Raakadata katkesi (BLE-paketti liian suuri tälle laitteelle/selaimelle)'
+          : `⚠️ Raakadata vajaa (${Math.round(coverage * 100)} %)`;
+        renderLiveSet();
+        return;
+      }
+      try {
+        attachTraceToRecentSet(raw);
+      } catch (e) {
+        console.warn('Trace analysis failed', e);
+        lastTraceStatus = '⚠️ Raakadatan analyysi epäonnistui';
+      }
+      renderLiveSet();
+    }
+
+    // ---------- signal processing helpers ----------
+    function butterLowpass4(x, fc, fs) {
+      // 4th-order Butterworth = 2 cascaded RBJ biquads (Q 0.5412, 1.3066), run forward+backward (zero phase)
+      const biquad = (sig, Q) => {
+        const w0 = 2 * Math.PI * fc / fs, cs = Math.cos(w0), al = Math.sin(w0) / (2 * Q);
+        const a0 = 1 + al;
+        const b0 = (1 - cs) / 2 / a0, b1 = (1 - cs) / a0, b2 = b0, a1 = -2 * cs / a0, a2 = (1 - al) / a0;
+        const y = new Array(sig.length);
+        let x1 = sig[0], x2 = sig[0], y1 = sig[0], y2 = sig[0];
+        for (let i = 0; i < sig.length; i++) {
+          const v = b0 * sig[i] + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+          x2 = x1; x1 = sig[i]; y2 = y1; y1 = v; y[i] = v;
+        }
+        return y;
+      };
+      const pad = Math.min(40, x.length - 1);
+      const ext = [];
+      for (let i = pad; i > 0; i--) ext.push(2 * x[0] - x[i]);
+      ext.push(...x);
+      for (let i = 1; i <= pad; i++) ext.push(2 * x[x.length - 1] - x[x.length - 1 - i]);
+      let y = biquad(biquad(ext, 0.5412), 1.3066);
+      y.reverse();
+      y = biquad(biquad(y, 0.5412), 1.3066);
+      y.reverse();
+      return y.slice(pad, pad + x.length);
+    }
+    const v3 = {
+      dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+      cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+      norm: (a) => Math.hypot(a[0], a[1], a[2]),
+      unit: (a) => { const n = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / n, a[1] / n, a[2] / n]; }
+    };
+    // quaternion [w,x,y,z], body -> world
+    function qMul(a, b) {
+      return [a[0] * b[0] - a[1] * b[1] - a[2] * b[2] - a[3] * b[3],
+        a[0] * b[1] + a[1] * b[0] + a[2] * b[3] - a[3] * b[2],
+        a[0] * b[2] - a[1] * b[3] + a[2] * b[0] + a[3] * b[1],
+        a[0] * b[3] + a[1] * b[2] - a[2] * b[1] + a[3] * b[0]];
+    }
+    function qRot(q, v) {
+      const p = qMul(qMul(q, [0, v[0], v[1], v[2]]), [q[0], -q[1], -q[2], -q[3]]);
+      return [p[1], p[2], p[3]];
+    }
+    function qNorm(q) { const n = Math.hypot(q[0], q[1], q[2], q[3]) || 1; return [q[0] / n, q[1] / n, q[2] / n, q[3] / n]; }
+    function qFromTwoVectors(from, to) {
+      const f = v3.unit(from), t = v3.unit(to);
+      const d = v3.dot(f, t);
+      if (d < -0.9999) return [0, 1, 0, 0];
+      const c = v3.cross(f, t);
+      return qNorm([1 + d, c[0], c[1], c[2]]);
+    }
+
+    // ---------- trace analysis ----------
+    function analyzeTrace(rows, exercise) {
+      const n = rows.length, dt = 1 / TRACE_FS;
+      const acc = rows.map((r) => [r[1], r[2], r[6]].map((x) => x / TRACE_ACC_LSB_PER_G * G0));
+      const gyr = rows.map((r) => [r[3], r[4], r[5]].map((x) => x / TRACE_GYRO_LSB_PER_DPS * Math.PI / 180));
+      const vFw = rows.map((r) => r[8] / 1000);
+      const v = butterLowpass4(vFw, 8, TRACE_FS); // Butterworth 4. aste 8 Hz -> whip & vibration out
+
+      // quiet windows (bar at rest): low rotation and |acc| ≈ g
+      const quiet = rows.map((r, i) => v3.norm(gyr[i]) < 0.12 && Math.abs(v3.norm(acc[i]) - G0) < 0.35 && Math.abs(vFw[i]) < 0.02);
+      // gyro bias & initial attitude from the longest quiet window
+      let qs = 0, ql = 0;
+      for (let i = 0, s = -1; i <= n; i++) {
+        if (i < n && quiet[i]) { if (s < 0) s = i; }
+        else if (s >= 0) { if (i - s > ql) { ql = i - s; qs = s; } s = -1; }
+      }
+      const win = ql >= 20 ? [qs, qs + ql] : [0, Math.min(n, 40)];
+      const mean3 = (arr, a, b) => { const m = [0, 0, 0]; for (let i = a; i < b; i++) { m[0] += arr[i][0]; m[1] += arr[i][1]; m[2] += arr[i][2]; } return m.map((x) => x / Math.max(1, b - a)); };
+      const bias = mean3(gyr, win[0], win[1]);
+      const g0 = mean3(acc, win[0], win[1]);
+
+      // bar axis in the sensor frame: the sensor axis that stays ⟂ to gravity in every quiet window
+      let barAxis = null, barAxisConf = 0;
+      const ovr = vbtSettings.barAxis;
+      if (ovr === 'x' || ovr === 'y' || ovr === 'z') {
+        barAxis = ovr === 'x' ? [1, 0, 0] : ovr === 'y' ? [0, 1, 0] : [0, 0, 1];
+        barAxisConf = 1;
+      } else {
+        const maxComp = [0, 0, 0];
+        let qn = 0;
+        for (let i = 0; i < n; i++) {
+          if (!quiet[i]) continue;
+          qn++;
+          const u = v3.unit(acc[i]);
+          for (let k = 0; k < 3; k++) maxComp[k] = Math.max(maxComp[k], Math.abs(u[k]));
+        }
+        if (qn > 10) {
+          const order = [0, 1, 2].sort((a, b) => maxComp[a] - maxComp[b]);
+          if (maxComp[order[0]] < 0.17 && maxComp[order[1]] > 0.35) { // ≈ < 10° from horizontal, unambiguous
+            barAxis = [0, 0, 0]; barAxis[order[0]] = 1;
+            barAxisConf = Math.min(1, (maxComp[order[1]] - maxComp[order[0]]) / 0.5);
+          }
+        }
+      }
+
+      // attitude: gyro integration (bias removed) + light Mahony correction while quasi-static
+      let q = qFromTwoVectors(g0, [0, 0, 1]);
+      const up = new Array(n), aVert = new Array(n), aHor = new Array(n), tilt = new Array(n);
+      let hDir = null;
+      const Kp = 0.6;
+      for (let i = 0; i < n; i++) {
+        let w = [gyr[i][0] - bias[0], gyr[i][1] - bias[1], gyr[i][2] - bias[2]];
+        const an = v3.norm(acc[i]);
+        const upBody = qRot([q[0], -q[1], -q[2], -q[3]], [0, 0, 1]);
+        if (Math.abs(an - G0) < 0.6 && v3.norm(w) < 0.5) {
+          const e = v3.cross(v3.unit(acc[i]), upBody);
+          w = [w[0] + Kp * e[0], w[1] + Kp * e[1], w[2] + Kp * e[2]];
+        }
+        const ang = v3.norm(w) * dt;
+        if (ang > 0) {
+          const ax = v3.unit(w), s = Math.sin(ang / 2);
+          q = qNorm(qMul(q, [Math.cos(ang / 2), ax[0] * s, ax[1] * s, ax[2] * s]));
+        }
+        const aw = qRot(q, acc[i]);
+        aVert[i] = aw[2] - G0;
+        up[i] = qRot([q[0], -q[1], -q[2], -q[3]], [0, 0, 1]);
+        if (barAxis) {
+          const bw = qRot(q, barAxis);
+          // horizontal sagittal direction ⟂ bar (fixed once, sign arbitrary but consistent in the set)
+          if (!hDir) hDir = v3.unit(v3.cross([0, 0, 1], bw));
+          aHor[i] = v3.dot(aw, hDir);
+          tilt[i] = Math.asin(Math.max(-1, Math.min(1, v3.dot(up[i], barAxis)))) * 180 / Math.PI;
+        } else { aHor[i] = 0; tilt[i] = 0; }
+      }
+
+      // ---- concentric segmentation on filtered velocity ----
+      const segs = [];
+      for (let i = 0; i < n;) {
+        if (v[i] > 0.02) {
+          let j = i; while (j < n && v[j] > 0.02) j++;
+          let pk = i; for (let k = i; k < j; k++) if (v[k] > v[pk]) pk = k;
+          const th = Math.max(0.02, 0.1 * v[pk]);
+          let s = pk; while (s > i && v[s - 1] > th) s--;
+          let e = pk; while (e < j - 1 && v[e + 1] > th) e++;
+          let disp = 0; for (let k = s; k <= e; k++) disp += v[k] * dt;
+          if (disp >= 0.08 && v[pk] > 0.08) segs.push({ s, e, pk, disp });
+          i = j;
+        } else i++;
+      }
+
+      const rules = TRACE_LIFT_RULES[getLiftKey(exercise)] || null;
+      const reps = segs.map((sg) => {
+        const { s, e } = sg;
+        const len = e - s + 1;
+        const pos = []; let z = 0;
+        for (let k = s; k <= e; k++) { z += v[k] * dt; pos.push(z); }
+        const rom = z;
+        let mv = 0; for (let k = s; k <= e; k++) mv += v[k]; mv /= len;
+        // propulsive phase ends where vertical acceleration (firmware) turns negative after the peak
+        let ip = sg.pk;
+        let mpv = 0; for (let k = s; k <= ip; k++) mpv += v[k]; mpv /= Math.max(1, ip - s + 1);
+
+        // ---- sticking point: V1 (first local max) -> Vmin -> V2 ----
+        let stick = null;
+        const segV = v.slice(s, e + 1);
+        let p1 = -1;
+        for (let k = 2; k < len - 2; k++) {
+          if (segV[k] >= segV[k - 1] && segV[k] >= segV[k + 1] && segV[k] >= segV[k - 2] && segV[k] >= segV[k + 2] && pos[k] < rom * 0.7) { p1 = k; break; }
+        }
+        if (p1 > 0) {
+          let mi = p1; for (let k = p1; k < len; k++) if (segV[k] < segV[mi]) mi = k;
+          // the minimum must be followed by re-acceleration
+          let mi2 = p1, p2 = -1;
+          for (let k = p1 + 1; k < len; k++) {
+            if (segV[k] < segV[mi2]) mi2 = k;
+            if (segV[k] - segV[mi2] >= STICK_MIN_DROP && segV[p1] - segV[mi2] >= STICK_MIN_DROP) {
+              let pp = k; while (pp + 1 < len && segV[pp + 1] >= segV[pp]) pp++;
+              p2 = pp; break;
+            }
+          }
+          if (p2 > 0) {
+            const v1 = segV[p1], vmin = segV[mi2], v2 = segV[p2];
+            const lvl = vmin + 0.25 * (Math.min(v1, v2) - vmin);
+            let a = mi2; while (a > p1 && segV[a - 1] <= lvl) a--;
+            let b = mi2; while (b < p2 && segV[b + 1] <= lvl) b++;
+            stick = {
+              heightCm: pos[mi2] * 100, vmin, v1, v2,
+              durationMs: Math.round((b - a + 1) * dt * 1000),
+              pctRom: pos[mi2] / rom * 100, idx: mi2
+            };
+          }
+        }
+        // slowest point in the middle 20–80 % of ROM (useful even without a classic V1-V2 pattern)
+        let midMin = null;
+        for (let k = 0; k < len; k++) {
+          if (pos[k] < rom * 0.2 || pos[k] > rom * 0.8) continue;
+          if (midMin === null || segV[k] < midMin.v) midMin = { v: segV[k], heightCm: pos[k] * 100 };
+        }
+
+        // ---- horizontal path (ZUPT-style detrend over the concentric window) ----
+        let path = null, dxMax = null, dxNet = null, tiltMax = null;
+        // horizontal double integration drifts: only trusted for short concentrics (≤ 3 s)
+        if (barAxis && len * dt <= 3.0) {
+          const vh = []; let acc0 = 0;
+          for (let k = s; k <= e; k++) { acc0 += aHor[k] * dt; vh.push(acc0); }
+          const vEnd = vh[vh.length - 1];
+          for (let k = 0; k < vh.length; k++) vh[k] -= vEnd * k / Math.max(1, vh.length - 1);
+          const xs = []; let x = 0;
+          for (let k = 0; k < vh.length; k++) { x += vh[k] * dt; xs.push(x * 100); }
+          dxNet = xs[xs.length - 1];
+          dxMax = xs.reduce((m, val) => (Math.abs(val) > Math.abs(m) ? val : m), 0);
+          // resample to 21 points by % of ROM
+          path = [];
+          let k = 0;
+          for (let f = 0; f <= 20; f++) {
+            const target = rom * f / 20;
+            while (k < len - 1 && pos[k] < target) k++;
+            path.push([Math.round(xs[k] * 10) / 10, Math.round(pos[k] * 1000) / 10]);
+          }
+          const t0 = tilt[s];
+          tiltMax = 0;
+          for (let k = s; k <= e; k++) tiltMax = Math.max(tiltMax, Math.abs(tilt[k] - t0));
+        }
+        // compact velocity curve (40 Hz, mm/s) for plotting
+        const curve = [];
+        for (let k = 0; k < len; k += 2) curve.push([Math.round(pos[k] * 1000) / 10, Math.round(segV[k] * 1000)]);
+        // pause at the bottom before this concentric (touch-and-go)
+        let pauseMs = null;
+        let b0i = s - 1; while (b0i > 0 && v[b0i] > -0.03) b0i--;
+        if (b0i > 0 && s - b0i < TRACE_FS * 8) pauseMs = Math.round((s - b0i) * dt * 1000);
+        return {
+          romCm: rom * 100, mv, mpv, vPeak: v[sg.pk], durMs: Math.round(len * dt * 1000),
+          stick, midMin, path, dxMax, dxNet, tiltMax, curve, pauseMs
+        };
+      });
+      return { reps, barAxis, barAxisConf, quietSamples: ql, samples: n, rules };
+    }
+
+    // match trace reps to app reps in order, minimising |MV difference| (handles ghost reps on either side)
+    function matchTraceReps(traceReps, appReps) {
+      const A = traceReps.length, B = appReps.length;
+      const INF = 1e9, cost = Array.from({ length: A + 1 }, () => new Array(B + 1).fill(INF));
+      const from = Array.from({ length: A + 1 }, () => new Array(B + 1).fill(null));
+      cost[0][0] = 0;
+      const SKIP = 0.15;
+      for (let i = 0; i <= A; i++) for (let j = 0; j <= B; j++) {
+        const c = cost[i][j]; if (c >= INF) continue;
+        if (i < A && j < B) {
+          const d = c + Math.abs(traceReps[i].mv - (Number(appReps[j].meanVelocity) || 0));
+          if (d < cost[i + 1][j + 1]) { cost[i + 1][j + 1] = d; from[i + 1][j + 1] = [i, j, 'm']; }
+        }
+        if (i < A && c + SKIP < cost[i + 1][j]) { cost[i + 1][j] = c + SKIP; from[i + 1][j] = [i, j, 's']; }
+        if (j < B && c + SKIP < cost[i][j + 1]) { cost[i][j + 1] = c + SKIP; from[i][j + 1] = [i, j, 's']; }
+      }
+      const map = new Array(B).fill(-1);
+      let i = A, j = B;
+      while (i > 0 || j > 0) {
+        const f = from[i][j]; if (!f) break;
+        if (f[2] === 'm') map[f[1]] = f[0];
+        i = f[0]; j = f[1];
+      }
+      return map;
+    }
+
+    function attachTraceToRecentSet(raw) {
+      const now = Date.now();
+      // candidate: open set in progress / just finished, else the most recently saved set
+      let targets = [];
+      let exercise = null;
+      const recent = (reps) => reps && reps.length && (now - (reps[reps.length - 1].t || 0)) < 90000;
+      if (recent(currentReps)) {
+        targets.push(currentReps);
+        if (currentSetSaved && lastSavedSetRef) targets.push(lastSavedSetRef.reps);
+        exercise = (activeSetMeta && activeSetMeta.exercise) || (lastSavedSetRef && lastSavedSetRef.exercise) || getCurrentSelectedExerciseName();
+      } else {
+        let cand = null;
+        workouts.forEach((w) => (w.sets || []).forEach((s) => { if (recent(s.reps) && (!cand || s.reps[s.reps.length - 1].t > cand.reps[cand.reps.length - 1].t)) cand = s; }));
+        if (cand) { targets.push(cand.reps); exercise = cand.exercise; }
+      }
+      if (!targets.length) { lastTraceStatus = '📡 Raakadata vastaanotettu, mutta sarjaa ei löytynyt'; return; }
+      const ta = analyzeTrace(raw.rows, exercise);
+      const map = matchTraceReps(ta.reps, targets[0]);
+      let matched = 0;
+      targets.forEach((reps) => {
+        reps.forEach((r, j) => {
+          const k = map[j];
+          if (k < 0) return;
+          const tr = ta.reps[k];
+          r.trace = {
+            romCm: +tr.romCm.toFixed(1), mvF: +tr.mv.toFixed(3), vPeak: +tr.vPeak.toFixed(3), durMs: tr.durMs,
+            stick: tr.stick ? { h: +tr.stick.heightCm.toFixed(1), vmin: +tr.stick.vmin.toFixed(3), v1: +tr.stick.v1.toFixed(3), v2: +tr.stick.v2.toFixed(3), ms: tr.stick.durationMs, pct: Math.round(tr.stick.pctRom) } : null,
+            midMin: tr.midMin ? { v: +tr.midMin.v.toFixed(3), h: +tr.midMin.heightCm.toFixed(1) } : null,
+            dxMax: tr.dxMax !== null ? +tr.dxMax.toFixed(1) : null,
+            dxNet: tr.dxNet !== null ? +tr.dxNet.toFixed(1) : null,
+            tilt: tr.tiltMax !== null ? +tr.tiltMax.toFixed(1) : null,
+            path: tr.path, curve: tr.curve, pauseMs: tr.pauseMs
+          };
+          if (Number.isFinite(tr.pauseMs) && (r.pauseMs === null || r.pauseMs === undefined)) r.pauseMs = tr.pauseMs;
+          if (reps === targets[0]) matched++;
+        });
+      });
+      const meta = { samples: ta.samples, coverage: +raw.coverage.toFixed(3), barAxis: ta.barAxis ? 'xyz'[ta.barAxis.indexOf(1)] : null, barAxisConf: +ta.barAxisConf.toFixed(2), segments: ta.reps.length, matched };
+      if (currentSetSaved && lastSavedSetRef && targets.includes(lastSavedSetRef.reps)) lastSavedSetRef.traceMeta = meta;
+      else if (!targets.includes(currentReps)) {
+        workouts.forEach((w) => (w.sets || []).forEach((s) => { if (targets.includes(s.reps)) s.traceMeta = meta; }));
+      } else pendingTraceMeta = meta;
+      saveJSON(KEY_WORKOUTS, workouts);
+      lastTraceStatus = `📡 Raakadata analysoitu: ${matched}/${targets[0].length} toistoa (${ta.samples} näytettä${meta.barAxis ? ', tangon akseli ' + meta.barAxis.toUpperCase() : ', tangon akseli ei tunnistettu'})`;
+      renderCalendar();
+      renderHistoryList();
+    }
+    let pendingTraceMeta = null;
+
+    // ---------- per-rep path / technique scoring ----------
+    function pathTemplateDeviation(path, tmpl) {
+      if (!path || !tmpl || path.length !== tmpl.length) return null;
+      // compare shapes after aligning both to start at x = 0
+      let ss = 0;
+      for (let i = 0; i < path.length; i++) {
+        const d = (path[i][0] - path[0][0]) - (tmpl[i][0] - tmpl[0][0]);
+        ss += d * d;
+      }
+      return Math.sqrt(ss / path.length);
+    }
+
+    function exportRawTracesCSV() {
+      if (!recentRawTraces.length) { alert('Ei raakadataa tässä istunnossa. Tee sarja ja odota ~10 s sarjan jälkeen.'); return; }
+      const lines = ['trace,received_at,sample,dt_us,ax,ay,gx,gy,gz,az,a_vert_mm_s2,v_vert_mm_s'];
+      recentRawTraces.forEach((t, ti) => t.rows.forEach((r, i) => lines.push([ti + 1, new Date(t.receivedAt).toISOString(), i, ...r].join(','))));
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `gpath_raw_${todayISO()}.csv`;
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+    // =================== /RAAKADATA ===================
+
+    // ---------- UI: Gpath Pin raw-trace section for a saved set ----------
+    function repColor(i, n) {
+      const t = n <= 1 ? 1 : i / (n - 1);
+      const lerp = (a, b) => Math.round(a + (b - a) * t);
+      return `rgb(${lerp(147, 239)},${lerp(197, 68)},${lerp(253, 68)})`;
+    }
+    function buildTraceCurvesSVG(reps, a) {
+      const items = reps.map((r, i) => ({ r, i })).filter((x) => x.r.trace && x.r.trace.curve && !(a.perRep[x.i] && a.perRep[x.i].suspect));
+      if (!items.length) return '';
+      const W = 340, H = 180, padL = 34, padR = 10, padT = 10, padB = 24;
+      const xMax = Math.max(10, ...items.map((x) => x.r.trace.curve[x.r.trace.curve.length - 1][0]));
+      const yMax = Math.max(0.3, ...items.map((x) => Math.max(...x.r.trace.curve.map((c) => c[1] / 1000)))) * 1.1;
+      const X = (cm) => padL + cm / xMax * (W - padL - padR);
+      const Y = (v) => padT + (1 - Math.max(0, v) / yMax) * (H - padT - padB);
+      let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;" role="img" aria-label="Nopeuskäyrät liikematkan funktiona">`;
+      const step = yMax > 1.2 ? 0.5 : (yMax > 0.6 ? 0.2 : 0.1);
+      for (let g = 0; g <= yMax + 1e-9; g += step) {
+        s += `<line x1="${padL}" x2="${W - padR}" y1="${Y(g)}" y2="${Y(g)}" stroke="rgba(148,163,184,0.15)"/><text x="${padL - 4}" y="${Y(g) + 3}" fill="#94a3b8" font-size="9" text-anchor="end">${g.toFixed(1)}</text>`;
+      }
+      for (let c = 0; c <= xMax; c += xMax > 50 ? 20 : 10) s += `<text x="${X(c)}" y="${H - 8}" fill="#94a3b8" font-size="9" text-anchor="middle">${c}</text>`;
+      s += `<text x="${W - padR}" y="${padT + 8}" fill="#64748b" font-size="9" text-anchor="end">x = cm pohjasta, y = m/s</text>`;
+      if (a.mvt !== null) s += `<line x1="${padL}" x2="${W - padR}" y1="${Y(0.10)}" y2="${Y(0.10)}" stroke="#ec4899" stroke-dasharray="2 3"/><text x="${padL + 3}" y="${Y(0.10) - 3}" fill="#ec4899" font-size="9">0.10 m/s</text>`;
+      items.forEach(({ r, i }, k) => {
+        const col = i === a.vBestIdx ? '#3b82f6' : repColor(k, items.length);
+        s += `<polyline points="${r.trace.curve.map((c) => `${X(c[0]).toFixed(1)},${Y(c[1] / 1000).toFixed(1)}`).join(' ')}" fill="none" stroke="${col}" stroke-width="${i === a.vBestIdx ? 2.4 : 1.6}" opacity="0.95"/>`;
+        if (r.trace.stick) {
+          s += `<circle cx="${X(r.trace.stick.h)}" cy="${Y(r.trace.stick.vmin)}" r="4" fill="#0f172a" stroke="#f9a8d4" stroke-width="2"/>`;
+        }
+        const last = r.trace.curve[r.trace.curve.length - 1];
+        s += `<text x="${Math.min(W - padR - 2, X(last[0]) + 2)}" y="${Y(last[1] / 1000) - 2}" fill="${col}" font-size="9">T${i + 1}</text>`;
+      });
+      return s + '</svg>';
+    }
+    function buildBarPathSVG(reps, a, rules) {
+      const items = reps.map((r, i) => ({ r, i })).filter((x) => x.r.trace && x.r.trace.path && !(a.perRep[x.i] && a.perRep[x.i].suspect));
+      if (!items.length) return '';
+      const W = 340, H = 230, padL = 34, padR = 10, padT = 10, padB = 24;
+      const xs = items.flatMap((x) => x.r.trace.path.map((p) => p[0] - x.r.trace.path[0][0]));
+      const lim = Math.max(8, (rules && rules.dxMax ? rules.dxMax * 1.4 : 0), ...xs.map(Math.abs)) * 1.1;
+      const zMax = Math.max(20, ...items.map((x) => x.r.trace.path[x.r.trace.path.length - 1][1]));
+      const X = (cm) => padL + (cm + lim) / (2 * lim) * (W - padL - padR);
+      const Y = (cm) => padT + (1 - cm / zMax) * (H - padT - padB);
+      let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;" role="img" aria-label="Tankoreitti sivulta">`;
+      for (let c = 0; c <= zMax; c += zMax > 50 ? 20 : 10) s += `<line x1="${padL}" x2="${W - padR}" y1="${Y(c)}" y2="${Y(c)}" stroke="rgba(148,163,184,0.12)"/><text x="${padL - 4}" y="${Y(c) + 3}" fill="#94a3b8" font-size="9" text-anchor="end">${c}</text>`;
+      const xStep = lim > 20 ? 10 : 5;
+      for (let c = -Math.floor(lim / xStep) * xStep; c <= lim; c += xStep) s += `<text x="${X(c)}" y="${H - 8}" fill="#94a3b8" font-size="9" text-anchor="middle">${c > 0 ? '+' : ''}${c}</text>`;
+      s += `<line x1="${X(0)}" x2="${X(0)}" y1="${padT}" y2="${H - padB}" stroke="rgba(148,163,184,0.35)"/>`;
+      if (rules && rules.dxMax) {
+        [-1, 1].forEach((sg) => { s += `<line x1="${X(sg * rules.dxMax)}" x2="${X(sg * rules.dxMax)}" y1="${padT}" y2="${H - padB}" stroke="#f59e0b" stroke-dasharray="5 4"/>`; });
+        s += `<text x="${X(rules.dxMax) + 3}" y="${padT + 9}" fill="#f59e0b" font-size="9">±${rules.dxMax} cm</text>`;
+      }
+      items.forEach(({ r, i }, k) => {
+        const col = i === a.vBestIdx ? '#3b82f6' : repColor(k, items.length);
+        const x0 = r.trace.path[0][0];
+        s += `<polyline points="${r.trace.path.map((p) => `${X(p[0] - x0).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(' ')}" fill="none" stroke="${col}" stroke-width="${i === a.vBestIdx ? 2.4 : 1.6}"/>`;
+        const end = r.trace.path[r.trace.path.length - 1];
+        s += `<text x="${X(end[0] - x0)}" y="${Y(end[1]) - 3}" fill="${col}" font-size="9" text-anchor="middle">T${i + 1}</text>`;
+      });
+      s += `<text x="${padL + 3}" y="${padT + 8}" fill="#64748b" font-size="9">y = korkeus cm, x = vaaka cm</text>`;
+      return s + '</svg>';
+    }
+    function buildTraceSectionHTML(s, a) {
+      const reps = s.reps || [];
+      if (!reps.some((r) => r.trace)) {
+        return `<div style="font-size:11px; color:var(--muted); margin-top:8px; line-height:1.4;">📡 Ei Gpath Pin -raakadataa tälle sarjalle. Pin lähettää 80 Hz aikasarjan automaattisesti ~5–10 s viimeisen toiston jälkeen – odota hetki ennen seuraavaa sarjaa, niin kuolokohta, tankoreitti ja kallistus analysoidaan.</div>`;
+      }
+      const rules = a.cfg ? TRACE_LIFT_RULES[a.cfg.id] : null;
+      const meta = s.traceMeta || {};
+      const hasPath = reps.some((r) => r.trace && r.trace.path);
+      const flagTxt = { stick: 'kuolokohta < 0.10 m/s', tech: 'tankoreitti hajosi', dx: 'vaakasiirtymä', tilt: 'kallistus' };
+      const rows = reps.map((r, i) => {
+        const p = a.perRep[i]; const t = r.trace;
+        if (!t) return `<tr><td>${i + 1}</td><td colspan="6" style="color:var(--muted)">ei raakadataa</td><td>${p && p.rqi !== null ? Math.round(p.rqi) : '--'}</td></tr>`;
+        const st = t.stick ? `${t.stick.h.toFixed(0)} cm<br><span class="${t.stick.vmin < 0.10 ? 'red' : t.stick.vmin < 0.2 ? 'amber' : ''}">${t.stick.vmin.toFixed(2)}</span>` : '–';
+        const mid = t.midMin ? t.midMin.v.toFixed(2) : '--';
+        const dx = t.dxMax !== null ? `<span class="${rules && rules.dxMax && Math.abs(t.dxMax) > rules.dxMax ? 'amber' : ''}">${t.dxMax > 0 ? '+' : ''}${t.dxMax.toFixed(1)}</span>` : '--';
+        const dev = p && p.pathDev !== null && p.pathDev !== undefined ? `<span class="${rules && p.pathDev > rules.templMax ? 'amber' : ''}">${p.pathDev.toFixed(1)}</span>` : '--';
+        const tl = t.tilt !== null ? `<span class="${t.tilt > TILT_WARN_DEG ? 'amber' : ''}">${t.tilt.toFixed(1)}°</span>` : '--';
+        const rq = p && p.rqi !== null ? `<strong class="${p.rqi >= 70 ? 'green' : p.rqi >= 50 ? 'amber' : 'red'}">${Math.round(p.rqi)}</strong>` : '--';
+        const fl = p && p.flags && p.flags.length ? `<div style="font-size:10px; color:#fcd34d;">${p.flags.map((f) => flagTxt[f]).join(', ')}</div>` : '';
+        return `<tr><td>${i + 1}</td><td>${st}</td><td>${mid}</td><td>${dx}</td><td>${dev}</td><td>${tl}</td><td>${t.pauseMs !== null && t.pauseMs !== undefined ? (t.pauseMs / 1000).toFixed(1) + ' s' : '--'}</td><td>${rq}${fl}</td></tr>`;
+      }).join('');
+      return `
+        <div style="margin-top:10px; padding-top:8px; border-top:1px dashed rgba(148,163,184,0.25);">
+          <div class="row"><strong style="font-size:12px;">📡 Gpath Pin -raakadata (80 Hz)</strong>
+            <span style="font-size:10px; color:var(--muted);">${meta.samples ? meta.samples + ' näytettä' : ''}${meta.barAxis ? ' · tangon akseli ' + meta.barAxis.toUpperCase() : ''}</span></div>
+          <div style="font-size:11px; color:var(--muted); margin:4px 0 2px;">Nopeus liikematkan funktiona (Butterworth 8 Hz) · ◯ = kuolokohta (V<sub>min</sub>)</div>
+          ${buildTraceCurvesSVG(reps, a)}
+          ${hasPath ? `<div style="font-size:11px; color:var(--muted); margin:6px 0 2px;">Tankoreitti sivulta (kokeellinen: IMU-kaksoisintegrointi, suunta ±)</div>${buildBarPathSVG(reps, a, rules)}` : `<div style="font-size:11px; color:var(--muted); margin-top:4px;">Tankoreittiä ja kallistusta ei voitu laskea: tangon akselia ei tunnistettu anturin asennosta. Valitse akseli Analyysi → VBT-asetukset.</div>`}
+          <div style="overflow-x:auto; margin-top:6px;"><table class="ana-table">
+            <thead><tr><th>#</th><th>Kuolo&shy;kohta</th><th>V<sub>min</sub> 20–80 %</th><th>ΔX max</th><th>Poikk. parh.</th><th>Kallist.</th><th>Tauko</th><th>RQI</th></tr></thead>
+            <tbody>${rows}</tbody></table></div>
+          <div style="font-size:10px; color:var(--muted); margin-top:4px; line-height:1.4;">Kuolokohta = korkeus pohjasta ja miniminopeus V₁→V<sub>min</sub>→V₂-kuviossa. V<sub>min</sub> &lt; 0.10 m/s ⇒ RIR 0 vaikka keskinopeus näyttäisi hyvältä. ΔX = suurin vaakasiirtymä lähtölinjasta (cm), poikkeama = RMS-ero sarjan parhaan toiston reittiin. Kallistus = tangon akselin kulman muutos nousun aikana.</div>
+        </div>`;
+    }
+
+    // =====================================================================
+    // ===  SYVÄ VBT-ANALYYSI  (Velocity Loss, RIR, MVT, laatupisteet,   ===
+    // ===  kuorma–nopeusprofiili, VBT-e1RM, valmius & trendit)         ===
+    // =====================================================================
+    // Perusteet: González-Badillo & Sánchez-Medina (2010, 2011), Pareja-Blanco ym. (2017, 2020),
+    // Helms ym. (2017), Weakley ym. (2021), Morán-Navarro ym. (2021).
+    // Kaikki raja-arvot ovat väestökeskiarvoja – sovellus oppii käyttäjän oman MVT:n ja
+    // kuorma–nopeusprofiilin tallennetuista sarjoista.
+
+    const KEY_VBT_SETTINGS = 'gpath_vbt_settings_v1';
+
+    const VBT_GOALS = {
+      peaking: {
+        key: 'peaking', label: 'Piikkaus / hermostollinen maksimivoima', short: 'Piikkaus',
+        pctRange: [85, 95], vl: { squat: 10, bench: 10, deadlift: 5, generic: 10 },
+        why: 'Maksimoi tehon ja hermoston terävyyden, minimoi lihasvaurion.'
+      },
+      maxStrength: {
+        key: 'maxStrength', label: 'Kehittävä maksimivoima (80–90 % 1RM)', short: 'Maksimivoima',
+        pctRange: [80, 90], vl: { squat: 15, bench: 15, deadlift: 10, generic: 15 },
+        why: 'Paras suhde voimankehityksen ja palautumisen välillä.'
+      },
+      baseStrength: {
+        key: 'baseStrength', label: 'Perusvoima / voima-hypertrofia (70–80 % 1RM)', short: 'Perusvoima',
+        pctRange: [70, 80], vl: { squat: 20, bench: 25, deadlift: 15, generic: 20 },
+        why: 'Riittävä mekaaninen kuormitus ja volyymi ilman ylikuormitusta.'
+      }
+    };
+
+    // lv = väestön kuorma–nopeustaulukko [ %1RM, keskinopeus m/s ] (vaihteluvälien keskikohdat)
+    const LIFT_ANALYSIS = {
+      squat: {
+        id: 'squat', name: 'Jalkakyykky', mvt: 0.30, mvtFloor: 0.15, repCost: 0.06, minRomCm: 35, redVl: 25,
+        lv: [[60, 0.86], [70, 0.715], [75, 0.63], [80, 0.55], [85, 0.47], [90, 0.40], [95, 0.34], [100, 0.30]]
+      },
+      bench: {
+        id: 'bench', name: 'Penkkipunnerrus', mvt: 0.165, mvtFloor: 0.08, repCost: 0.05, minRomCm: 20, redVl: 30,
+        lv: [[60, 0.72], [70, 0.575], [75, 0.50], [80, 0.43], [85, 0.36], [90, 0.285], [95, 0.22], [100, 0.165]]
+      },
+      deadlift: {
+        id: 'deadlift', name: 'Maastaveto', mvt: 0.155, mvtFloor: 0.08, repCost: 0.05, minRomCm: 25, redVl: 15,
+        lv: [[60, 0.66], [70, 0.535], [75, 0.465], [80, 0.405], [85, 0.335], [90, 0.275], [95, 0.22], [100, 0.155]]
+      }
+    };
+    const GENERIC_RED_VL = 30;
+    const TNG_PAUSE_MS = 800;
+
+    let vbtSettings = Object.assign(
+      { goal: 'maxStrength', velocityMetric: 'mv', autoStopOnCutoff: false, cutoffSound: true, mvtOverride: {}, barAxis: 'auto' },
+      loadJSON(KEY_VBT_SETTINGS, {}) || {}
+    );
+    if (!VBT_GOALS[vbtSettings.goal]) vbtSettings.goal = 'maxStrength';
+    if (!vbtSettings.mvtOverride || typeof vbtSettings.mvtOverride !== 'object') vbtSettings.mvtOverride = {};
+    function saveVbtSettings() { saveJSON(KEY_VBT_SETTINGS, vbtSettings); }
+
+    let vbtCutoffAlerted = false;
+    let vbtFailureAlerted = false;
+
+    function getLiftKey(exerciseName) {
+      const p = getVbtProfileForExercise(exerciseName);
+      return p ? p.id : null;
+    }
+    function getLiftCfg(exerciseName) {
+      const k = getLiftKey(exerciseName);
+      return k ? LIFT_ANALYSIS[k] : null;
+    }
+    function getGoal() { return VBT_GOALS[vbtSettings.goal] || VBT_GOALS.maxStrength; }
+    function getCutoffPct(exerciseName) {
+      const g = getGoal();
+      const k = getLiftKey(exerciseName);
+      return g.vl[k || 'generic'];
+    }
+    function repV(r) {
+      if (!r) return 0;
+      if (vbtSettings.velocityMetric === 'mpv' && Number(r.propulsiveVelocity) > 0) return Number(r.propulsiveVelocity);
+      return Number(r.meanVelocity) || 0;
+    }
+    function metricLabel() { return vbtSettings.velocityMetric === 'mpv' ? 'MPV' : 'MV'; }
+
+    function vbtMedian(arr) {
+      const a = arr.filter((x) => Number.isFinite(x)).sort((x, y) => x - y);
+      if (!a.length) return null;
+      const m = Math.floor(a.length / 2);
+      return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+    }
+    function vbtLinReg(xs, ys) {
+      const n = xs.length;
+      if (n < 2) return null;
+      const mx = xs.reduce((a, b) => a + b, 0) / n;
+      const my = ys.reduce((a, b) => a + b, 0) / n;
+      let sxy = 0, sxx = 0, syy = 0;
+      for (let i = 0; i < n; i++) {
+        sxy += (xs[i] - mx) * (ys[i] - my);
+        sxx += (xs[i] - mx) ** 2;
+        syy += (ys[i] - my) ** 2;
+      }
+      if (sxx === 0) return null;
+      const slope = sxy / sxx;
+      const intercept = my - slope * mx;
+      const r2 = syy === 0 ? 1 : (sxy * sxy) / (sxx * syy);
+      return { slope, intercept, r2, n };
+    }
+    function fmtV(v) { return (v === null || v === undefined || !Number.isFinite(v)) ? '--' : v.toFixed(2); }
+    function fmtDateFi(iso) {
+      if (!iso) return '';
+      const [y, m, d] = iso.split('-');
+      return `${parseInt(d, 10)}.${parseInt(m, 10)}.${y}`;
+    }
+
+    // --- Velocity -> %1RM from the population table (linear interpolation / extrapolation) ---
+    function pctFromVelocityTable(cfg, v) {
+      if (!cfg || !(v > 0)) return null;
+      const t = cfg.lv; // pct ascending, velocity descending
+      let lo = t[0], hi = t[1];
+      if (v <= t[t.length - 1][1]) { lo = t[t.length - 2]; hi = t[t.length - 1]; }
+      else {
+        for (let i = 0; i < t.length - 1; i++) {
+          if (v <= t[i][1] && v >= t[i + 1][1]) { lo = t[i]; hi = t[i + 1]; break; }
+        }
+      }
+      const pct = lo[0] + (v - lo[1]) * (hi[0] - lo[0]) / (hi[1] - lo[1]);
+      return Math.max(30, Math.min(110, pct));
+    }
+    function velocityFromPctTable(cfg, pct) {
+      if (!cfg) return null;
+      const t = cfg.lv;
+      let lo = t[0], hi = t[1];
+      if (pct >= t[t.length - 1][0]) { lo = t[t.length - 2]; hi = t[t.length - 1]; }
+      else {
+        for (let i = 0; i < t.length - 1; i++) {
+          if (pct >= t[i][0] && pct <= t[i + 1][0]) { lo = t[i]; hi = t[i + 1]; break; }
+        }
+      }
+      return lo[1] + (pct - lo[0]) * (hi[1] - lo[1]) / (hi[0] - lo[0]);
+    }
+
+    // --- Suspect rep detection (unrack / positioning / partial ROM) ---
+    function flagSuspectReps(reps, cfg) {
+      const n = reps.length;
+      const flags = new Array(n).fill(false);
+      if (n < 2) return flags;
+      const vs = reps.map(repV);
+      const roms = reps.map((r) => Number(r.rangeOfMotionCm) || 0);
+      const medRom = vbtMedian(roms);
+      const minRom = cfg ? cfg.minRomCm : 15;
+      reps.forEach((r, i) => {
+        // 1. Unrack / positioning movement recorded as 1st rep (much slower than the rest)
+        if (i === 0) {
+          const others = vbtMedian(vs.slice(1));
+          if (others && vs[0] < others * 0.5) flags[0] = true;
+        }
+        // 2. Partial movement: ROM clearly below set median AND below lift-specific minimum
+        if (medRom && roms[i] < medRom * 0.5 && roms[i] < minRom) flags[i] = true;
+      });
+      return flags;
+    }
+
+    // --- Personal MVT: manual override > learned from completed reps > population default ---
+    let _mvtCache = { sig: '', map: {} };
+    function workoutsSignature() {
+      let n = 0;
+      workouts.forEach((w) => (w.sets || []).forEach((s) => { n += (s.reps || []).length; }));
+      return `${workouts.length}:${n}:${vbtSettings.velocityMetric}`;
+    }
+    function learnedMvt(liftKey) {
+      const sig = workoutsSignature();
+      if (_mvtCache.sig !== sig) _mvtCache = { sig, map: {} };
+      if (_mvtCache.map[liftKey] !== undefined) return _mvtCache.map[liftKey];
+      const cfg = LIFT_ANALYSIS[liftKey];
+      let minV = null;
+      workouts.forEach((w) => (w.sets || []).forEach((s) => {
+        if (getLiftKey(s.exercise) !== liftKey) return;
+        const reps = s.reps || [];
+        const sus = flagSuspectReps(reps, cfg);
+        reps.forEach((r, i) => {
+          if (sus[i]) return;
+          const v = repV(r);
+          if (v >= cfg.mvtFloor && (minV === null || v < minV)) minV = v;
+        });
+      }));
+      const res = (minV !== null && minV < cfg.mvt) ? minV : null;
+      _mvtCache.map[liftKey] = res;
+      return res;
+    }
+    function getEffectiveMvt(exerciseName) {
+      const k = getLiftKey(exerciseName);
+      if (!k) return null;
+      const cfg = LIFT_ANALYSIS[k];
+      const man = parseFloat(vbtSettings.mvtOverride[k]);
+      if (Number.isFinite(man) && man > 0) return { value: man, source: 'manual', label: 'oma asetus' };
+      const learned = learnedMvt(k);
+      if (learned !== null) return { value: learned, source: 'learned', label: 'opittu omista toistoista' };
+      return { value: cfg.mvt, source: 'default', label: 'väestökeskiarvo' };
+    }
+
+    // --- Core: analyse one set ---
+    function analyzeSet(reps, exercise, weightKg, opts = {}) {
+      reps = reps || [];
+      const cfg = getLiftCfg(exercise);
+      const cutoffPct = getCutoffPct(exercise);
+      const redVl = cfg ? cfg.redVl : GENERIC_RED_VL;
+      const mvtInfo = getEffectiveMvt(exercise);
+      const mvt = mvtInfo ? mvtInfo.value : null;
+      const n = reps.length;
+      const vs = reps.map(repV);
+      const suspect = flagSuspectReps(reps, cfg);
+
+      // Touch-and-go detection (deadlift): pause between reps < 0.8 s
+      const pauses = reps.slice(1).map((r) => r.pauseMs).filter((p) => Number.isFinite(p));
+      const tng = !!(cfg && cfg.id === 'deadlift' && pauses.length >= 1 && vbtMedian(pauses) < TNG_PAUSE_MS);
+
+      // Velocity loss vs. best-so-far rep (NOT vs. 1st rep: PAP, unrack & dead-start would distort it)
+      let bestSoFar = 0;
+      let vBest = null, vBestIdx = -1;
+      const perRep = reps.map((r, i) => {
+        const v = vs[i];
+        const excludedFromRef = suspect[i] || (tng && i === 0 && n > 1);
+        if (!excludedFromRef && v > bestSoFar) bestSoFar = v;
+        if (!suspect[i] && !(tng && i === 0 && n > 1) && (vBest === null || v > vBest)) { vBest = v; vBestIdx = i; }
+        const vl = (!suspect[i] && bestSoFar > 0 && !(tng && i === 0 && n > 1)) ? Math.max(0, (bestSoFar - v) / bestSoFar * 100) : null;
+        return { idx: i, v, vl, bestSoFar: bestSoFar || null, suspect: suspect[i], rir: null, quality: 'good' };
+      });
+      if (vBest === null && n > 0) { vBest = Math.max(...vs); vBestIdx = vs.indexOf(vBest); }
+
+      // Velocity cost per rep: from this set's own slope (best rep -> end) or lift default
+      let cost = cfg ? cfg.repCost : null, costSource = cfg ? 'default' : null;
+      const tail = perRep.filter((p) => p.idx >= vBestIdx && !p.suspect);
+      if (tail.length >= 3) {
+        const reg = vbtLinReg(tail.map((p) => p.idx), tail.map((p) => p.v));
+        if (reg && reg.slope < -0.005) { cost = Math.min(0.12, Math.max(0.02, -reg.slope)); costSource = 'set'; }
+      }
+
+      perRep.forEach((p) => {
+        if (mvt !== null && cost && !p.suspect) p.rir = Math.max(0, Math.floor((p.v - mvt) / cost + 1e-9));
+        if (p.suspect) p.quality = 'suspect';
+        else if (mvt !== null && p.v < mvt) p.quality = 'bad';
+        else if (p.vl !== null && p.vl > redVl) p.quality = 'bad';
+        else if (p.vl !== null && p.vl > cutoffPct) p.quality = 'warn';
+        else if (p.rir !== null && p.rir < 1) p.quality = 'warn';
+        else p.quality = 'good';
+      });
+
+      // --- Gpath Pin raw-trace metrics: sticking point, bar path vs best rep, tilt ---
+      const rules = cfg ? TRACE_LIFT_RULES[cfg.id] : null;
+      const hasTrace = reps.some((r) => r && r.trace);
+      const bestTrRep = (vBestIdx >= 0 && reps[vBestIdx] && reps[vBestIdx].trace && reps[vBestIdx].trace.path)
+        ? reps[vBestIdx] : reps.find((r, i) => r.trace && r.trace.path && !suspect[i]);
+      const bestTr = bestTrRep ? bestTrRep.trace : null;
+      perRep.forEach((p) => {
+        p.flags = [];
+        p.pathDev = null;
+        const tr = reps[p.idx].trace;
+        if (!tr || p.suspect) return;
+        if (tr.stick && tr.stick.vmin < 0.10 && p.quality !== 'bad') {
+          p.flags.push('stick');
+          if (p.rir !== null) p.rir = 0;
+          if (p.quality === 'good') p.quality = 'warn';
+        }
+        if (tr.path && bestTr && bestTr.path) p.pathDev = tr === bestTr ? 0 : pathTemplateDeviation(tr.path, bestTr.path);
+        if (p.pathDev !== null && rules && p.pathDev > rules.templMax) { p.flags.push('tech'); if (p.quality === 'good') p.quality = 'warn'; }
+        if (tr.dxMax !== null && tr.dxMax !== undefined && rules && rules.dxMax && Math.abs(tr.dxMax) > rules.dxMax) { p.flags.push('dx'); if (p.quality === 'good') p.quality = 'warn'; }
+        if (tr.tilt !== null && tr.tilt !== undefined && tr.tilt > TILT_WARN_DEG) { p.flags.push('tilt'); if (p.quality === 'good') p.quality = 'warn'; }
+      });
+
+      const valid = perRep.filter((p) => !p.suspect);
+      const lastValid = valid[valid.length - 1] || null;
+      const vlFinal = lastValid && lastValid.vl !== null ? lastValid.vl : null;
+      const vlMax = valid.reduce((m, p) => (p.vl !== null && p.vl > m ? p.vl : m), 0);
+      const vCutoff = vBest ? vBest * (1 - cutoffPct / 100) : null;
+      const rirEnd = lastValid ? lastValid.rir : null;
+      const qualityReps = valid.filter((p) => p.quality === 'good').length;
+      const firstOver = valid.find((p) => p.vl !== null && p.vl > cutoffPct);
+      const stopAfterRep = firstOver ? firstOver.idx : null; // 0-based index of last rep that was still within the cutoff = firstOver.idx - 1
+      const junkReps = firstOver ? valid.filter((p) => p.idx >= firstOver.idx).length : 0;
+      const effectiveReps = valid.filter((p) => p.rir !== null && p.rir <= 4).length;
+
+      // Projected reps left / reps to cutoff
+      let repsToCutoff = null;
+      if (lastValid && vCutoff !== null && cost) repsToCutoff = Math.max(0, Math.floor((lastValid.v - vCutoff) / cost + 1e-9));
+
+      // Intensity (%1RM) from personal profile, else population table
+      let pct1RM = null, pctSource = null, e1RM = null;
+      const prof = opts.profile || null;
+      if (vBest && weightKg > 0) {
+        if (prof && prof.valid && prof.e1RM > 0) {
+          // personal profile: the load the profile predicts for today's vBest gives the
+          // day-adjusted relative intensity (faster than usual -> lower %1RM -> higher e1RM)
+          const loadAtV = (vBest - prof.intercept) / prof.slope;
+          pct1RM = Math.max(30, Math.min(110, loadAtV / prof.e1RM * 100));
+          pctSource = 'profile';
+          e1RM = weightKg / (pct1RM / 100);
+          if (!Number.isFinite(e1RM) || e1RM <= 0) e1RM = prof.e1RM;
+        } else if (cfg) {
+          // shift table so its 1RM velocity equals this lifter's effective MVT
+          const shift = (mvt !== null ? mvt : cfg.mvt) - cfg.mvt;
+          pct1RM = pctFromVelocityTable(cfg, vBest - shift);
+          pctSource = 'table';
+          e1RM = pct1RM ? weightKg / (pct1RM / 100) : null;
+        }
+      }
+      const isWarmup = pct1RM !== null && pct1RM < 65;
+
+      // Epley corrected with reps-in-reserve (reps to failure = reps done + RIR)
+      const epleyRir = (weightKg > 0 && valid.length > 0)
+        ? weightKg * (1 + (valid.length + (rirEnd || 0)) / 30) : null;
+
+      // --- Rep Quality Index (RQI) = 0.40·S_intensity + 0.40·S_fatigue + 0.20·S_path ---
+      const roms = valid.map((p) => Number(reps[p.idx].rangeOfMotionCm) || 0).filter((x) => x > 0);
+      let romCv = null;
+      if (roms.length >= 2) {
+        const m = roms.reduce((a, b) => a + b, 0) / roms.length;
+        const sd = Math.sqrt(roms.reduce((a, b) => a + (b - m) ** 2, 0) / (roms.length - 1));
+        romCv = m > 0 ? sd / m * 100 : null;
+      }
+      const [pLo, pHi] = getGoal().pctRange;
+      let sInt = null, vWin = null;
+      if (cfg && vBest) {
+        const mvtShift = (mvt !== null ? mvt : cfg.mvt) - cfg.mvt;
+        const vAt = (pc) => (prof && prof.valid) ? prof.intercept + prof.slope * (prof.e1RM * pc / 100) : velocityFromPctTable(cfg, pc) + mvtShift;
+        vWin = [vAt(pHi) - 0.03, vAt(pLo) + 0.03];
+        const dist = vBest < vWin[0] ? vWin[0] - vBest : (vBest > vWin[1] ? vBest - vWin[1] : 0);
+        sInt = Math.max(0, 100 - dist / 0.10 * 100);
+      }
+      const medRom = vbtMedian(roms);
+      perRep.forEach((p) => {
+        if (p.suspect) { p.rqi = null; return; }
+        let f;
+        if (mvt !== null && p.v < mvt) f = 0;
+        else if (p.vl === null || p.vl <= cutoffPct) f = 100;
+        else if (p.vl <= redVl) f = 100 - 70 * (p.vl - cutoffPct) / Math.max(1, redVl - cutoffPct);
+        else f = Math.max(0, 30 - 3 * (p.vl - redVl));
+        if (p.flags.includes('stick')) f = Math.min(f, 30);
+        p.sFat = f;
+        const tr = reps[p.idx].trace;
+        const comps = [];
+        if (tr) {
+          if (p.pathDev !== null) comps.push(p.pathDev <= 1 ? 100 : Math.max(0, 100 - (p.pathDev - 1) / ((rules ? rules.templMax * 2 : 6) - 1) * 100));
+          if (tr.dxMax !== null && tr.dxMax !== undefined && rules && rules.dxMax) {
+            const ad = Math.abs(tr.dxMax);
+            comps.push(ad <= rules.dxMax ? 100 : Math.max(0, 100 - (ad - rules.dxMax) / rules.dxMax * 100));
+          }
+          if (tr.tilt !== null && tr.tilt !== undefined) comps.push(tr.tilt <= 2 ? 100 : Math.max(0, 100 - (tr.tilt - 2) / (TILT_WARN_DEG * 2 - 2) * 100));
+        }
+        if (comps.length) { p.sPath = comps.reduce((a, b) => a + b, 0) / comps.length; p.pathSrc = 'trace'; }
+        else {
+          const rc = [];
+          const rom = Number(reps[p.idx].rangeOfMotionCm) || 0;
+          if (medRom && rom > 0) { const dev = Math.abs(rom - medRom) / medRom * 100; rc.push(dev <= 10 ? 100 : Math.max(0, 100 - (dev - 10) / 30 * 100)); }
+          const lw = reps[p.idx].loweringVelocity;
+          if (lw !== null && lw !== undefined) rc.push(isControlled(lw) ? 100 : 40);
+          p.sPath = rc.length ? rc.reduce((a, b) => a + b, 0) / rc.length : 70;
+          p.pathSrc = 'proxy';
+        }
+        p.rqi = sInt === null ? (0.667 * f + 0.333 * p.sPath) : (0.4 * sInt + 0.4 * f + 0.2 * p.sPath);
+      });
+      const rq = valid.filter((p) => p.rqi !== null && p.rqi !== undefined);
+      const wInt = sInt === null ? 0 : 40, wFat = sInt === null ? 67 : 40, wPath = sInt === null ? 33 : 20;
+      const parts = {
+        intensity: sInt === null ? null : sInt * wInt / 100,
+        // set level: the most fatigued rep decides (a set taken to failure must not average out to "good")
+        fatigue: rq.length ? wFat * Math.min(...rq.map((p) => p.sFat)) / 100 : 0,
+        path: rq.length ? wPath * rq.reduce((acc, p) => acc + p.sPath, 0) / rq.length / 100 : 0,
+        wInt, wFat, wPath, pathSrc: rq.some((p) => p.pathSrc === 'trace') ? 'trace' : 'proxy'
+      };
+      const score = rq.length ? Math.round((parts.intensity || 0) + parts.fatigue + parts.path) : 0;
+      const stickReps = valid.filter((p) => reps[p.idx].trace && reps[p.idx].trace.stick);
+      const stickSummary = stickReps.length ? {
+        n: stickReps.length,
+        hAvg: stickReps.reduce((acc, p) => acc + reps[p.idx].trace.stick.h, 0) / stickReps.length,
+        vminMin: Math.min(...stickReps.map((p) => reps[p.idx].trace.stick.vmin))
+      } : null;
+      const techFirst = valid.find((p) => p.flags.includes('tech') || p.flags.includes('dx'));
+      const tiltReps = valid.filter((p) => p.flags.includes('tilt')).map((p) => p.idx + 1);
+      const grade = score >= 85 ? 'Erinomainen' : score >= 70 ? 'Hyvä' : score >= 50 ? 'Kohtalainen' : 'Heikko';
+      const gradeClass = score >= 70 ? 'green' : score >= 50 ? 'amber' : 'red';
+
+      return {
+        n, cfg, perRep, valid, suspectCount: perRep.filter((p) => p.suspect).length,
+        vBest, vBestIdx, vlFinal, vlMax, cutoffPct, redVl, vCutoff, mvt, mvtInfo, cost, costSource,
+        rirEnd, qualityReps, stopAfterRep, junkReps, effectiveReps, repsToCutoff, tng,
+        pct1RM, pctSource, e1RM, epleyRir, isWarmup, romCv,
+        score, scoreParts: parts, grade, gradeClass,
+        hasTrace, sInt, vWin, stickSummary, techFirst, tiltReps, rules
+      };
+    }
+
+    // --- Collect set points for one exercise ---
+    function setsForExercise(exercise, dateFilter) {
+      const out = [];
+      workouts.forEach((w) => {
+        if (dateFilter && !dateFilter(w.date)) return;
+        (w.sets || []).forEach((s, sIdx) => {
+          if (s.exercise !== exercise || !s.reps || !s.reps.length || !(s.weightKg > 0)) return;
+          out.push({ date: w.date, set: s, sIdx });
+        });
+      });
+      return out;
+    }
+
+    // --- Load–velocity profile (best rep of each load) & VBT e1RM at MVT ---
+    function buildLVProfile(points, exercise) {
+      const mvtInfo = getEffectiveMvt(exercise);
+      const byLoad = new Map();
+      points.forEach((p) => {
+        const key = Math.round(p.load * 2) / 2;
+        if (!byLoad.has(key) || byLoad.get(key).v < p.v) byLoad.set(key, { load: key, v: p.v, date: p.date });
+      });
+      const pts = [...byLoad.values()].sort((a, b) => a.load - b.load);
+      const res = { points: pts, allPoints: points, valid: false, mvt: mvtInfo ? mvtInfo.value : null, mvtInfo };
+      if (pts.length < 2) { res.reason = 'Tarvitaan vähintään 2 eri kuormaa (mieluiten 3–4, n. 40–90 % 1RM).'; return res; }
+      const span = pts[pts.length - 1].load - pts[0].load;
+      const reg = vbtLinReg(pts.map((p) => p.load), pts.map((p) => p.v));
+      if (!reg) { res.reason = 'Regressiota ei voitu laskea.'; return res; }
+      Object.assign(res, reg);
+      if (reg.slope >= 0) { res.reason = 'Nopeus ei laske kuorman kasvaessa – tarkista data.'; return res; }
+      if (res.mvt === null) { res.reason = 'Liikkeelle ei ole MVT-arvoa (vain kyykky, penkki ja maastaveto).'; return res; }
+      res.e1RM = (res.mvt - reg.intercept) / reg.slope;
+      res.v0 = reg.intercept;
+      res.l0 = -reg.intercept / reg.slope;
+      res.spanKg = span;
+      res.valid = Number.isFinite(res.e1RM) && res.e1RM > pts[pts.length - 1].load * 0.9;
+      res.reliability = reg.r2 >= 0.95 && pts.length >= 3 ? 'Hyvä' : (reg.r2 >= 0.85 ? 'Kohtalainen' : 'Heikko');
+      if (!res.valid) res.reason = 'Profiili ei ole uskottava (e1RM alle raskaimman kuorman).';
+      return res;
+    }
+    function sessionProfile(exercise, dateStr) {
+      const sets = setsForExercise(exercise, (d) => d === dateStr);
+      const pts = sets.map(({ date, set }) => {
+        const a = analyzeSet(set.reps, set.exercise, set.weightKg);
+        return { load: set.weightKg, v: a.vBest, date };
+      }).filter((p) => p.v > 0);
+      return buildLVProfile(pts, exercise);
+    }
+    // Latest valid personal profile on/before a date (single session, else pooled 28 d)
+    function recentProfile(exercise, onOrBeforeDate) {
+      if (!exercise || !getLiftCfg(exercise)) return null;
+      const dates = [...new Set(setsForExercise(exercise, (d) => d <= onOrBeforeDate).map((x) => x.date))].sort().reverse();
+      for (const d of dates.slice(0, 6)) {
+        const p = sessionProfile(exercise, d);
+        if (p.valid && p.r2 >= 0.8) { p.date = d; p.method = 'session'; return p; }
+      }
+      const from = new Date(onOrBeforeDate); from.setDate(from.getDate() - 28);
+      const fromIso = from.toISOString().slice(0, 10);
+      const sets = setsForExercise(exercise, (d) => d <= onOrBeforeDate && d >= fromIso);
+      const pts = sets.map(({ date, set }) => ({ load: set.weightKg, v: analyzeSet(set.reps, set.exercise, set.weightKg).vBest, date })).filter((p) => p.v > 0);
+      const p = buildLVProfile(pts, exercise);
+      if (p.valid && p.r2 >= 0.7) { p.date = dates[0]; p.method = 'pooled28'; return p; }
+      return null;
+    }
+
+    // --- e1RM trend: session profile if possible, else best single-set estimate (work sets) ---
+    function e1rmTrend(exercise) {
+      const dates = [...new Set(setsForExercise(exercise).map((x) => x.date))].sort();
+      return dates.map((d) => {
+        const p = sessionProfile(exercise, d);
+        if (p.valid && p.r2 >= 0.8) return { date: d, e1RM: p.e1RM, method: 'profiili' };
+        let best = null;
+        setsForExercise(exercise, (x) => x === d).forEach(({ set }) => {
+          const a = analyzeSet(set.reps, set.exercise, set.weightKg);
+          if (a.e1RM && !a.isWarmup && (best === null || a.e1RM > best)) best = a.e1RM;
+        });
+        return best ? { date: d, e1RM: best, method: 'yksittäinen sarja' } : null;
+      }).filter(Boolean);
+    }
+
+    // --- Day readiness: same absolute load vs. previous sessions (90 d) ---
+    function readinessForDate(exercise, dateStr) {
+      const today = setsForExercise(exercise, (d) => d === dateStr);
+      if (!today.length) return null;
+      const from = new Date(dateStr); from.setDate(from.getDate() - 90);
+      const fromIso = from.toISOString().slice(0, 10);
+      const prev = setsForExercise(exercise, (d) => d < dateStr && d >= fromIso);
+      let best = null;
+      today.forEach(({ set }) => {
+        const vT = analyzeSet(set.reps, set.exercise, set.weightKg).vBest;
+        const same = prev.filter((p) => Math.abs(p.set.weightKg - set.weightKg) < 0.6)
+          .map((p) => analyzeSet(p.set.reps, p.set.exercise, p.set.weightKg).vBest).filter((v) => v > 0);
+        if (!same.length || !vT) return;
+        const base = same.reduce((a, b) => a + b, 0) / same.length;
+        const cand = { weight: set.weightKg, today: vT, baseline: base, deltaPct: (vT - base) / base * 100, nPrev: same.length };
+        if (!best || cand.weight > best.weight) best = cand;
+      });
+      return best;
+    }
+
+    // --- Verdict text ---
+    function buildVerdict(a, exercise) {
+      if (!a || a.n === 0) return '';
+      const g = getGoal();
+      const parts = [];
+      if (a.suspectCount) parts.push(`${a.suspectCount} epäilyttävä(ä) liike(ttä) (telineestä otto / vajaa liikerata) jätettiin laskennan ulkopuolelle.`);
+      if (a.tng) parts.push('Touch-and-go tunnistettu (tauko < 0,8 s): 1. toistoa ei verrata muihin.');
+      if (a.isWarmup) {
+        parts.push(`Arvioitu kuorma ~${Math.round(a.pct1RM)} % 1RM → lämmittely-/tekniikkasarja, ei laatuluokitusta maksimivoimalle.`);
+        return parts.join(' ');
+      }
+      if (a.n >= 2 && a.vlFinal !== null) {
+        if (a.stopAfterRep !== null) {
+          const keep = a.stopAfterRep; // reps within cutoff = idx of first over
+          parts.push(`${g.short}: VL-raja ${a.cutoffPct} % ylittyi toistolla ${a.stopAfterRep + 1} → sarja olisi kannattanut katkaista toiston ${keep} jälkeen. ${a.junkReps} toisto(a) kerrytti lähinnä väsymystä.`);
+        } else {
+          parts.push(`${g.short}: nopeuden lasku ${a.vlFinal.toFixed(0)} % pysyi rajan ${a.cutoffPct} % sisällä – jokainen toisto tehtiin hyvällä hermostollisella laadulla.`);
+        }
+      }
+      if (a.rirEnd !== null && a.mvt !== null) {
+        if (a.rirEnd === 0) parts.push(`Viimeinen toisto oli lähellä failure-rajaa (MVT ${fmtV(a.mvt)} m/s) – RIR ~0.`);
+        else parts.push(`Varastoon jäi arviolta ~${a.rirEnd} toisto${a.rirEnd === 1 ? '' : 'a'} ennen MVT-rajaa.`);
+        if (a.stopAfterRep === null && a.repsToCutoff !== null && a.repsToCutoff >= 2 && a.pct1RM !== null && a.pct1RM >= g.pctRange[0]) {
+          parts.push(`VL-rajaan olisi ollut vielä ~${a.repsToCutoff} toistoa → voit lisätä toiston tai kuormaa.`);
+        }
+      }
+      if (a.pct1RM !== null) {
+        const [lo, hi] = g.pctRange;
+        if (a.pct1RM < lo - 2) parts.push(`Kuorma ~${Math.round(a.pct1RM)} % 1RM on tavoitteen (${lo}–${hi} %) alapuolella.`);
+        else if (a.pct1RM > hi + 2) parts.push(`Kuorma ~${Math.round(a.pct1RM)} % 1RM on tavoitteen (${lo}–${hi} %) yläpuolella.`);
+      }
+      if (a.techFirst) parts.push(`Toistolla ${a.techFirst.idx + 1} tankoreitti poikkesi parhaasta toistosta (${a.techFirst.pathDev !== null ? a.techFirst.pathDev.toFixed(1) + ' cm' : 'raja ylittyi'}) → tekninen uupumus${a.rules ? ' (' + a.rules.label + ')' : ''}, vaikka nopeutta olisi vielä ollut jäljellä.`);
+      if (a.tiltReps && a.tiltReps.length) parts.push(`Epäsymmetriavaroitus: tanko kallistui yli ${TILT_WARN_DEG}° toistoilla ${a.tiltReps.join(', ')}.`);
+      if (a.stickSummary) parts.push(`Kuolokohta keskimäärin ${a.stickSummary.hAvg.toFixed(0)} cm pohjasta, hitaimmillaan ${fmtV(a.stickSummary.vminMin)} m/s${a.stickSummary.vminMin < 0.10 ? ' – erittäin lähellä epäonnistumista' : ''}.`);
+      if (a.romCv !== null && a.romCv > 20 && !a.hasTrace) parts.push(`Liikelaajuus vaihteli paljon (CV ${a.romCv.toFixed(0)} %) – tarkista tekniikka tai anturin kiinnitys.`);
+      return parts.join(' ');
+    }
+
+    // --- SVG: rep velocity curve with V_cutoff and MVT lines (+ projection) ---
+    const Q_COLORS = { good: '#22c55e', warn: '#f59e0b', bad: '#ef4444', suspect: '#64748b' };
+    function buildRepCurveSVG(a, opts = {}) {
+      if (!a || a.n === 0) return '';
+      const W = 340, H = opts.height || 190, padL = 34, padR = 10, padT = 18, padB = 22;
+      const proj = [];
+      const last = a.valid[a.valid.length - 1];
+      if (opts.projection !== false && last && a.mvt !== null && a.cost && !a.isWarmup) {
+        let v = last.v, i = last.idx;
+        for (let k = 0; k < 8 && v - a.cost >= a.mvt - a.cost * 0.999; k++) {
+          v -= a.cost; i += 1; if (v < a.mvt) break; proj.push({ idx: i, v });
+        }
+      }
+      const nSlots = Math.max(a.n + proj.length, 3);
+      const vMax = Math.max(0.6, ...a.perRep.map((p) => p.v), a.vBest || 0) * 1.12;
+      const yMax = Math.ceil(vMax * 10) / 10;
+      const x = (i) => padL + (nSlots === 1 ? 0.5 : i / (nSlots - 1)) * (W - padL - padR);
+      const y = (v) => padT + (1 - Math.max(0, Math.min(yMax, v)) / yMax) * (H - padT - padB);
+      let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block; max-height:${H + 20}px;" role="img" aria-label="Toistokohtainen nopeuskäyrä">`;
+      const gStep = yMax <= 0.8 ? 0.2 : (yMax > 1.2 ? 0.5 : 0.25);
+      for (let g = 0; g <= yMax + 1e-9; g += gStep) {
+        s += `<line x1="${padL}" x2="${W - padR}" y1="${y(g)}" y2="${y(g)}" stroke="rgba(148,163,184,0.15)"/>`;
+        s += `<text x="${padL - 4}" y="${y(g) + 3}" fill="#94a3b8" font-size="9" text-anchor="end">${g.toFixed(2)}</text>`;
+      }
+      if (a.vCutoff && !a.isWarmup) {
+        s += `<line x1="${padL}" x2="${W - padR}" y1="${y(a.vCutoff)}" y2="${y(a.vCutoff)}" stroke="#f59e0b" stroke-width="1.4" stroke-dasharray="6 4"/>`;
+        s += `<text x="${W - padR}" y="${y(a.vCutoff) - 3}" fill="#f59e0b" font-size="9" text-anchor="end">VL ${a.cutoffPct} % · ${fmtV(a.vCutoff)}</text>`;
+      }
+      if (a.mvt !== null) {
+        s += `<line x1="${padL}" x2="${W - padR}" y1="${y(a.mvt)}" y2="${y(a.mvt)}" stroke="#ec4899" stroke-width="1.4" stroke-dasharray="2 3"/>`;
+        s += `<text x="${W - padR}" y="${y(a.mvt) + 11}" fill="#ec4899" font-size="9" text-anchor="end">MVT ${fmtV(a.mvt)}</text>`;
+      }
+      if (proj.length && last) {
+        const pts = [[x(last.idx), y(last.v)], ...proj.map((p) => [x(p.idx), y(p.v)])];
+        s += `<polyline points="${pts.map((p) => p.join(',')).join(' ')}" fill="none" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="3 3"/>`;
+        proj.forEach((p) => { s += `<circle cx="${x(p.idx)}" cy="${y(p.v)}" r="3" fill="none" stroke="#64748b"/>`; });
+      }
+      const line = a.perRep.filter((p) => !p.suspect).map((p) => `${x(p.idx)},${y(p.v)}`).join(' ');
+      if (line) s += `<polyline points="${line}" fill="none" stroke="#3b82f6" stroke-width="2"/>`;
+      a.perRep.forEach((p) => {
+        const c = Q_COLORS[p.quality] || '#3b82f6';
+        s += `<circle cx="${x(p.idx)}" cy="${y(p.v)}" r="5" fill="#0f172a" stroke="${c}" stroke-width="2.4"/>`;
+        s += `<text x="${x(p.idx)}" y="${y(p.v) - 8}" fill="#e2e8f0" font-size="9" text-anchor="middle">${p.v.toFixed(2)}</text>`;
+      });
+      for (let i = 0; i < nSlots; i++) {
+        const isProj = i >= a.n;
+        s += `<text x="${x(i)}" y="${H - 6}" fill="${isProj ? '#475569' : '#94a3b8'}" font-size="9" text-anchor="middle">T${i + 1}</text>`;
+      }
+      s += `</svg>`;
+      return s;
+    }
+
+    function buildVbtKpiHTML(a, live) {
+      if (!a || a.n === 0) return '';
+      const mvtSrc = a.mvtInfo ? a.mvtInfo.label : '';
+      const vlNow = a.valid.length ? a.valid[a.valid.length - 1].vl : null;
+      const vlCls = (vlNow === null || a.isWarmup) ? '' : (vlNow > a.redVl ? 'red' : (vlNow > a.cutoffPct ? 'amber' : 'green'));
+      const rirTxt = a.rirEnd === null ? '--' : (a.rirEnd >= 10 ? '10+' : `~${a.rirEnd}`);
+      const rirCls = (a.rirEnd === null || a.isWarmup) ? '' : (a.rirEnd <= 0 ? 'red' : (a.rirEnd <= 1 ? 'amber' : 'green'));
+      const scoreTxt = a.isWarmup ? 'LÄ' : a.score;
+      const scoreSub = a.isWarmup ? 'lämmittely' : a.grade;
+      return `
+        <div class="vbt-kpi-grid">
+          <div class="vbt-kpi"><span class="vbt-kpi-l">V<sub>best</sub> (${metricLabel()})</span><span class="vbt-kpi-v">${fmtV(a.vBest)}</span><span class="vbt-kpi-s">${a.pct1RM !== null ? `~${Math.round(a.pct1RM)} % 1RM` : (a.vBestIdx >= 0 ? `toisto ${a.vBestIdx + 1}` : '')}</span></div>
+          <div class="vbt-kpi"><span class="vbt-kpi-l">VL ${live ? 'nyt' : 'lopussa'}</span><span class="vbt-kpi-v ${vlCls}">${vlNow === null ? '--' : vlNow.toFixed(0) + ' %'}</span><span class="vbt-kpi-s">raja ${a.cutoffPct} % · ${fmtV(a.vCutoff)} m/s</span></div>
+          <div class="vbt-kpi"><span class="vbt-kpi-l">RIR-arvio</span><span class="vbt-kpi-v ${rirCls}">${rirTxt}</span><span class="vbt-kpi-s">MVT ${fmtV(a.mvt)} (${mvtSrc})</span></div>
+          <div class="vbt-kpi"><span class="vbt-kpi-l">${live ? 'Laadukkaat' : 'RQI (0–100)'}</span><span class="vbt-kpi-v ${live || a.isWarmup ? '' : a.gradeClass}">${live ? `${a.qualityReps}/${a.valid.length}` : scoreTxt}</span><span class="vbt-kpi-s">${live ? (a.isWarmup ? 'lämmittely' : (a.repsToCutoff !== null && a.stopAfterRep === null ? `~${a.repsToCutoff} toistoa rajaan` : (a.stopAfterRep !== null ? 'raja ylitetty' : ''))) : scoreSub}</span></div>
+        </div>`;
+    }
+
+    function buildVbtLegendHTML() {
+      return `<div class="vbt-legend" style="display:flex; gap:10px; flex-wrap:wrap; font-size:11px; color:var(--muted);">
+        <span><span class="q-dot" style="border-color:${Q_COLORS.good}"></span>Laadukas</span>
+        <span><span class="q-dot" style="border-color:${Q_COLORS.warn}"></span>Yli VL-rajan / RIR&lt;1</span>
+        <span><span class="q-dot" style="border-color:${Q_COLORS.bad}"></span>Liian väsynyt / alle MVT</span>
+        <span><span class="q-dot" style="border-color:${Q_COLORS.suspect}"></span>Epäilyttävä</span>
+        <span style="color:#94a3b8;">┈ ennuste</span>
+      </div>`;
+    }
+
+    function buildScoreBreakdownHTML(a) {
+      const p = a.scoreParts;
+      const row = (label, val, max) => `
+        <div class="score-row"><span>${label}</span>
+          <div class="score-track"><div class="score-fill" style="width:${max ? Math.round(val / max * 100) : 0}%"></div></div>
+          <strong>${val.toFixed(0)}/${max}</strong></div>`;
+      return `<div class="score-break">
+        <div style="font-size:11px; color:var(--muted); font-weight:700;">RQI = 0.40·intensiteetti + 0.40·väsymys + 0.20·tankoreitti</div>
+        ${p.intensity !== null ? row(`Intensiteetti (V<sub>best</sub> ${a.vWin ? fmtV(a.vWin[0]) + '–' + fmtV(a.vWin[1]) : ''} m/s)`, p.intensity, p.wInt) : ''}
+        ${row('Väsymyksen hallinta (VL, kuolokohta)', p.fatigue, p.wFat)}
+        ${row(p.pathSrc === 'trace' ? 'Tankoreitti & kallistus (Pin 80 Hz)' : 'Tekniikka (arvio: ROM + lasku)', p.path, p.wPath)}
+      </div>`;
+    }
+
+    // Full VBT block used in saved-set analysis
+    function buildVbtSetBlockHTML(s, dateStr) {
+      const prof = getLiftCfg(s.exercise) ? recentProfile(s.exercise, dateStr || todayISO()) : null;
+      const a = analyzeSet(s.reps, s.exercise, s.weightKg, { profile: prof });
+      if (!a.n) return '';
+      const e1 = a.e1RM ? `${a.e1RM.toFixed(1)} kg <span style="color:var(--muted); font-weight:500; font-size:11px;">(${a.pctSource === 'profile' ? 'oma profiili' : 'nopeustaulukko'})</span>` : '--';
+      return `
+        <div class="analysis-card">
+          <div class="row" style="align-items:flex-start;">
+            <span style="font-size:11px; text-transform:uppercase; font-weight:700; color:var(--muted); letter-spacing:0.04em;">VBT-laatuanalyysi · ${getGoal().short} · ${metricLabel()}</span>
+            <span class="vbt-zone-badge" style="font-size:11px; padding:2px 8px;">${a.isWarmup ? 'Lämmittely' : 'Työsarja'}${a.tng ? ' · TnG' : ''}</span>
+          </div>
+          ${buildVbtKpiHTML(a, false)}
+          ${buildRepCurveSVG(a)}
+          ${buildVbtLegendHTML()}
+          <p class="vbt-verdict">${buildVerdict(a, s.exercise)}</p>
+          ${buildScoreBreakdownHTML(a)}
+          ${buildTraceSectionHTML(s, a)}
+          <div class="stat-pill-grid" style="margin-top:8px;">
+            <div class="stat-pill"><span class="stat-pill-label">e1RM (VBT)</span><span class="stat-pill-val" style="color:#60a5fa; font-size:13px;">${e1}</span></div>
+            <div class="stat-pill"><span class="stat-pill-label">e1RM (Epley + RIR)</span><span class="stat-pill-val" style="font-size:13px;">${a.epleyRir ? a.epleyRir.toFixed(1) + ' kg' : '--'}</span></div>
+            <div class="stat-pill"><span class="stat-pill-label">Nopeuskustannus / toisto</span><span class="stat-pill-val" style="font-size:13px;">${a.cost ? '−' + a.cost.toFixed(3) + ' m/s' : '--'}</span></div>
+            <div class="stat-pill"><span class="stat-pill-label">Efektiiviset toistot (RIR ≤ 4)</span><span class="stat-pill-val" style="font-size:13px;">${a.mvt !== null ? a.effectiveReps : '--'}</span></div>
+          </div>
+        </div>`;
+    }
+
+    // --- Live VBT card ---
+    function renderVbtLiveCard() {
+      const el = document.getElementById('vbtLiveCard');
+      if (!el) return;
+      const exercise = (activeSetMeta && activeSetMeta.exercise) || getCurrentSelectedExerciseName();
+      const weightKg = (activeSetMeta && activeSetMeta.weightKg) || parseFloat(document.getElementById('weightInput').value) || 0;
+      if (!currentReps.length) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+      const prof = getLiftCfg(exercise) ? recentProfile(exercise, document.getElementById('workoutDate').value || todayISO()) : null;
+      const a = analyzeSet(currentReps, exercise, weightKg, { profile: prof });
+      el.classList.remove('hidden');
+      let alert = '';
+      const lastP = a.valid[a.valid.length - 1];
+      if (!a.isWarmup && lastP) {
+        if (a.mvt !== null && lastP.rir === 0) {
+          alert = `<div class="vbt-alert red">⛔ Lähellä failurea (RIR ~0, ${fmtV(lastP.v)} m/s vs. MVT ${fmtV(a.mvt)}) – lopeta sarja.</div>`;
+        } else if (lastP.vl !== null && lastP.vl > a.cutoffPct) {
+          alert = `<div class="vbt-alert amber">🛑 VL ${lastP.vl.toFixed(0)} % > raja ${a.cutoffPct} % – katkaise sarja, laatu heikkenee.</div>`;
+        }
+      }
+      el.innerHTML = `
+        ${alert}
+        ${lastTraceStatus ? `<div style="font-size:11px; color:var(--muted); margin-top:4px;">${lastTraceStatus}</div>` : ''}
+        ${buildVbtKpiHTML(a, true)}
+        ${buildRepCurveSVG(a, { height: 170 })}
+        ${buildVbtLegendHTML()}
+        <p class="vbt-verdict">${buildVerdict(a, exercise)}</p>`;
+      return a;
+    }
+
+    // Called right after a new rep was pushed during an active set. Returns true if the set was auto-stopped.
+    function vbtOnNewRep() {
+      const exercise = (activeSetMeta && activeSetMeta.exercise) || getCurrentSelectedExerciseName();
+      const weightKg = (activeSetMeta && activeSetMeta.weightKg) || 0;
+      const a = analyzeSet(currentReps, exercise, weightKg);
+      const lastP = a.valid[a.valid.length - 1];
+      if (!lastP || a.isWarmup) return false;
+      const overCutoff = lastP.vl !== null && lastP.vl > a.cutoffPct;
+      const nearFailure = a.mvt !== null && lastP.rir === 0;
+      if ((overCutoff && !vbtCutoffAlerted) || (nearFailure && !vbtFailureAlerted)) {
+        if (overCutoff) vbtCutoffAlerted = true;
+        if (nearFailure) vbtFailureAlerted = true;
+        if (vbtSettings.cutoffSound) soundCutoff();
+        if (vbtSettings.autoStopOnCutoff) { stopSetOnPin(true); return true; }
+      }
+      return false;
+    }
+
+    function soundCutoff() {
+      playCue([
+        { freq: 988, durationMs: 120, delayMs: 0, type: 'square', gain: 0.32 },
+        { freq: 740, durationMs: 120, delayMs: 140, type: 'square', gain: 0.32 },
+        { freq: 494, durationMs: 260, delayMs: 280, type: 'square', gain: 0.36 }
+      ]);
+    }
+
+    // --- Setup card forecast for the chosen weight ---
+    function renderSetupVbtForecast() {
+      const el = document.getElementById('setupVbtForecast');
+      const goalSel = document.getElementById('goalSelect');
+      if (goalSel && goalSel.value !== vbtSettings.goal) goalSel.value = vbtSettings.goal;
+      const cutEl = document.getElementById('setupCutoffInfo');
+      const exercise = getCurrentSelectedExerciseName();
+      if (cutEl) {
+        const mvtInfo = getEffectiveMvt(exercise);
+        cutEl.textContent = `VL-raja ${getCutoffPct(exercise)} %` + (mvtInfo ? ` · MVT ${fmtV(mvtInfo.value)} m/s` : '');
+      }
+      if (!el) return;
+      const cfg = getLiftCfg(exercise);
+      const w = parseFloat(document.getElementById('weightInput').value) || 0;
+      if (!cfg) { el.innerHTML = '<span style="color:var(--muted)">VBT-ennuste vain kyykylle, penkille ja maastavedolle</span>'; return; }
+      const prof = recentProfile(exercise, document.getElementById('workoutDate').value || todayISO());
+      if (prof && w > 0) {
+        const pct = w / prof.e1RM * 100;
+        const vExp = prof.intercept + prof.slope * w;
+        const [lo, hi] = getGoal().pctRange;
+        const wLo = prof.e1RM * lo / 100, wHi = prof.e1RM * hi / 100;
+        el.innerHTML = `~${Math.round(pct)} % 1RM · odotettu V<sub>best</sub> <strong>${fmtV(vExp)}</strong> m/s (±0.03)<br>
+          <span style="color:var(--muted)">e1RM ${prof.e1RM.toFixed(0)} kg (${prof.method === 'session' ? 'profiili ' + fmtDateFi(prof.date) : '28 pv profiili'}) · tavoitealue ${Math.round(wLo)}–${Math.round(wHi)} kg</span>`;
+      } else {
+        const [lo, hi] = getGoal().pctRange;
+        const mvt = getEffectiveMvt(exercise).value;
+        const shift = mvt - cfg.mvt;
+        el.innerHTML = `Tavoite ${lo}–${hi} % 1RM ≈ V<sub>best</sub> <strong>${fmtV(velocityFromPctTable(cfg, hi) + shift)}–${fmtV(velocityFromPctTable(cfg, lo) + shift)}</strong> m/s<br>
+          <span style="color:var(--muted)">Oma profiili puuttuu: tee 3–4 nousevaa kuormaa samana päivänä</span>`;
+      }
+    }
+
+    // ===================== ANALYYSI-VÄLILEHTI =====================
+    let anaExercise = null;
+    let anaDate = null;
+
+    function exercisesWithData() {
+      const set = new Set();
+      workouts.forEach((w) => (w.sets || []).forEach((s) => { if (s.reps && s.reps.length) set.add(s.exercise); }));
+      const arr = [...set];
+      arr.sort((a, b) => (getLiftCfg(b) ? 1 : 0) - (getLiftCfg(a) ? 1 : 0) || a.localeCompare(b));
+      return arr;
+    }
+
+    function buildLVProfileSVG(prof) {
+      const W = 340, H = 210, padL = 36, padR = 12, padT = 14, padB = 26;
+      const pts = prof.allPoints && prof.allPoints.length ? prof.allPoints : prof.points;
+      const loads = pts.map((p) => p.load);
+      const xMaxData = Math.max(...loads, prof.valid ? prof.e1RM : 0);
+      const xMin = Math.max(0, Math.floor((Math.min(...loads) * 0.85) / 10) * 10);
+      const xMax = Math.ceil((xMaxData * 1.05) / 10) * 10;
+      const yMax = Math.ceil(Math.max(0.6, ...pts.map((p) => p.v), prof.valid ? prof.intercept + prof.slope * xMin : 0) * 1.1 * 10) / 10;
+      const x = (l) => padL + (l - xMin) / Math.max(1, xMax - xMin) * (W - padL - padR);
+      const y = (v) => padT + (1 - Math.max(0, Math.min(yMax, v)) / yMax) * (H - padT - padB);
+      let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;" role="img" aria-label="Kuorma–nopeusprofiili">`;
+      const yStep = yMax > 1.2 ? 0.5 : 0.25;
+      for (let g = 0; g <= yMax + 1e-9; g += yStep) {
+        s += `<line x1="${padL}" x2="${W - padR}" y1="${y(g)}" y2="${y(g)}" stroke="rgba(148,163,184,0.15)"/>`;
+        s += `<text x="${padL - 4}" y="${y(g) + 3}" fill="#94a3b8" font-size="9" text-anchor="end">${g.toFixed(2)}</text>`;
+      }
+      const xStep = (xMax - xMin) > 120 ? 40 : 20;
+      for (let l = Math.ceil(xMin / xStep) * xStep; l <= xMax; l += xStep) {
+        s += `<text x="${x(l)}" y="${H - 8}" fill="#94a3b8" font-size="9" text-anchor="middle">${l}</text>`;
+      }
+      s += `<text x="${W - padR}" y="${H - 8}" fill="#64748b" font-size="9" text-anchor="end">kg</text>`;
+      if (prof.mvt !== null) {
+        s += `<line x1="${padL}" x2="${W - padR}" y1="${y(prof.mvt)}" y2="${y(prof.mvt)}" stroke="#ec4899" stroke-width="1.3" stroke-dasharray="2 3"/>`;
+        s += `<text x="${padL + 4}" y="${y(prof.mvt) - 4}" fill="#ec4899" font-size="9">MVT ${fmtV(prof.mvt)}</text>`;
+      }
+      if (prof.slope !== undefined && prof.slope < 0) {
+        const xEnd = prof.valid ? prof.e1RM : xMax;
+        s += `<line x1="${x(xMin)}" y1="${y(prof.intercept + prof.slope * xMin)}" x2="${x(xEnd)}" y2="${y(prof.intercept + prof.slope * xEnd)}" stroke="#3b82f6" stroke-width="2"/>`;
+      }
+      pts.forEach((p) => {
+        const top = prof.points.find((q) => Math.abs(q.load - p.load) < 0.3 && Math.abs(q.v - p.v) < 1e-6);
+        s += `<circle cx="${x(p.load)}" cy="${y(p.v)}" r="${top ? 5 : 3.5}" fill="${top ? '#0f172a' : 'rgba(148,163,184,0.35)'}" stroke="${top ? '#60a5fa' : 'none'}" stroke-width="2.2"/>`;
+        if (top) s += `<text x="${x(p.load)}" y="${y(p.v) - 8}" fill="#e2e8f0" font-size="9" text-anchor="middle">${p.v.toFixed(2)}</text>`;
+      });
+      if (prof.valid) {
+        s += `<circle cx="${x(prof.e1RM)}" cy="${y(prof.mvt)}" r="6" fill="#ec4899"/>`;
+        s += `<text x="${x(prof.e1RM)}" y="${y(prof.mvt) + 16}" fill="#f9a8d4" font-size="10" font-weight="700" text-anchor="end">e1RM ${prof.e1RM.toFixed(0)} kg</text>`;
+      }
+      s += '</svg>';
+      return s;
+    }
+
+    function buildTrendSVG(points) {
+      const W = 340, H = 150, padL = 36, padR = 12, padT = 14, padB = 24;
+      const vals = points.map((p) => p.e1RM);
+      let yMin = Math.floor(Math.min(...vals) * 0.95 / 5) * 5;
+      let yMax = Math.ceil(Math.max(...vals) * 1.05 / 5) * 5;
+      if (yMax - yMin < 30) { const mid = (yMax + yMin) / 2; yMin = Math.floor((mid - 15) / 5) * 5; yMax = yMin + 30; }
+      const x = (i) => padL + (points.length === 1 ? 0.5 : i / (points.length - 1)) * (W - padL - padR);
+      const y = (v) => padT + (1 - (v - yMin) / Math.max(1, yMax - yMin)) * (H - padT - padB);
+      let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;" role="img" aria-label="e1RM-trendi">`;
+      [yMin, (yMin + yMax) / 2, yMax].forEach((g) => {
+        s += `<line x1="${padL}" x2="${W - padR}" y1="${y(g)}" y2="${y(g)}" stroke="rgba(148,163,184,0.15)"/>`;
+        s += `<text x="${padL - 4}" y="${y(g) + 3}" fill="#94a3b8" font-size="9" text-anchor="end">${g.toFixed(0)}</text>`;
+      });
+      if (points.length > 1) s += `<polyline points="${points.map((p, i) => `${x(i)},${y(p.e1RM)}`).join(' ')}" fill="none" stroke="#3b82f6" stroke-width="2"/>`;
+      points.forEach((p, i) => {
+        s += `<circle cx="${x(i)}" cy="${y(p.e1RM)}" r="4.5" fill="${p.method === 'profiili' ? '#3b82f6' : '#0f172a'}" stroke="#3b82f6" stroke-width="2"/>`;
+        s += `<text x="${x(i)}" y="${y(p.e1RM) - 8}" fill="#e2e8f0" font-size="9" text-anchor="middle">${p.e1RM.toFixed(0)}</text>`;
+        const lbl = fmtDateFi(p.date).split('.').slice(0, 2).join('.') + '.';
+        s += `<text x="${x(i)}" y="${H - 6}" fill="#94a3b8" font-size="9" text-anchor="middle">${lbl}</text>`;
+      });
+      s += '</svg>';
+      return s;
+    }
+
+    function renderAnalysisTab() {
+      const exSel = document.getElementById('anaExerciseSelect');
+      const dateSel = document.getElementById('anaDateSelect');
+      const sessionEl = document.getElementById('anaSessionCard');
+      const profEl = document.getElementById('anaProfileCard');
+      const trendEl = document.getElementById('anaTrendCard');
+      if (!exSel) return;
+      const exList = exercisesWithData();
+      if (!exList.length) {
+        exSel.innerHTML = ''; dateSel.innerHTML = '';
+        sessionEl.innerHTML = '<div style="color:var(--muted); text-align:center;">Ei vielä tallennettuja sarjoja analysoitavaksi.</div>';
+        profEl.innerHTML = ''; trendEl.innerHTML = '';
+        renderVbtSettingsCard();
+        return;
+      }
+      if (!anaExercise || !exList.includes(anaExercise)) {
+        const cur = getCurrentSelectedExerciseName();
+        anaExercise = exList.includes(cur) ? cur : exList[0];
+      }
+      exSel.innerHTML = exList.map((e) => `<option value="${e.replace(/"/g, '&quot;')}" ${e === anaExercise ? 'selected' : ''}>${e}</option>`).join('');
+      const dates = [...new Set(setsForExercise(anaExercise).map((x) => x.date))].sort().reverse();
+      if (!anaDate || !dates.includes(anaDate)) anaDate = dates[0];
+      dateSel.innerHTML = dates.map((d) => `<option value="${d}" ${d === anaDate ? 'selected' : ''}>${fmtDateFi(d)}</option>`).join('');
+
+      const cfg = getLiftCfg(anaExercise);
+      const prof = cfg ? recentProfile(anaExercise, anaDate) : null;
+      const sets = setsForExercise(anaExercise, (d) => d === anaDate);
+      const analyses = sets.map(({ set }) => ({ set, a: analyzeSet(set.reps, set.exercise, set.weightKg, { profile: prof }) }));
+      const work = analyses.filter((x) => !x.a.isWarmup);
+      const totalReps = analyses.reduce((s, x) => s + x.a.valid.length, 0);
+      const goodReps = work.reduce((s, x) => s + x.a.qualityReps, 0);
+      const junk = work.reduce((s, x) => s + x.a.junkReps, 0);
+      const avgScore = work.length ? Math.round(work.reduce((s, x) => s + x.a.score, 0) / work.length) : null;
+      const effReps = work.reduce((s, x) => s + (x.a.mvt !== null ? x.a.effectiveReps : 0), 0);
+      const tonnage = analyses.reduce((s, x) => s + x.set.weightKg * x.a.valid.length, 0);
+      const ready = readinessForDate(anaExercise, anaDate);
+
+      const rows = analyses.map(({ set, a }, i) => {
+        const vlTxt = a.vlFinal === null ? '--' : a.vlFinal.toFixed(0) + ' %';
+        const vlCls = (a.vlFinal === null || a.isWarmup) ? '' : (a.vlFinal > a.redVl ? 'red' : a.vlFinal > a.cutoffPct ? 'amber' : 'green');
+        return `<tr>
+          <td>${i + 1}</td><td>${set.weightKg}</td><td>${a.pct1RM !== null ? Math.round(a.pct1RM) : '--'}</td>
+          <td>${fmtV(a.vBest)}</td><td class="${vlCls}">${vlTxt}</td>
+          <td>${a.rirEnd === null ? '--' : (a.rirEnd >= 10 ? '10+' : a.rirEnd)}</td><td>${a.valid.length}${a.junkReps && !a.isWarmup ? `<span class="amber"> (${a.junkReps})</span>` : ''}</td>
+          <td class="${a.isWarmup ? '' : a.gradeClass}">${a.isWarmup ? 'LÄ' : a.score}</td></tr>`;
+      }).join('');
+
+      const readyHtml = ready
+        ? `<div class="stat-pill"><span class="stat-pill-label">Päivän valmius @ ${ready.weight} kg</span><span class="stat-pill-val ${ready.deltaPct >= 3 ? 'green' : ready.deltaPct <= -5 ? 'red' : ready.deltaPct < -2 ? 'amber' : ''}" style="font-size:13px;">${ready.deltaPct >= 0 ? '+' : ''}${ready.deltaPct.toFixed(1)} % <span style="color:var(--muted); font-weight:500;">(${fmtV(ready.today)} vs ${fmtV(ready.baseline)})</span></span></div>`
+        : `<div class="stat-pill"><span class="stat-pill-label">Päivän valmius</span><span class="stat-pill-val" style="font-size:12px; color:var(--muted);">Ei vertailukuormaa</span></div>`;
+
+      let readinessAdvice = '';
+      if (ready) {
+        if (ready.deltaPct <= -5) readinessAdvice = 'Nopeus on selvästi tavallista alempi samalla kuormalla → keskushermosto/palautuminen vajaa. Harkitse kuorman pudottamista 5–10 % tai sarjojen vähentämistä.';
+        else if (ready.deltaPct >= 5) readinessAdvice = 'Nopeus on tavallista korkeampi → hyvä päivä. Kuormaa voi nostaa 2,5–5 % tavoitealueen sisällä.';
+        else readinessAdvice = 'Valmius normaali – toteuta suunniteltu ohjelma.';
+      }
+
+      sessionEl.innerHTML = `
+        <div class="row" style="margin-bottom:6px;"><strong style="font-size:14px;">📋 Session analyysi · ${fmtDateFi(anaDate)}</strong>
+          <span style="font-size:11px; color:var(--muted);">${getGoal().short} · ${metricLabel()}</span></div>
+        <div class="stat-pill-grid">
+          <div class="stat-pill"><span class="stat-pill-label">Työsarjat / kaikki</span><span class="stat-pill-val">${work.length} / ${analyses.length}</span></div>
+          <div class="stat-pill"><span class="stat-pill-label">RQI työsarjat (ka.)</span><span class="stat-pill-val ${avgScore === null ? '' : avgScore >= 70 ? 'green' : avgScore >= 50 ? 'amber' : 'red'}">${avgScore === null ? '--' : avgScore}</span></div>
+          <div class="stat-pill"><span class="stat-pill-label">Laadukkaat toistot (työ)</span><span class="stat-pill-val">${goodReps}</span></div>
+          <div class="stat-pill"><span class="stat-pill-label">Yli VL-rajan (hukka)</span><span class="stat-pill-val ${junk ? 'amber' : 'green'}">${junk}</span></div>
+          <div class="stat-pill"><span class="stat-pill-label">Efektiiviset toistot</span><span class="stat-pill-val">${cfg ? effReps : '--'}</span></div>
+          <div class="stat-pill"><span class="stat-pill-label">Tonnimäärä</span><span class="stat-pill-val">${Math.round(tonnage)} kg</span></div>
+          ${readyHtml}
+          <div class="stat-pill"><span class="stat-pill-label">Toistoja yhteensä</span><span class="stat-pill-val">${totalReps}</span></div>
+          ${(() => { const st = work.map((x) => x.a.stickSummary).filter(Boolean); if (!st.length) return ''; const h = st.reduce((acc, x) => acc + x.hAvg, 0) / st.length; const vm = Math.min(...st.map((x) => x.vminMin)); return `<div class="stat-pill"><span class="stat-pill-label">Kuolokohta (työsarjat)</span><span class="stat-pill-val" style="font-size:13px;">${h.toFixed(0)} cm · V<sub>min</sub> <span class="${vm < 0.10 ? 'red' : ''}">${fmtV(vm)}</span></span></div>`; })()}
+        </div>
+        ${readinessAdvice ? `<p class="vbt-verdict">${readinessAdvice}</p>` : ''}
+        <div style="overflow-x:auto; margin-top:8px;">
+          <table class="ana-table">
+            <thead><tr><th>#</th><th>kg</th><th>%1RM</th><th>V<sub>best</sub></th><th>VL</th><th>RIR</th><th>Toist.</th><th>RQI</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <div style="font-size:11px; color:var(--muted); margin-top:6px; line-height:1.4;">LÄ = lämmittely (&lt; 65 % 1RM, ei laatuluokitusta). Suluissa VL-rajan jälkeen tehdyt toistot. Efektiiviset toistot = toistot, joissa RIR ≤ 4.</div>`;
+
+      // L–V profile
+      if (cfg) {
+        const sp = sessionProfile(anaExercise, anaDate);
+        const showProf = sp.points.length >= 2 ? sp : (prof || sp);
+        let body = '';
+        if (showProf.points && showProf.points.length) {
+          body += buildLVProfileSVG(showProf);
+        }
+        if (showProf.valid) {
+          const [lo, hi] = getGoal().pctRange;
+          const tgt = [lo, (lo + hi) / 2, hi].map((pc) => {
+            const load = showProf.e1RM * pc / 100;
+            return `<tr><td>${Math.round(pc)} %</td><td>${(Math.round(load / 2.5) * 2.5).toFixed(1)} kg</td><td>${fmtV(showProf.intercept + showProf.slope * load)} m/s</td></tr>`;
+          }).join('');
+          body += `
+            <div class="stat-pill-grid" style="margin-top:6px;">
+              <div class="stat-pill"><span class="stat-pill-label">e1RM @ MVT</span><span class="stat-pill-val" style="color:#f9a8d4;">${showProf.e1RM.toFixed(1)} kg</span></div>
+              <div class="stat-pill"><span class="stat-pill-label">Luotettavuus (R²)</span><span class="stat-pill-val ${showProf.r2 >= 0.95 ? 'green' : showProf.r2 >= 0.85 ? 'amber' : 'red'}">${showProf.r2.toFixed(3)} · ${showProf.reliability}</span></div>
+              <div class="stat-pill"><span class="stat-pill-label">Kulmakerroin</span><span class="stat-pill-val" style="font-size:13px;">${(showProf.slope * 10).toFixed(3)} m/s / 10 kg</span></div>
+              <div class="stat-pill"><span class="stat-pill-label">V₀ / L₀ (teoreettiset)</span><span class="stat-pill-val" style="font-size:13px;">${fmtV(showProf.v0)} m/s · ${showProf.l0.toFixed(0)} kg</span></div>
+            </div>
+            <div style="font-size:12px; font-weight:700; margin:8px 0 4px;">Tavoitenopeudet (${getGoal().short}, ±0.03 m/s)</div>
+            <table class="ana-table"><thead><tr><th>%1RM</th><th>Kuorma</th><th>V<sub>best</sub></th></tr></thead><tbody>${tgt}</tbody></table>`;
+        } else {
+          body += `<p class="vbt-verdict">${showProf.reason || 'Profiilia ei voitu muodostaa.'}</p>`;
+        }
+        profEl.innerHTML = `
+          <div class="row" style="margin-bottom:4px;"><strong style="font-size:14px;">📈 Kuorma–nopeusprofiili</strong>
+            <span style="font-size:11px; color:var(--muted);">${sp.points.length >= 2 ? fmtDateFi(anaDate) : (prof ? (prof.method === 'session' ? fmtDateFi(prof.date) : '28 pv yhdistetty') : fmtDateFi(anaDate))}</span></div>
+          ${body}
+          <div style="font-size:11px; color:var(--muted); margin-top:6px; line-height:1.4;">Jokaisen kuorman paras toisto (${metricLabel()}) → lineaarinen regressio → kuorma, jolla nopeus = MVT ${fmtV(getEffectiveMvt(anaExercise).value)} m/s (${getEffectiveMvt(anaExercise).label}). Paras tarkkuus: 3–4 kuormaa välillä 40–90 % 1RM, nostettu maksimaalisella tahdolla.</div>`;
+        const tr = e1rmTrend(anaExercise);
+        trendEl.innerHTML = tr.length
+          ? `<div class="row" style="margin-bottom:4px;"><strong style="font-size:14px;">🏆 e1RM-kehitys</strong><span style="font-size:11px; color:var(--muted);">● profiili ○ yksittäinen sarja</span></div>
+             ${buildTrendSVG(tr.slice(-12))}
+             ${tr.length >= 2 ? `<p class="vbt-verdict">Muutos ensimmäisestä: <strong class="${tr[tr.length - 1].e1RM >= tr[0].e1RM ? 'green' : 'red'}">${(tr[tr.length - 1].e1RM - tr[0].e1RM >= 0 ? '+' : '') + (tr[tr.length - 1].e1RM - tr[0].e1RM).toFixed(1)} kg</strong> (${tr.length} sessiota).</p>` : ''}`
+          : '';
+      } else {
+        profEl.innerHTML = '<div style="font-size:12px; color:var(--muted);">Kuorma–nopeusprofiili, MVT ja e1RM ovat käytössä jalkakyykylle, penkkipunnerrukselle ja maastavedolle.</div>';
+        trendEl.innerHTML = '';
+      }
+      renderVbtSettingsCard();
+    }
+
+    function renderVbtSettingsCard() {
+      const el = document.getElementById('anaSettingsCard');
+      if (!el) return;
+      const liftRows = Object.values(LIFT_ANALYSIS).map((c) => {
+        const ex = c.id === 'squat' ? 'Jalkakyykky' : c.id === 'bench' ? 'Penkkipunnerrus' : 'Maastaveto';
+        const eff = getEffectiveMvt(ex);
+        const learned = learnedMvt(c.id);
+        return `<tr>
+          <td>${c.id === 'bench' ? 'Penkki' : c.name}</td>
+          <td>${fmtV(c.mvt)}</td>
+          <td>${learned !== null ? fmtV(learned) : '--'}</td>
+          <td><input type="number" step="0.01" min="0.05" max="0.6" inputmode="decimal" data-mvt-lift="${c.id}" value="${vbtSettings.mvtOverride[c.id] || ''}" placeholder="auto" style="width:56px; padding:5px 3px; font-size:12px;"></td>
+          <td><strong>${fmtV(eff.value)}</strong></td>
+          <td style="white-space:nowrap;">${VBT_GOALS.peaking.vl[c.id]}/${VBT_GOALS.maxStrength.vl[c.id]}/${VBT_GOALS.baseStrength.vl[c.id]}</td>
+        </tr>`;
+      }).join('');
+      el.innerHTML = `
+        <strong style="font-size:14px;">⚙️ VBT-asetukset</strong>
+        <div class="setup-grid" style="margin-top:8px;">
+          <div class="row"><label class="small" for="anaGoalSelect">Harjoitustavoite</label>
+            <select id="anaGoalSelect">${Object.values(VBT_GOALS).map((g) => `<option value="${g.key}" ${g.key === vbtSettings.goal ? 'selected' : ''}>${g.label}</option>`).join('')}</select></div>
+          <div class="row"><label class="small" for="anaMetricSelect">Analyysinopeus</label>
+            <select id="anaMetricSelect">
+              <option value="mv" ${vbtSettings.velocityMetric === 'mv' ? 'selected' : ''}>MV – koko konsentrinen keskinopeus</option>
+              <option value="mpv" ${vbtSettings.velocityMetric === 'mpv' ? 'selected' : ''}>MPV – propulsiivinen keskinopeus</option>
+            </select></div>
+          <label class="row" style="justify-content:flex-start; gap:8px; font-size:13px;"><input type="checkbox" id="anaCutoffSound" ${vbtSettings.cutoffSound ? 'checked' : ''}> Äänimerkki, kun VL-raja ylittyy tai RIR ~0</label>
+          <label class="row" style="justify-content:flex-start; gap:8px; font-size:13px;"><input type="checkbox" id="anaAutoStop" ${vbtSettings.autoStopOnCutoff ? 'checked' : ''}> Lopeta sarja automaattisesti VL-rajalla</label>
+          <div class="row"><label class="small" for="anaBarAxis">Tangon akseli (Pin)</label>
+            <select id="anaBarAxis">
+              <option value="auto" ${(vbtSettings.barAxis || 'auto') === 'auto' ? 'selected' : ''}>Automaattinen (painovoimasta)</option>
+              <option value="x" ${vbtSettings.barAxis === 'x' ? 'selected' : ''}>Anturin X</option>
+              <option value="y" ${vbtSettings.barAxis === 'y' ? 'selected' : ''}>Anturin Y</option>
+              <option value="z" ${vbtSettings.barAxis === 'z' ? 'selected' : ''}>Anturin Z</option>
+            </select></div>
+          <div class="row"><span class="small">Raakadata (${recentRawTraces.length} sarjaa muistissa)</span>
+            <button type="button" id="anaRawExport" style="padding:6px 10px; font-size:12px;">Vie raakadata CSV</button></div>
+        </div>
+        <div style="font-size:12px; font-weight:700; margin:10px 0 4px;">Failure-raja (MVT, m/s) ja VL-katkaisurajat</div>
+        <div style="overflow-x:auto;"><table class="ana-table">
+          <thead><tr><th>Liike</th><th>Oletus</th><th>Opittu</th><th>Oma</th><th>Käyt.</th><th>VL %<br>P/M/V</th></tr></thead>
+          <tbody>${liftRows}</tbody></table></div>
+        <div style="font-size:11px; color:var(--muted); margin-top:6px; line-height:1.45;">
+          <strong>Opittu MVT</strong> = hitain loppuun asti suoritettu toisto (epäilyttävät liikkeet poistettu) – jos se alittaa väestöoletuksen, sitä käytetään automaattisesti. Oma arvo ohittaa molemmat (esim. aidon 1RM-noston nopeus).
+          VL-rajat: P = piikkaus, M = kehittävä maksimivoima, V = perusvoima/hypertrofia. <strong>MPV</strong> poistaa jarrutusvaiheen kevyillä kuormilla (&lt; 80 % 1RM); raskailla kuormilla MV ≈ MPV.
+        </div>`;
+      el.querySelector('#anaGoalSelect').addEventListener('change', (e) => { vbtSettings.goal = e.target.value; saveVbtSettings(); onVbtSettingsChanged(); });
+      el.querySelector('#anaMetricSelect').addEventListener('change', (e) => { vbtSettings.velocityMetric = e.target.value; saveVbtSettings(); onVbtSettingsChanged(); });
+      el.querySelector('#anaCutoffSound').addEventListener('change', (e) => { vbtSettings.cutoffSound = e.target.checked; saveVbtSettings(); });
+      el.querySelector('#anaAutoStop').addEventListener('change', (e) => { vbtSettings.autoStopOnCutoff = e.target.checked; saveVbtSettings(); });
+      el.querySelector('#anaBarAxis').addEventListener('change', (e) => { vbtSettings.barAxis = e.target.value; saveVbtSettings(); });
+      el.querySelector('#anaRawExport').addEventListener('click', exportRawTracesCSV);
+      el.querySelectorAll('[data-mvt-lift]').forEach((inp) => {
+        inp.addEventListener('change', () => {
+          const k = inp.getAttribute('data-mvt-lift');
+          const v = parseFloat(String(inp.value).replace(',', '.'));
+          if (Number.isFinite(v) && v > 0) vbtSettings.mvtOverride[k] = v; else delete vbtSettings.mvtOverride[k];
+          saveVbtSettings(); onVbtSettingsChanged();
+        });
+      });
+    }
+
+    function onVbtSettingsChanged() {
+      _mvtCache = { sig: '', map: {} };
+      renderLiveSet();
+      renderHistoryList();
+      if (!document.getElementById('tabAnalysis').classList.contains('hidden')) renderAnalysisTab();
+    }
+    // =================== /SYVÄ VBT-ANALYYSI ===================
+
 
     function buildVelocityChartHTML(reps, exerciseName) {
       if (!reps || reps.length === 0) {
@@ -2107,8 +3735,9 @@
       const avgVel = count ? reps.reduce((a, r) => a + (r.meanVelocity || 0), 0) / count : 0;
       const bestWatt = Math.max(0, ...reps.map((r) => r.power || 0));
       const avgRom = count ? reps.reduce((a, r) => a + (r.rangeOfMotionCm || 0), 0) / count : 0;
-      const dropPct = calcVelocityDropPct(reps);
+      const dropPct = calcVelocityDropPct(reps, s.exercise);
       const est1RM = calcEpley1RM(s.weightKg, count);
+      const setA = analyzeSet(reps, s.exercise, s.weightKg);
 
       const zone = classifyVbtVelocity(s.exercise, avgVel) || getVbtZoneForVelocity(s.exercise, avgVel);
 
@@ -2162,29 +3791,33 @@
       // Fatigue assessment
       let dropDesc = '';
       if (dropPct !== null) {
-        if (dropPct < 10) {
-          dropDesc = 'Pieni nopeuspudotus (<10%) – erittäin terävä sarja ja vähäinen uupumus. Nopea palautuminen, ihanteellinen nopeus- ja tehotreeniin.';
-        } else if (dropPct <= 20) {
-          dropDesc = 'Hallittu nopeuspudotus (10–20%) – optimaalinen tasapaino voiman ja tehontuoton kehittämiseen ilman liiallista lihasvauriota.';
-        } else if (dropPct <= 30) {
-          dropDesc = 'Merkittävä nopeuspudotus (20–30%) – voimakas ärsyke lihaskasvulle (hypertrofia) ja voimakestävyydelle.';
+        const cut = setA.cutoffPct;
+        const red = setA.redVl;
+        if (dropPct <= cut) {
+          dropDesc = `Nopeuden lasku pysyi tavoitteen (${getGoal().short}) VL-rajan ${cut} % sisällä – hermostollinen laatu säilyi, väsymys ja palautumistarve pienet.`;
+        } else if (dropPct <= red) {
+          dropDesc = `VL-raja ${cut} % ylittyi – viimeiset toistot kerryttivät enemmän väsymystä kuin maksimivoimaärsykettä. Katkaise sarja aiemmin.`;
         } else {
-          dropDesc = 'Suuri nopeuspudotus (>30%) – sarja viety lähelle uupumusta (failure). Aiheuttaa suuren hermostollisen kuormituksen ja vaatii pidemmän sarjapalautuksen.';
+          dropDesc = `Nopeuden lasku yli ${red} % – keskushermoston väsymys ja tekniikan hajoamisen riski. Harjoitusvaikutus siirtyy kohti voimakestävyyttä ja palautuminen pitenee.`;
         }
       }
 
       // Rep table
       const repListRows = reps.map((r, rIdx) => {
         const rZone = classifyVbtVelocity(s.exercise, r.meanVelocity) || getVbtZoneForVelocity(s.exercise, r.meanVelocity);
-        const firstV = reps[0].meanVelocity;
-        const repDrop = firstV > 0 ? ((firstV - r.meanVelocity) / firstV) * 100 : 0;
-        const dropHtml = rIdx === 0
-          ? '<span style="color:var(--muted); font-size:11px;">1. toisto</span>'
-          : `<span class="${dropColorClass(repDrop)}" style="font-size:11px; font-weight:600;">${formatDropBadge(repDrop)}</span>`;
+        const pr = setA.perRep[rIdx];
+        const repDrop = pr && pr.vl !== null ? pr.vl : null;
+        const qDot = pr ? `<span class="q-dot" style="border-color:${Q_COLORS[pr.quality]}" title="${pr.quality}"></span>` : '';
+        const rirHtml = pr && pr.rir !== null ? `<span style="color:var(--muted); font-size:11px;">RIR ~${pr.rir >= 10 ? '10+' : pr.rir}</span>` : '';
+        const dropHtml = pr && pr.suspect
+          ? '<span style="color:#64748b; font-size:11px;">epäilyttävä</span>'
+          : (repDrop === null || (pr && pr.v >= pr.bestSoFar && rIdx === setA.vBestIdx))
+            ? '<span style="color:var(--muted); font-size:11px;">paras</span>'
+            : `<span class="${repDrop > setA.cutoffPct ? (repDrop > setA.redVl ? 'red' : 'amber') : 'green'}" style="font-size:11px; font-weight:600;">VL ${repDrop.toFixed(0)} %</span> ${rirHtml}`;
         const zoneBadge = rZone ? `<span class="vbt-zone-badge ${rZone.cssClass}" style="font-size:10px; padding:2px 6px;">${rZone.icon} ${rZone.label}</span>` : '';
         return `
           <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; background:rgba(15,23,42,0.55); border:1px solid rgba(51,65,85,0.4); padding:5px 8px; border-radius:7px; font-size:12px; font-variant-numeric:tabular-nums; flex-wrap:wrap;">
-            <span style="font-weight:700; color:var(--muted); width:24px;">#${rIdx + 1}</span>
+            <span style="font-weight:700; color:var(--muted); width:38px;">${qDot}#${rIdx + 1}</span>
             <strong style="color:var(--text);">${r.meanVelocity.toFixed(2)} m/s</strong>
             <span style="color:var(--muted); font-size:11px;">${(r.power || 0).toFixed(0)} W</span>
             <span style="color:var(--muted); font-size:11px;">${(r.rangeOfMotionCm || 0).toFixed(0)} cm</span>
@@ -2216,6 +3849,9 @@
             </div>
           </div>
 
+          <!-- Syvä VBT-laatuanalyysi -->
+          ${buildVbtSetBlockHTML(s, s._date)}
+
           <!-- Analyysi: Voiman osa-alue -->
           <div class="analysis-card">
             <div class="row" style="align-items:flex-start; gap:8px;">
@@ -2243,7 +3879,7 @@
 
             ${dropDesc ? `
               <div style="margin-top:8px; padding-top:6px; border-top:1px dashed rgba(148,163,184,0.25); font-size:12px; line-height:1.4; color:var(--muted);">
-                <strong style="color:var(--text);">Väsymys & nopeuden pudotus (${formatDropBadge(dropPct)}):</strong> ${dropDesc}
+                <strong style="color:var(--text);">Väsymys (VL paras → viimeinen ${dropPct.toFixed(0)} %, raja ${setA.cutoffPct} %):</strong> ${dropDesc}
               </div>
             ` : ''}
           </div>
@@ -2259,8 +3895,8 @@
               <span class="stat-pill-val" style="color:#60a5fa;">${bestVel.toFixed(2)} m/s</span>
             </div>
             <div class="stat-pill">
-              <span class="stat-pill-label">Pudotus</span>
-              <span class="stat-pill-val ${dropColorClass(dropPct)}">${formatDropBadge(dropPct)}</span>
+              <span class="stat-pill-label">VL (paras→viim.)</span>
+              <span class="stat-pill-val ${dropColorClass(dropPct)}">${dropPct === null ? '--' : dropPct.toFixed(1) + ' %'}</span>
             </div>
             <div class="stat-pill">
               <span class="stat-pill-label">Huipputeho</span>
@@ -2310,8 +3946,11 @@
         const count = s.reps ? s.reps.length : 0;
         const bestVel = Math.max(0, ...s.reps.map((r) => r.meanVelocity || 0));
         const avgVel = count ? s.reps.reduce((a, r) => a + (r.meanVelocity || 0), 0) / count : 0;
-        const dropPct = calcVelocityDropPct(s.reps);
-        const dropText = dropPct !== null ? ` • Pudotus ${formatDropBadge(dropPct)}` : '';
+        const dropPct = calcVelocityDropPct(s.reps, s.exercise);
+        const qa = analyzeSet(s.reps, s.exercise, s.weightKg);
+        const dropText = (dropPct !== null ? ` • VL ${dropPct.toFixed(0)} %` : '')
+          + (qa.n ? ` • ${qa.isWarmup ? 'Lämmittely' : `Laatu <strong class="${qa.gradeClass}">${qa.score}</strong>`}` : '')
+          + (qa.rirEnd !== null ? ` • RIR ~${qa.rirEnd}` : '');
         const est1RM = calcEpley1RM(s.weightKg, count);
         const rmText = est1RM !== null ? ` • 1RM: <strong style="color:#60a5fa;">${est1RM.toFixed(1)} kg</strong>` : '';
         const vbtZone = classifyVbtVelocity(s.exercise, avgVel) || getVbtZoneForVelocity(s.exercise, avgVel);
@@ -2340,7 +3979,7 @@
                 </span>
               </div>
             </div>
-            ${isOpen ? buildSetAnalysisHTML(s) : ''}
+            ${isOpen ? buildSetAnalysisHTML(Object.assign({ _date: dateStr }, s)) : ''}
           </div>
         `;
       }).join('');
@@ -2388,7 +4027,8 @@
 
       box.classList.remove('hidden');
       titleEl.textContent = `🎯 Voiman osa-alueet (${exerciseName})`;
-      mvtEl.textContent = profile.mvtText;
+      const effMvt = getEffectiveMvt(exerciseName);
+      mvtEl.textContent = effMvt ? `Failure-raja (MVT): ${fmtV(effMvt.value)} m/s · ${effMvt.label}` : profile.mvtText;
 
       const activeZone = classifyVbtVelocity(exerciseName, lastVel);
 
@@ -2423,7 +4063,7 @@
       if (liveBadge) {
         if (activeZone && lastVel !== null && lastVel !== undefined) {
           liveBadge.className = `vbt-zone-badge ${activeZone.cssClass}`;
-          const mvtNote = lastVel < profile.mvt ? ' (alle 1RM MVT!)' : '';
+          const mvtNote = (effMvt && lastVel < effMvt.value) ? ' (alle MVT!)' : '';
           liveBadge.textContent = `${activeZone.icon} ${activeZone.label}${mvtNote}`;
           liveBadge.classList.remove('hidden');
         } else if (selectedTargetVbtZoneKey) {
@@ -2519,17 +4159,16 @@
       }
 
       const bannerEl = document.getElementById('velDropBanner');
-      const dropPct = calcVelocityDropPct(currentReps);
-      if (bannerEl && count >= 2 && dropPct !== null) {
-        const firstV = currentReps[0].meanVelocity.toFixed(2);
-        const lastV = last.meanVelocity.toFixed(2);
-        const label = dropPct >= 0
-          ? `Nopeus tippui <strong>${dropPct.toFixed(1)} %</strong>`
-          : `Nopeus nousi <strong>+${Math.abs(dropPct).toFixed(1)} %</strong>`;
+      const liveA = renderVbtLiveCard();
+      const dropPct = liveA ? liveA.vlFinal : null;
+      if (bannerEl && count >= 2 && dropPct !== null && liveA) {
+        const bestV = fmtV(liveA.vBest);
+        const lastV = fmtV(liveA.valid[liveA.valid.length - 1].v);
+        const cls = dropPct > liveA.redVl ? 'red' : (dropPct > liveA.cutoffPct ? 'amber' : 'green');
         bannerEl.classList.remove('hidden');
         bannerEl.innerHTML = `
-          <span>1. → viimeinen (${firstV} → ${lastV} m/s)</span>
-          <span class="${dropColorClass(dropPct)}">${label}</span>
+          <span>Paras → viimeinen (${bestV} → ${lastV} m/s, ${metricLabel()})</span>
+          <span class="${cls}">VL <strong>${dropPct.toFixed(1)} %</strong> / raja ${liveA.cutoffPct} %</span>
         `;
       } else if (bannerEl) {
         bannerEl.classList.add('hidden');
@@ -2550,7 +4189,6 @@
       const listEl = document.getElementById('repList');
       listEl.innerHTML = '';
       const maxVel = Math.max(0.01, ...currentReps.map((r) => r.meanVelocity));
-      const firstVel = count > 0 ? currentReps[0].meanVelocity : maxVel;
 
       currentReps.forEach((r, idx) => {
         const div = document.createElement('div');
@@ -2558,11 +4196,16 @@
         const lowHtml = r.loweringVelocity !== null
           ? `<span class="${isControlled(r.loweringVelocity) ? 'green' : 'red'}">↓ ${r.loweringVelocity.toFixed(2)} m/s</span>`
           : `<span style="color:var(--muted)">↓ …</span>`;
-        const repDrop = firstVel > 0 ? ((firstVel - r.meanVelocity) / firstVel) * 100 : 0;
+        const pr = liveA ? liveA.perRep[idx] : null;
         const widthPct = Math.max(6, Math.round((r.meanVelocity / maxVel) * 100));
-        const vsFirstHtml = idx === 0
-          ? `<span style="color:var(--muted); font-size:12px;">1. toisto</span>`
-          : `<span class="${dropColorClass(repDrop)}" style="font-size:12px; font-weight:600;">${formatDropBadge(repDrop)}</span>`;
+        const qDot = pr ? `<span class="q-dot" style="border-color:${Q_COLORS[pr.quality]}"></span>` : '';
+        const vsFirstHtml = (pr && pr.suspect)
+          ? `<span style="color:#64748b; font-size:12px;">epäilyttävä</span>`
+          : (!pr || pr.vl === null || idx === liveA.vBestIdx)
+            ? `<span style="color:var(--muted); font-size:12px;">paras</span>`
+            : `<span class="${pr.vl > liveA.redVl ? 'red' : (pr.vl > liveA.cutoffPct ? 'amber' : 'green')}" style="font-size:12px; font-weight:600;">VL ${pr.vl.toFixed(0)} %</span>`
+              + (pr.rir !== null ? ` <span style="color:var(--muted); font-size:12px;">RIR ~${pr.rir >= 10 ? '10+' : pr.rir}</span>` : '')
+              + (pr.rqi !== null && pr.rqi !== undefined ? ` <span style="color:var(--muted); font-size:12px;">RQI ${Math.round(pr.rqi)}</span>` : '');
         const repVbt = getVbtZoneForVelocity(currentExercise, r.meanVelocity);
         const repVbtHtml = repVbt
           ? `<span style="font-size:11px; color:var(--muted); font-weight:600;">${repVbt.icon || ''} ${repVbt.label}</span>`
@@ -2571,7 +4214,7 @@
 
         div.innerHTML = `
           <div class="rep-item-top" style="flex-wrap: wrap;">
-            <span class="rep-num">#${idx + 1}</span>
+            <span class="rep-num">${qDot}#${idx + 1}</span>
             <span><strong>${r.meanVelocity.toFixed(2)} m/s</strong> (${r.power.toFixed(1)} W)</span>
             ${repVbtHtml}
             ${vsFirstHtml}
@@ -2596,6 +4239,7 @@
         listEl.appendChild(div);
       });
 
+      renderSetupVbtForecast();
       renderTodaySetsOnLiftTab();
       updateSetButton();
     }
@@ -2628,10 +4272,9 @@
       renderCalendar();
       renderHistoryList();
 
-      document.getElementById('tabLift').classList.add('hidden');
-      document.getElementById('tabHistory').classList.remove('hidden');
-      document.getElementById('navLiftBtn').classList.remove('active');
-      document.getElementById('navHistoryBtn').classList.add('active');
+      anaDate = dateStr;
+      anaExercise = null;
+      showTab('analysis');
     }
 
     // --- Exercises Management ---
@@ -2760,13 +4403,16 @@
           const avgVel = s.reps.length ? s.reps.reduce((a, r) => a + r.meanVelocity, 0) / s.reps.length : 0;
           const bestWatt = Math.max(0, ...s.reps.map((r) => r.power));
           const avgRom = s.reps.length ? s.reps.reduce((a, r) => a + r.rangeOfMotionCm, 0) / s.reps.length : 0;
-          const dropPct = calcVelocityDropPct(s.reps);
-          const dropHtml = dropPct !== null
-            ? ` • Pudotus 1.→viim.: <strong class="${dropColorClass(dropPct)}">${formatDropBadge(dropPct)}</strong>`
-            : '';
-          const est1RM = calcEpley1RM(s.weightKg, s.reps.length);
-          const rmHtml = est1RM !== null
-            ? ` • 1RM (Epley): <strong style="color:#60a5fa;">${est1RM.toFixed(1)} kg</strong>`
+          const dropPct = calcVelocityDropPct(s.reps, s.exercise);
+          const ha = analyzeSet(s.reps, s.exercise, s.weightKg);
+          const dropHtml = (dropPct !== null
+            ? ` • VL paras→viim.: <strong class="${dropPct > ha.redVl ? 'red' : dropPct > ha.cutoffPct ? 'amber' : 'green'}">${dropPct.toFixed(1)} %</strong>`
+            : '')
+            + (ha.n ? ` • ${ha.isWarmup ? 'Lämmittely' : `Laatu <strong class="${ha.gradeClass}">${ha.score}/100</strong>`}` : '')
+            + (ha.rirEnd !== null ? ` • RIR ~${ha.rirEnd}` : '');
+          const est1RM = ha.e1RM || calcEpley1RM(s.weightKg, s.reps.length);
+          const rmHtml = est1RM
+            ? ` • e1RM${ha.e1RM ? ' (VBT)' : ' (Epley)'}: <strong style="color:#60a5fa;">${est1RM.toFixed(1)} kg</strong>`
             : '';
           const vbtZone = classifyVbtVelocity(s.exercise, avgVel);
           const vbtHtml = vbtZone
@@ -2808,12 +4454,17 @@
       const list = getFilteredWorkouts();
       const source = list.length > 0 ? list : workouts;
       const rows = [
-        'date,time,exercise,set_number,weight_kg,target_reps,rep_number,movement_power_m_s,movement_power_w,vbt_strength_zone,controlled_lowering_m_s,lowering_status,rom_cm,set_velocity_drop_1st_to_last_pct,epley_1rm_kg'
+        'date,time,exercise,set_number,weight_kg,target_reps,rep_number,movement_power_m_s,movement_power_w,vbt_strength_zone,controlled_lowering_m_s,lowering_status,rom_cm,set_velocity_drop_1st_to_last_pct,epley_1rm_kg,'
+        + 'propulsive_velocity_m_s,propulsive_accel_m_s2,pause_before_ms,analysis_metric,rep_vl_from_best_pct,rep_est_rir,rep_quality,'
+        + 'set_v_best_m_s,set_vl_final_pct,set_vl_cutoff_pct,set_mvt_m_s,set_est_pct_1rm,set_e1rm_vbt_kg,set_e1rm_epley_rir_kg,set_quality_score,set_warmup,set_touch_and_go,goal,'
+        + 'rep_rqi,rep_flags,trace_mv_filtered_m_s,trace_v_peak_m_s,stick_height_cm,stick_vmin_m_s,stick_duration_ms,mid_vmin_m_s,bar_dx_max_cm,bar_path_dev_cm,bar_tilt_deg'
       ];
       source.forEach((w) => {
         w.sets.forEach((s, sIdx) => {
           const ex = `"${String(s.exercise).replace(/"/g, '""')}"`;
-          const setDrop = calcVelocityDropPct(s.reps);
+          const setDrop = calcFirstToLastDropPct(s.reps);
+          const ca = analyzeSet(s.reps, s.exercise, s.weightKg, { profile: getLiftCfg(s.exercise) ? recentProfile(s.exercise, w.date) : null });
+          const f = (x, d) => (x === null || x === undefined || !Number.isFinite(x)) ? '' : x.toFixed(d);
           const setDropStr = setDrop !== null ? setDrop.toFixed(1) : '';
           const set1RM = calcEpley1RM(s.weightKg, s.reps.length);
           const set1RMStr = set1RM !== null ? set1RM.toFixed(1) : '';
@@ -2839,7 +4490,36 @@
               status,
               r.rangeOfMotionCm.toFixed(1),
               setDropStr,
-              set1RMStr
+              set1RMStr,
+              f(r.propulsiveVelocity, 3),
+              f(r.propulsiveAcceleration, 3),
+              f(r.pauseMs, 0),
+              metricLabel(),
+              f(ca.perRep[rIdx].vl, 1),
+              ca.perRep[rIdx].rir === null ? '' : ca.perRep[rIdx].rir,
+              ca.perRep[rIdx].quality,
+              f(ca.vBest, 3),
+              f(ca.vlFinal, 1),
+              ca.cutoffPct,
+              f(ca.mvt, 3),
+              f(ca.pct1RM, 1),
+              f(ca.e1RM, 1),
+              f(ca.epleyRir, 1),
+              ca.score,
+              ca.isWarmup ? 1 : 0,
+              ca.tng ? 1 : 0,
+              getGoal().key,
+              f(ca.perRep[rIdx].rqi, 0),
+              (ca.perRep[rIdx].flags || []).join('|'),
+              r.trace ? f(r.trace.mvF, 3) : '',
+              r.trace ? f(r.trace.vPeak, 3) : '',
+              r.trace && r.trace.stick ? f(r.trace.stick.h, 1) : '',
+              r.trace && r.trace.stick ? f(r.trace.stick.vmin, 3) : '',
+              r.trace && r.trace.stick ? r.trace.stick.ms : '',
+              r.trace && r.trace.midMin ? f(r.trace.midMin.v, 3) : '',
+              r.trace ? f(r.trace.dxMax, 1) : '',
+              f(ca.perRep[rIdx].pathDev, 1),
+              r.trace ? f(r.trace.tilt, 1) : ''
             ].join(','));
           });
         });
@@ -3064,19 +4744,27 @@
     document.getElementById('filterDateChk').addEventListener('change', renderHistoryList);
     document.getElementById('exportCsvBtn').addEventListener('click', exportCSV);
 
-    document.getElementById('navLiftBtn').addEventListener('click', () => {
-      document.getElementById('tabLift').classList.remove('hidden');
-      document.getElementById('tabHistory').classList.add('hidden');
-      document.getElementById('navLiftBtn').classList.add('active');
-      document.getElementById('navHistoryBtn').classList.remove('active');
-    });
-    document.getElementById('navHistoryBtn').addEventListener('click', () => {
-      document.getElementById('tabLift').classList.add('hidden');
-      document.getElementById('tabHistory').classList.remove('hidden');
-      document.getElementById('navLiftBtn').classList.remove('active');
-      document.getElementById('navHistoryBtn').classList.add('active');
-      renderCalendar();
-      renderHistoryList();
+    function showTab(name) {
+      const map = { lift: ['tabLift', 'navLiftBtn'], analysis: ['tabAnalysis', 'navAnalysisBtn'], history: ['tabHistory', 'navHistoryBtn'] };
+      Object.entries(map).forEach(([k, [tabId, btnId]]) => {
+        document.getElementById(tabId).classList.toggle('hidden', k !== name);
+        document.getElementById(btnId).classList.toggle('active', k === name);
+      });
+      if (name === 'history') { renderCalendar(); renderHistoryList(); }
+      if (name === 'analysis') renderAnalysisTab();
+      if (name === 'lift') renderLiveSet();
+      window.scrollTo(0, 0);
+    }
+    document.getElementById('navLiftBtn').addEventListener('click', () => showTab('lift'));
+    document.getElementById('navHistoryBtn').addEventListener('click', () => showTab('history'));
+    document.getElementById('navAnalysisBtn').addEventListener('click', () => showTab('analysis'));
+    document.getElementById('anaExerciseSelect').addEventListener('change', (e) => { anaExercise = e.target.value; anaDate = null; renderAnalysisTab(); });
+    document.getElementById('anaDateSelect').addEventListener('change', (e) => { anaDate = e.target.value; renderAnalysisTab(); });
+    document.getElementById('goalSelect').value = vbtSettings.goal;
+    document.getElementById('goalSelect').addEventListener('change', (e) => {
+      vbtSettings.goal = e.target.value;
+      saveVbtSettings();
+      onVbtSettingsChanged();
     });
   </script>
 </body>
