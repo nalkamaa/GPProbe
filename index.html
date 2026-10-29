@@ -767,7 +767,10 @@
     <!-- Today's completed sets on the live training tab -->
     <div id="todaySetsCard" class="card hidden">
       <div class="row" style="margin-bottom: 4px;">
-        <strong id="todaySetsTitle" style="font-size: 14px;">Tallennetut sarjat tänään</strong>
+        <div>
+          <strong id="todaySetsTitle" style="font-size: 14px;">Tallennetut sarjat tänään</strong>
+          <span style="display: block; font-size: 11px; color: var(--muted); margin-top: 1px;">Avaa palkit ja analyysi klikkaamalla sarjaa</span>
+        </div>
         <span id="todaySetsCount" style="font-size: 12px; color: var(--muted);"></span>
       </div>
       <div id="todaySetsList"></div>
@@ -2054,6 +2057,8 @@
       }).join('');
     }
 
+    let openTodaySetIndices = new Set();
+
     function deleteSavedSet(dateStr, setIdx) {
       const wIdx = workouts.findIndex((w) => w.date === dateStr);
       if (wIdx === -1) return;
@@ -2068,10 +2073,211 @@
         currentSetSaved = false;
         lastSavedSetRef = null;
       }
+      const updated = new Set();
+      openTodaySetIndices.forEach((i) => {
+        if (i < setIdx) updated.add(i);
+        else if (i > setIdx) updated.add(i - 1);
+      });
+      openTodaySetIndices = updated;
+
       saveJSON(KEY_WORKOUTS, workouts);
       renderLiveSet();
       renderCalendar();
       renderHistoryList();
+    }
+
+    function buildSetAnalysisHTML(s) {
+      const reps = s.reps || [];
+      const count = reps.length;
+      if (count === 0) {
+        return `<div style="color:var(--muted); font-size:12px; padding:6px 0;">Sarjassa ei ole toistoja.</div>`;
+      }
+      const bestVel = Math.max(0, ...reps.map((r) => r.meanVelocity || 0));
+      const avgVel = count ? reps.reduce((a, r) => a + (r.meanVelocity || 0), 0) / count : 0;
+      const bestWatt = Math.max(0, ...reps.map((r) => r.power || 0));
+      const avgRom = count ? reps.reduce((a, r) => a + (r.rangeOfMotionCm || 0), 0) / count : 0;
+      const dropPct = calcVelocityDropPct(reps);
+      const est1RM = calcEpley1RM(s.weightKg, count);
+
+      const zone = classifyVbtVelocity(s.exercise, avgVel) || getVbtZoneForVelocity(s.exercise, avgVel);
+
+      let zoneTitle = 'Voima-alue';
+      let zoneSub = '';
+      let zoneDesc = '';
+      let zoneIcon = '🎯';
+      let zoneClass = 'zone-acc';
+
+      if (zone) {
+        zoneTitle = zone.label;
+        zoneSub = zone.subLabel || (zone.rangeText ? `Liikenopeusalue: ${zone.rangeText}` : '');
+        zoneIcon = zone.icon || '🎯';
+        zoneClass = zone.cssClass || 'zone-acc';
+
+        switch (zone.key) {
+          case 'max':
+            zoneDesc = 'Sarja kohdistui <strong>maksimivoima-alueelle</strong>. Suuri ulkoinen vastus kehittää maksimaalista voimantuottoa, nopeiden motoristen yksiköiden rekrytointia ja hermolihasjärjestelmän käskytyskykyä.';
+            break;
+          case 'acc':
+            zoneDesc = 'Sarja kohdistui <strong>voima-alueelle (perusvoima)</strong>. Ihanteellinen kuormitusalue voimatason ja lihasmassan (hypertrofia) kasvattamiseen sekä suoritusvarmuuden kehittämiseen.';
+            break;
+          case 'str-spd':
+            zoneDesc = 'Sarja kohdistui <strong>nopeusvoiman voimapainotteiselle alueelle</strong> (tehoalue). Kehittää dynaamista tehoa (Watt), kykyä liikuttaa vastusta suurella kiihtyvyydellä ja parantaa voiman siirtonopeutta.';
+            break;
+          case 'spd-str':
+            zoneDesc = 'Sarja kohdistui <strong>nopeusvoiman räjähtävälle alueelle</strong>. Maksimoi liikenopeuden ja hermoston syttymisnopeuden (RFD). Kehittää räjähtävyyttä ja elastista voimantuottoa.';
+            break;
+          default:
+            zoneDesc = `Sarja kohdistui alueelle <strong>${zone.label}</strong>.`;
+            break;
+        }
+      }
+
+      // Toistojen jakauma osa-alueittain
+      const zoneCounts = {};
+      reps.forEach((r) => {
+        const rz = classifyVbtVelocity(s.exercise, r.meanVelocity) || getVbtZoneForVelocity(s.exercise, r.meanVelocity);
+        if (rz) {
+          if (!zoneCounts[rz.key]) {
+            zoneCounts[rz.key] = { label: rz.label, icon: rz.icon, count: 0, cssClass: rz.cssClass };
+          }
+          zoneCounts[rz.key].count++;
+        }
+      });
+
+      const zonePillsHtml = Object.values(zoneCounts).map((zc) => {
+        return `<span class="vbt-zone-badge ${zc.cssClass}" style="font-size:11px; padding:3px 8px;">${zc.icon} ${zc.label}: <strong>${zc.count} ${zc.count === 1 ? 'toisto' : 'toistoa'}</strong></span>`;
+      }).join(' ');
+
+      // Fatigue assessment
+      let dropDesc = '';
+      if (dropPct !== null) {
+        if (dropPct < 10) {
+          dropDesc = 'Pieni nopeuspudotus (<10%) – erittäin terävä sarja ja vähäinen uupumus. Nopea palautuminen, ihanteellinen nopeus- ja tehotreeniin.';
+        } else if (dropPct <= 20) {
+          dropDesc = 'Hallittu nopeuspudotus (10–20%) – optimaalinen tasapaino voiman ja tehontuoton kehittämiseen ilman liiallista lihasvauriota.';
+        } else if (dropPct <= 30) {
+          dropDesc = 'Merkittävä nopeuspudotus (20–30%) – voimakas ärsyke lihaskasvulle (hypertrofia) ja voimakestävyydelle.';
+        } else {
+          dropDesc = 'Suuri nopeuspudotus (>30%) – sarja viety lähelle uupumusta (failure). Aiheuttaa suuren hermostollisen kuormituksen ja vaatii pidemmän sarjapalautuksen.';
+        }
+      }
+
+      // Rep table
+      const repListRows = reps.map((r, rIdx) => {
+        const rZone = classifyVbtVelocity(s.exercise, r.meanVelocity) || getVbtZoneForVelocity(s.exercise, r.meanVelocity);
+        const firstV = reps[0].meanVelocity;
+        const repDrop = firstV > 0 ? ((firstV - r.meanVelocity) / firstV) * 100 : 0;
+        const dropHtml = rIdx === 0
+          ? '<span style="color:var(--muted); font-size:11px;">1. toisto</span>'
+          : `<span class="${dropColorClass(repDrop)}" style="font-size:11px; font-weight:600;">${formatDropBadge(repDrop)}</span>`;
+        const zoneBadge = rZone ? `<span class="vbt-zone-badge ${rZone.cssClass}" style="font-size:10px; padding:2px 6px;">${rZone.icon} ${rZone.label}</span>` : '';
+        return `
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; background:rgba(15,23,42,0.55); border:1px solid rgba(51,65,85,0.4); padding:5px 8px; border-radius:7px; font-size:12px; font-variant-numeric:tabular-nums; flex-wrap:wrap;">
+            <span style="font-weight:700; color:var(--muted); width:24px;">#${rIdx + 1}</span>
+            <strong style="color:var(--text);">${r.meanVelocity.toFixed(2)} m/s</strong>
+            <span style="color:var(--muted); font-size:11px;">${(r.power || 0).toFixed(0)} W</span>
+            <span style="color:var(--muted); font-size:11px;">${(r.rangeOfMotionCm || 0).toFixed(0)} cm</span>
+            <div>${dropHtml}</div>
+            <div style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${zoneBadge}</div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="today-set-detail-content" style="display:flex; flex-direction:column; gap:10px; margin-top:8px; padding-top:10px; border-top:1px solid var(--border);">
+          
+          <!-- Palkkinäkymä -->
+          <div>
+            <div class="row" style="margin-bottom:4px;">
+              <span style="font-size:12px; font-weight:700; color:var(--text); display:inline-flex; align-items:center; gap:5px;">
+                📊 Toistonopeudet (palkkinäkymä)
+              </span>
+              <span style="font-size:11px; color:var(--muted);">Keskinopeus ${avgVel.toFixed(2)} m/s</span>
+            </div>
+            <div class="vel-chart" style="height:92px;">
+              ${buildVelocityChartHTML(reps, s.exercise)}
+            </div>
+            <div class="vbt-legend" style="display:flex; justify-content:space-between; gap:4px; font-size:11px; color:var(--muted); padding-top:4px; flex-wrap:wrap;">
+              <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:8px; height:8px; border-radius:2px; background:#ef4444; display:inline-block;"></span>Maksimivoima</span>
+              <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:8px; height:8px; border-radius:2px; background:#22c55e; display:inline-block;"></span>Voima-alue</span>
+              <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:8px; height:8px; border-radius:2px; background:#3b82f6; display:inline-block;"></span>Nopeusvoima (voima)</span>
+              <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:8px; height:8px; border-radius:2px; background:#60a5fa; display:inline-block;"></span>Nopeusvoima (räj.)</span>
+            </div>
+          </div>
+
+          <!-- Analyysi: Voiman osa-alue -->
+          <div class="analysis-card">
+            <div class="row" style="align-items:flex-start; gap:8px;">
+              <div>
+                <span style="font-size:11px; text-transform:uppercase; font-weight:700; color:var(--muted); letter-spacing:0.04em;">Voiman osa-alue -analyysi</span>
+                <div style="margin-top:4px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                  <span class="vbt-zone-badge ${zoneClass}" style="font-size:13px; padding:4px 10px;">${zoneIcon} ${zoneTitle}</span>
+                  ${zoneSub ? `<span style="font-size:12px; color:var(--muted); font-weight:600;">(${zoneSub})</span>` : ''}
+                </div>
+              </div>
+            </div>
+
+            <p style="font-size:12px; line-height:1.45; color:var(--text); margin:8px 0 6px;">
+              ${zoneDesc}
+            </p>
+
+            ${Object.keys(zoneCounts).length > 0 ? `
+              <div style="margin-top:6px; padding-top:6px; border-top:1px dashed rgba(148,163,184,0.25);">
+                <div style="font-size:11px; color:var(--muted); font-weight:600; margin-bottom:4px;">Toistojen jakautuminen alueille:</div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                  ${zonePillsHtml}
+                </div>
+              </div>
+            ` : ''}
+
+            ${dropDesc ? `
+              <div style="margin-top:8px; padding-top:6px; border-top:1px dashed rgba(148,163,184,0.25); font-size:12px; line-height:1.4; color:var(--muted);">
+                <strong style="color:var(--text);">Väsymys & nopeuden pudotus (${formatDropBadge(dropPct)}):</strong> ${dropDesc}
+              </div>
+            ` : ''}
+          </div>
+
+          <!-- Tilastoruudukko -->
+          <div class="stat-pill-grid">
+            <div class="stat-pill">
+              <span class="stat-pill-label">Keskinopeus</span>
+              <span class="stat-pill-val">${avgVel.toFixed(2)} m/s</span>
+            </div>
+            <div class="stat-pill">
+              <span class="stat-pill-label">Paras nopeus</span>
+              <span class="stat-pill-val" style="color:#60a5fa;">${bestVel.toFixed(2)} m/s</span>
+            </div>
+            <div class="stat-pill">
+              <span class="stat-pill-label">Pudotus</span>
+              <span class="stat-pill-val ${dropColorClass(dropPct)}">${formatDropBadge(dropPct)}</span>
+            </div>
+            <div class="stat-pill">
+              <span class="stat-pill-label">Huipputeho</span>
+              <span class="stat-pill-val">${bestWatt.toFixed(0)} W</span>
+            </div>
+            <div class="stat-pill">
+              <span class="stat-pill-label">Liikerata (ROM)</span>
+              <span class="stat-pill-val">${avgRom.toFixed(0)} cm</span>
+            </div>
+            <div class="stat-pill">
+              <span class="stat-pill-label">Arvioitu 1RM</span>
+              <span class="stat-pill-val" style="color:#60a5fa;">${est1RM ? est1RM.toFixed(1) + ' kg' : '--'}</span>
+            </div>
+          </div>
+
+          <!-- Toistokohtainen erittely -->
+          <div>
+            <div class="row" style="margin-bottom:4px;">
+              <span style="font-size:12px; font-weight:700; color:var(--text);">Toistoerittely</span>
+              <span style="font-size:11px; color:var(--muted);">${count} toistoa</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              ${repListRows}
+            </div>
+          </div>
+
+        </div>
+      `;
     }
 
     function renderTodaySetsOnLiftTab() {
@@ -2090,32 +2296,60 @@
       card.classList.remove('hidden');
       countEl.textContent = `${sets.length} sarjaa valmiina`;
       listEl.innerHTML = sets.map((s, idx) => {
-        const bestVel = Math.max(0, ...s.reps.map((r) => r.meanVelocity));
-        const avgVel = s.reps.length ? s.reps.reduce((a, r) => a + r.meanVelocity, 0) / s.reps.length : 0;
+        const count = s.reps ? s.reps.length : 0;
+        const bestVel = Math.max(0, ...s.reps.map((r) => r.meanVelocity || 0));
+        const avgVel = count ? s.reps.reduce((a, r) => a + (r.meanVelocity || 0), 0) / count : 0;
         const dropPct = calcVelocityDropPct(s.reps);
         const dropText = dropPct !== null ? ` • Pudotus ${formatDropBadge(dropPct)}` : '';
-        const est1RM = calcEpley1RM(s.weightKg, s.reps.length);
+        const est1RM = calcEpley1RM(s.weightKg, count);
         const rmText = est1RM !== null ? ` • 1RM: <strong style="color:#60a5fa;">${est1RM.toFixed(1)} kg</strong>` : '';
-        const vbtZone = classifyVbtVelocity(s.exercise, avgVel);
+        const vbtZone = classifyVbtVelocity(s.exercise, avgVel) || getVbtZoneForVelocity(s.exercise, avgVel);
         const vbtText = vbtZone ? ` • ${vbtZone.icon} <strong>${vbtZone.label}</strong>` : '';
+        const isOpen = openTodaySetIndices.has(idx);
+
         return `
-          <div class="history-set" style="padding: 8px 10px; margin-top: 6px;">
-            <div class="row" style="gap: 8px;">
-              <strong style="font-size: 13px;">Sarja #${idx + 1}: ${s.exercise}</strong>
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span style="color: var(--muted); font-size: 12px;">${s.weightKg} kg • ${s.reps.length}/${s.targetReps} toistoa</span>
-                <button type="button" class="danger" data-del-set-idx="${idx}" style="padding: 3px 8px; font-size: 11px; border-radius: 6px;">🗑 Poista</button>
+          <div class="today-set-item ${isOpen ? 'expanded' : ''}" data-today-idx="${idx}">
+            <div class="today-set-header">
+              <div class="row" style="gap: 8px;">
+                <div style="display:flex; align-items:center; gap:6px; min-width:0;">
+                  <span class="today-set-chevron">${isOpen ? '▼' : '▶'}</span>
+                  <strong style="font-size: 13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Sarja #${idx + 1}: ${s.exercise}</strong>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+                  <span style="color: var(--muted); font-size: 12px;">${s.weightKg} kg • ${count}/${s.targetReps} toistoa</span>
+                  <button type="button" class="danger" data-del-set-idx="${idx}" title="Poista sarja" style="padding: 3px 8px; font-size: 11px; border-radius: 6px;">🗑 Poista</button>
+                </div>
+              </div>
+              <div class="row" style="font-size: 12px; color: var(--muted); margin-top: 3px; align-items: center;">
+                <div style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                  Paras: ${bestVel.toFixed(2)} m/s${vbtText}${dropText}${rmText}
+                </div>
+                <span class="today-set-hint" style="font-size: 11px; color: var(--accent); font-weight: 600; flex-shrink:0;">
+                  ${isOpen ? 'Sulje ▲' : 'Palkit & analyysi ▼'}
+                </span>
               </div>
             </div>
-            <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">
-              Paras: ${bestVel.toFixed(2)} m/s${vbtText}${dropText}${rmText}
-            </div>
+            ${isOpen ? buildSetAnalysisHTML(s) : ''}
           </div>
         `;
       }).join('');
 
+      listEl.querySelectorAll('.today-set-item').forEach((itemEl) => {
+        itemEl.addEventListener('click', (e) => {
+          if (e.target.closest('[data-del-set-idx]')) return;
+          const idx = parseInt(itemEl.getAttribute('data-today-idx'), 10);
+          if (openTodaySetIndices.has(idx)) {
+            openTodaySetIndices.delete(idx);
+          } else {
+            openTodaySetIndices.add(idx);
+          }
+          renderTodaySetsOnLiftTab();
+        });
+      });
+
       listEl.querySelectorAll('[data-del-set-idx]').forEach((btn) => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
           const idx = parseInt(btn.getAttribute('data-del-set-idx'), 10);
           deleteSavedSet(dateStr, idx);
         });
@@ -2365,6 +2599,7 @@
       currentReps = [];
       currentSetSaved = false;
       lastSavedSetRef = null;
+      openTodaySetIndices.clear();
       selectedHistoryDate = dateStr;
       document.getElementById('filterDateChk').checked = true;
       renderLiveSet();
@@ -2618,6 +2853,7 @@
     // --- Event Listeners ---
     document.getElementById('workoutDate').value = todayISO();
     document.getElementById('workoutDate').addEventListener('change', () => {
+      openTodaySetIndices.clear();
       renderLiveSet();
     });
 
