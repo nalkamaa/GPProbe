@@ -317,14 +317,14 @@ struct LiveSetView: View {
                                 let barColor: Color = {
                                     switch zone?.id {
                                     case "max": return .red
-                                    case "acc": return .orange
-                                    case "str-spd": return .green
-                                    case "spd-str": return .blue
+                                    case "acc": return .green
+                                    case "str-spd": return .blue
+                                    case "spd-str": return Color(red: 0.38, green: 0.65, blue: 0.98)
                                     default:
                                         if rep.meanVelocity < 0.50 { return .red }
-                                        if rep.meanVelocity < 0.75 { return .orange }
-                                        if rep.meanVelocity < 1.00 { return .green }
-                                        return .blue
+                                        if rep.meanVelocity < 0.75 { return .green }
+                                        if rep.meanVelocity < 1.00 { return .blue }
+                                        return Color(red: 0.38, green: 0.65, blue: 0.98)
                                     }
                                 }()
                                 VStack(spacing: 3) {

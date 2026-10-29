@@ -102,8 +102,8 @@ struct VBTProfile {
         mvtText: "1RM kynnys (MVT): ~0.23 m/s",
         zones: [
             VBTZone(id: "max", label: "Maksimivoima", subLabel: "85–100% 1RM", rangeText: "0.23 – 0.50 m/s", minVel: 0.01, maxVel: 0.50, icon: "🔴"),
-            VBTZone(id: "acc", label: "Perus- / kiihdyttävä voima", subLabel: "65–85% 1RM", rangeText: "0.50 – 0.75 m/s", minVel: 0.50, maxVel: 0.75, icon: "🟠"),
-            VBTZone(id: "str-spd", label: "Nopeusvoima (Voimapainotteinen)", subLabel: "45–65% 1RM", rangeText: "0.75 – 1.00 m/s", minVel: 0.75, maxVel: 1.00, icon: "🟢"),
+            VBTZone(id: "acc", label: "Voima-alue", subLabel: "65–85% 1RM", rangeText: "0.50 – 0.75 m/s", minVel: 0.50, maxVel: 0.75, icon: "🟢"),
+            VBTZone(id: "str-spd", label: "Nopeusvoima (Voimapainotteinen)", subLabel: "45–65% 1RM", rangeText: "0.75 – 1.00 m/s", minVel: 0.75, maxVel: 1.00, icon: "🔵"),
             VBTZone(id: "spd-str", label: "Nopeusvoima (Räjähtävä)", subLabel: "30–45% 1RM", rangeText: "1.00 – 1.30+ m/s", minVel: 1.00, maxVel: 99.0, icon: "⚡")
         ]
     )
@@ -114,8 +114,8 @@ struct VBTProfile {
         mvtText: "1RM kynnys (MVT): ~0.15 m/s",
         zones: [
             VBTZone(id: "max", label: "Maksimivoima", subLabel: "85–100% 1RM", rangeText: "0.15 – 0.45 m/s", minVel: 0.01, maxVel: 0.45, icon: "🔴"),
-            VBTZone(id: "acc", label: "Perus- / kiihdyttävä voima", subLabel: "65–85% 1RM", rangeText: "0.45 – 0.75 m/s", minVel: 0.45, maxVel: 0.75, icon: "🟠"),
-            VBTZone(id: "str-spd", label: "Nopeusvoima (Voimapainotteinen)", subLabel: "45–65% 1RM", rangeText: "0.75 – 0.95 m/s", minVel: 0.75, maxVel: 0.95, icon: "🟢"),
+            VBTZone(id: "acc", label: "Voima-alue", subLabel: "65–85% 1RM", rangeText: "0.45 – 0.75 m/s", minVel: 0.45, maxVel: 0.75, icon: "🟢"),
+            VBTZone(id: "str-spd", label: "Nopeusvoima (Voimapainotteinen)", subLabel: "45–65% 1RM", rangeText: "0.75 – 0.95 m/s", minVel: 0.75, maxVel: 0.95, icon: "🔵"),
             VBTZone(id: "spd-str", label: "Nopeusvoima (Räjähtävä)", subLabel: "30–45% 1RM", rangeText: "0.95 – 1.30+ m/s", minVel: 0.95, maxVel: 99.0, icon: "⚡")
         ]
     )
@@ -126,8 +126,8 @@ struct VBTProfile {
         mvtText: "1RM kynnys (MVT): ~0.14 m/s",
         zones: [
             VBTZone(id: "max", label: "Maksimivoima", subLabel: "85–100% 1RM", rangeText: "0.14 – 0.45 m/s", minVel: 0.01, maxVel: 0.45, icon: "🔴"),
-            VBTZone(id: "acc", label: "Perus- / kiihdyttävä voima", subLabel: "65–85% 1RM", rangeText: "0.45 – 0.70 m/s", minVel: 0.45, maxVel: 0.70, icon: "🟠"),
-            VBTZone(id: "str-spd", label: "Nopeusvoima (Voimapainotteinen)", subLabel: "50–65% 1RM", rangeText: "0.70 – 0.90 m/s", minVel: 0.70, maxVel: 0.90, icon: "🟢"),
+            VBTZone(id: "acc", label: "Voima-alue", subLabel: "65–85% 1RM", rangeText: "0.45 – 0.70 m/s", minVel: 0.45, maxVel: 0.70, icon: "🟢"),
+            VBTZone(id: "str-spd", label: "Nopeusvoima (Voimapainotteinen)", subLabel: "50–65% 1RM", rangeText: "0.70 – 0.90 m/s", minVel: 0.70, maxVel: 0.90, icon: "🔵"),
             VBTZone(id: "spd-str", label: "Nopeusvoima (Räjähtävä)", subLabel: "30–50% 1RM", rangeText: "0.90 – 1.20+ m/s", minVel: 0.90, maxVel: 99.0, icon: "⚡")
         ]
     )

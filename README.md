@@ -19,7 +19,7 @@ Kevyt ja luotettava sovellus **Gpath Pin** (`GPATH_Sensor`) -anturille. Sisält�
   - Kuorma (`kg`) ja tavoitetoistot (`Tavoite`)
 - **Reaaliaikaiset mittarit**:
   - **Movement Power**: keskinopeus (`m/s`) ja teho (`W`), kalibroitu virallisen sovelluksen kaavalla
-  - **VBT-liikenopeusalueet (Voiman osa-alueet)**: automaattinen liikekohtainen viitetaulukko ja reaaliaikainen luokittelu (**Maksimivoima**, **Perus- / kiihdyttävä voima**, **Nopeusvoima – voimapainotteinen**, **Nopeusvoima – räjähtävä**) kun valittuna on **Jalkakyykky**, **Penkkipunnerrus**, **Sotilaspenkkipunnerrus** tai **Maastaveto**
+  - **VBT-liikenopeusalueet (Voiman osa-alueet)**: automaattinen liikekohtainen viitetaulukko ja reaaliaikainen luokittelu (**Maksimivoima**, **Voima-alue**, **Nopeusvoima – voimapainotteinen**, **Nopeusvoima – räjähtävä**) kun valittuna on **Jalkakyykky**, **Penkkipunnerrus**, **Sotilaspenkkipunnerrus** tai **Maastaveto**
   - **Controlled Lowering**: laskuvaiheen nopeus (`m/s`) värikoodattuna (`0.20–0.60 m/s` vihreä, `> 0.60 m/s` punainen)
   - **Range of Motion (ROM)**: toistojen keskimääräinen liikelaajuus (`cm`) ja toistokohtainen ROM
 - **Äänimerkit (Web Audio API)**:
