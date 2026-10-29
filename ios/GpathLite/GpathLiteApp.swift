@@ -1,3 +1,4 @@
+import AVFoundation
 import AudioToolbox
 import SwiftData
 import SwiftUI
@@ -22,34 +23,87 @@ struct GpathLiteApp: App {
     }
 }
 
-// MARK: - Audio & Haptic Feedback
+// MARK: - Audio & Haptic Feedback (ignores iOS silent switch via AVAudioSession .playback)
 
 enum SoundFeedback {
+    private static var activePlayer: AVAudioPlayer?
+
+    private static func playTone(frequency: Double, durationMs: Int) {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+        try? session.setActive(true)
+
+        let sampleRate = 22050
+        let numSamples = max(1, (sampleRate * durationMs) / 1000)
+        var pcm = [Int16](repeating: 0, count: numSamples)
+        for i in 0..<numSamples {
+            let t = Double(i) / Double(sampleRate)
+            let env = exp(-3.0 * Double(i) / Double(numSamples))
+            let val = sin(2.0 * .pi * frequency * t) * env * 0.45
+            pcm[i] = Int16(max(-1.0, min(1.0, val)) * Double(Int16.max))
+        }
+
+        let dataSize = UInt32(numSamples * 2)
+        var wav = Data()
+        wav.append("RIFF".data(using: .ascii)!)
+        var chunkSize = (36 + dataSize).littleEndian
+        wav.append(Data(bytes: &chunkSize, count: 4))
+        wav.append("WAVEfmt ".data(using: .ascii)!)
+        var fmtLen = UInt32(16).littleEndian
+        var audioFmt = UInt16(1).littleEndian
+        var channels = UInt16(1).littleEndian
+        var sr = UInt32(sampleRate).littleEndian
+        var byteRate = UInt32(sampleRate * 2).littleEndian
+        var blockAlign = UInt16(2).littleEndian
+        var bitsPerSample = UInt16(16).littleEndian
+        wav.append(Data(bytes: &fmtLen, count: 4))
+        wav.append(Data(bytes: &audioFmt, count: 2))
+        wav.append(Data(bytes: &channels, count: 2))
+        wav.append(Data(bytes: &sr, count: 4))
+        wav.append(Data(bytes: &byteRate, count: 4))
+        wav.append(Data(bytes: &blockAlign, count: 2))
+        wav.append(Data(bytes: &bitsPerSample, count: 2))
+        wav.append("data".data(using: .ascii)!)
+        var subchunk2Size = dataSize.littleEndian
+        wav.append(Data(bytes: &subchunk2Size, count: 4))
+        pcm.withUnsafeBufferPointer { ptr in
+            wav.append(UnsafeBufferPointer(start: UnsafeRawPointer(ptr.baseAddress!)
+                .assumingMemoryBound(to: UInt8.self), count: Int(dataSize)))
+        }
+
+        if let player = try? AVAudioPlayer(data: wav) {
+            activePlayer = player
+            player.play()
+        } else {
+            AudioServicesPlaySystemSound(1057)
+        }
+    }
+
     /// Short confirmation tone when sensor zeroing (`0x83`) completes.
     static func playReady(enabled: Bool) {
         guard enabled else { return }
-        AudioServicesPlaySystemSound(1113)
+        playTone(frequency: 784.0, durationMs: 180)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     /// Beep when a rep concentric phase completes.
     static func playRep(enabled: Bool) {
         guard enabled else { return }
-        AudioServicesPlaySystemSound(1057)
+        playTone(frequency: 880.0, durationMs: 130)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 
     /// Distinct fanfare when the target rep count is reached.
     static func playTargetReached(enabled: Bool) {
         guard enabled else { return }
-        AudioServicesPlaySystemSound(1025)
+        playTone(frequency: 1046.5, durationMs: 260)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     /// Warning feedback when controlled lowering is too fast (> 0.60 m/s).
     static func playLoweringWarning(enabled: Bool) {
         guard enabled else { return }
-        AudioServicesPlaySystemSound(1053)
+        playTone(frequency: 240.0, durationMs: 220)
         UINotificationFeedbackGenerator().notificationOccurred(.warning)
     }
 }
@@ -73,6 +127,10 @@ struct CSVDocument: Transferable {
 enum ExerciseStore {
     private static let key = "savedExercises"
     static let defaults = [
+        "Jalkakyykky",
+        "Penkkipunnerrus",
+        "Sotilaspenkkipunnerrus",
+        "Maastaveto",
         "Ylätalja (Lat Pulldown)",
         "Alatalja (Seated Row)",
         "Rintaprässi (Chest Press)",
@@ -86,6 +144,13 @@ enum ExerciseStore {
 
     static func load() -> [String] {
         if let saved = UserDefaults.standard.stringArray(forKey: key), !saved.isEmpty {
+            let topDefaults = ["Jalkakyykky", "Penkkipunnerrus", "Sotilaspenkkipunnerrus", "Maastaveto"]
+            let missing = topDefaults.filter { !saved.contains($0) }
+            if !missing.isEmpty {
+                let merged = missing + saved
+                save(merged)
+                return merged
+            }
             return saved
         }
         return defaults
@@ -112,7 +177,21 @@ struct LiveSetView: View {
     @State private var showingExerciseSheet: Bool = false
 
     @State private var reps: [Rep] = []
+    @State private var currentSetSaved: Bool = false
     @State private var assembler = PinProtocol.RepAssembler()
+
+    private var completedSetsToday: Int {
+        let cal = Calendar.current
+        let targetDay = cal.startOfDay(for: workoutDate)
+        return workouts.first(where: { cal.isDate($0.date, inSameDayAs: targetDay) })?.sets.count ?? 0
+    }
+
+    private var activeSetNumber: Int {
+        if currentSetSaved && !reps.isEmpty {
+            return max(1, completedSetsToday)
+        }
+        return completedSetsToday + 1
+    }
 
     private var avgRomCm: Double {
         guard !reps.isEmpty else { return 0 }
@@ -137,6 +216,7 @@ struct LiveSetView: View {
                     Spacer()
                     Button {
                         soundEnabled.toggle()
+                        if soundEnabled { SoundFeedback.playRep(enabled: true) }
                     } label: {
                         Image(systemName: soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
                             .font(.subheadline)
@@ -144,7 +224,7 @@ struct LiveSetView: View {
                     .buttonStyle(.bordered)
                 }
 
-                // Pre-set settings: Date, Exercise, Weight (kg), Target Reps
+                // Pre-set settings: Date, Exercise, Weight (kg), Target Reps on separate rows so nothing clips
                 VStack(spacing: 8) {
                     HStack {
                         DatePicker("Päivä", selection: $workoutDate, displayedComponents: .date)
@@ -159,26 +239,33 @@ struct LiveSetView: View {
                         Button {
                             showingExerciseSheet = true
                         } label: {
-                            Image(systemName: "plus.circle")
+                            Label("Liikkeet", systemImage: "plus.circle.fill")
+                                .labelStyle(.iconOnly)
                         }
                     }
 
-                    HStack(spacing: 12) {
+                    HStack {
+                        Text("Paino (kg)").font(.caption.bold()).foregroundStyle(.secondary)
+                        Spacer()
                         HStack(spacing: 4) {
+                            Button("-2.5") { weightKg = max(0, weightKg - 2.5) }.buttonStyle(.bordered)
                             Button("-1") { weightKg = max(0, weightKg - 1) }.buttonStyle(.bordered)
                             TextField("kg", value: $weightKg, format: .number)
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.center)
-                                .frame(width: 60)
+                                .frame(width: 56)
                                 .textFieldStyle(.roundedBorder)
-                            Text("kg").font(.caption).foregroundStyle(.secondary)
                             Button("+1") { weightKg += 1 }.buttonStyle(.bordered)
+                            Button("+2.5") { weightKg += 2.5 }.buttonStyle(.bordered)
                         }
+                    }
 
+                    HStack {
+                        Text("Tavoitetoistot").font(.caption.bold()).foregroundStyle(.secondary)
                         Spacer()
-
-                        Stepper("Tavoite: \(targetReps)", value: $targetReps, in: 1...50)
+                        Stepper("\(targetReps) toistoa", value: $targetReps, in: 1...100)
                             .font(.subheadline.bold())
+                            .fixedSize()
                     }
                 }
                 .padding(10)
@@ -209,13 +296,13 @@ struct LiveSetView: View {
 
                 // Rep counter & target progress
                 HStack {
-                    Text("Toistot: \(reps.count) / \(targetReps)")
+                    Text("Sarja #\(activeSetNumber) • Toistot: \(reps.count) / \(targetReps)")
                         .font(.headline)
                         .foregroundStyle(reps.count >= targetReps ? .green : .primary)
                     Spacer()
                     ProgressView(value: min(Double(reps.count), Double(targetReps)),
                                  total: Double(max(targetReps, 1)))
-                        .frame(width: 140)
+                        .frame(width: 110)
                         .tint(reps.count >= targetReps ? .green : .accentColor)
                 }
 
@@ -238,19 +325,19 @@ struct LiveSetView: View {
                 // Action buttons
                 HStack(spacing: 12) {
                     if pin.state == .ready || pin.state == .zeroing {
-                        Button("⏹ Lopeta sarja") {
-                            pin.stopSet()
+                        Button("⏹ Lopeta sarja #\(completedSetsToday + 1)") {
+                            stopAndSaveCurrentSet()
                         }
                         .buttonStyle(.bordered)
                         .tint(.red)
                     } else {
-                        Button("▶ Aloita sarja") {
-                            pin.startSet()
+                        Button("▶ Aloita sarja #\(completedSetsToday + 1)") {
+                            beginNewSet()
                         }
                         .buttonStyle(.borderedProminent)
                     }
 
-                    Button("Tallenna sarja", action: finishSet)
+                    Button("Seuraava sarja →", action: finishSet)
                         .buttonStyle(.borderedProminent)
                         .tint(.green)
                         .disabled(reps.isEmpty)
@@ -264,7 +351,7 @@ struct LiveSetView: View {
             }
             .onAppear {
                 pin.onPacket = { packet in
-                    if case .ack(0x03) = packet {
+                    if case .ack(0x03) = packet, pin.state == .ready {
                         SoundFeedback.playReady(enabled: soundEnabled)
                     }
                     guard pin.state == .ready else { return }
@@ -295,7 +382,8 @@ struct LiveSetView: View {
         return controlled ? .green : .red
     }
 
-    private func finishSet() {
+    private func saveSetToStoreIfNeeded() {
+        guard !reps.isEmpty, !currentSetSaved else { return }
         let cal = Calendar.current
         let targetDay = cal.startOfDay(for: workoutDate)
         let workout: Workout
@@ -308,8 +396,29 @@ struct LiveSetView: View {
         let set = LiftSet(createdAt: .now, exercise: selectedExercise, weightKg: weightKg, targetReps: targetReps)
         set.reps = reps
         workout.sets.append(set)
-        reps = []
+        currentSetSaved = true
+    }
+
+    private func beginNewSet() {
+        if !reps.isEmpty {
+            saveSetToStoreIfNeeded()
+            reps = []
+            currentSetSaved = false
+        }
+        assembler = PinProtocol.RepAssembler()
+        pin.startSet()
+    }
+
+    private func stopAndSaveCurrentSet() {
         pin.stopSet()
+        saveSetToStoreIfNeeded()
+    }
+
+    private func finishSet() {
+        pin.stopSet()
+        saveSetToStoreIfNeeded()
+        reps = []
+        currentSetSaved = false
     }
 }
 
@@ -321,23 +430,27 @@ struct ExerciseManagerSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var newExercise = ""
 
+    private func addExercise() {
+        let trimmed = newExercise.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        if !exercises.contains(trimmed) {
+            exercises.insert(trimmed, at: 0)
+            ExerciseStore.save(exercises)
+        }
+        selectedExercise = trimmed
+        newExercise = ""
+    }
+
     var body: some View {
         NavigationStack {
             List {
                 Section("Lisää uusi liike") {
                     HStack {
                         TextField("Esim. Ristikkäistalja", text: $newExercise)
-                        Button("Lisää") {
-                            let trimmed = newExercise.trimmingCharacters(in: .whitespacesAndNewlines)
-                            guard !trimmed.isEmpty else { return }
-                            if !exercises.contains(trimmed) {
-                                exercises.append(trimmed)
-                                ExerciseStore.save(exercises)
-                            }
-                            selectedExercise = trimmed
-                            newExercise = ""
-                        }
-                        .disabled(newExercise.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .submitLabel(.done)
+                            .onSubmit(addExercise)
+                        Button("Lisää", action: addExercise)
+                            .disabled(newExercise.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 }
 

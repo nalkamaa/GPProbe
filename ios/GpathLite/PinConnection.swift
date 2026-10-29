@@ -22,6 +22,7 @@ final class PinConnection: NSObject {
     private var central: CBCentralManager!
     private var pin: CBPeripheral?
     private var dataChar: CBCharacteristic?
+    private var pinStarted: Bool = false
     private let savedPinKey = "savedPinIdentifier"
 
     override init() {
@@ -30,13 +31,18 @@ final class PinConnection: NSObject {
                                    options: [CBCentralManagerOptionRestoreIdentifierKey: "GpathLite"])
     }
 
-    /// Re-zeroes the Pin (~3 s on first set, ~30 ms on subsequent sets) and starts a new set.
+    /// Zeroes the Pin on the first set (~3 s) and activates subsequent sets immediately.
     func startSet() {
-        send(PinProtocol.Command.hello)
-        send(PinProtocol.Command.battery)
-        send(PinProtocol.Command.startSet)
-        if pin?.state == .connected {
+        guard pin?.state == .connected else { return }
+        if !pinStarted {
             state = .zeroing
+            send(PinProtocol.Command.hello)
+            send(PinProtocol.Command.battery)
+            send(PinProtocol.Command.startSet)
+        } else {
+            state = .ready
+            send(PinProtocol.Command.hello)
+            onPacket?(.ack(0x03))
         }
     }
 
@@ -92,19 +98,22 @@ extension PinConnection: CBCentralManagerDelegate {
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         UserDefaults.standard.set(peripheral.identifier.uuidString, forKey: savedPinKey)
-        state = .zeroing
+        pinStarted = false
+        state = .connecting
         peripheral.discoverServices([PinProtocol.service])
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral,
                         error: Error?) {
         dataChar = nil
+        pinStarted = false
         connect(peripheral)
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral,
                         error: Error?) {
         dataChar = nil
+        pinStarted = false
         connect(peripheral)
     }
 }
@@ -142,7 +151,10 @@ extension PinConnection: CBPeripheralDelegate {
         case .battery(let pct):
             batteryPercent = pct
         case .ack(0x03):
-            state = .ready
+            if state == .zeroing {
+                pinStarted = true
+                state = .ready
+            }
         case .ack(0x04):
             state = .idle
         default:
