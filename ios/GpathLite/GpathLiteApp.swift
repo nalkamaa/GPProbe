@@ -388,14 +388,7 @@ struct LiveSetView: View {
                     .disabled(pin.state != .ready && pin.state != .zeroing)
                 }
 
-                // Bottom button: Lopeta treeni
-                Button("🏁 Lopeta treeni", action: finishSet)
-                    .buttonStyle(.borderedProminent)
-                    .tint(.green)
-                    .frame(maxWidth: .infinity)
-                    .disabled(reps.isEmpty && completedSetsToday == 0)
-
-                // Exercise-specific VBT velocity zones siirretty ALIMMAKSI
+                // Exercise-specific VBT velocity zones
                 if let vbtProfile = VBTProfile.forExercise(selectedExercise) {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
@@ -428,6 +421,13 @@ struct LiveSetView: View {
                     .padding(10)
                     .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
                 }
+
+                // Lopeta treeni -painike sivun alimpana
+                Button("🏁 Lopeta treeni", action: finishSet)
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
+                    .frame(maxWidth: .infinity)
+                    .disabled(reps.isEmpty && completedSetsToday == 0)
             }
             .padding()
             .navigationTitle("Gpath Lite")
