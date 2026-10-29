@@ -567,7 +567,7 @@
 
     <div class="action-bar">
       <button type="button" id="startSetBtn" class="primary" disabled>▶ Aloita sarja #1</button>
-      <button type="button" id="saveSetBtn" class="success" disabled>Seuraava sarja &rarr;</button>
+      <button type="button" id="saveSetBtn" class="success" disabled>🏁 Lopeta treeni</button>
     </div>
 
     <!-- Today's completed sets on the live training tab -->
@@ -1099,7 +1099,7 @@
 
     function updateSetButton() {
       const btn = document.getElementById('startSetBtn');
-      const saveBtn = document.getElementById('saveSetBtn');
+      const finishBtn = document.getElementById('saveSetBtn');
       const completedCount = getCompletedSetsForCurrentDate().length;
       const nextSetNum = completedCount + 1;
 
@@ -1115,17 +1115,10 @@
         btn.className = 'primary';
       }
 
-      if (saveBtn) {
-        if (currentReps.length === 0) {
-          saveBtn.disabled = true;
-          saveBtn.textContent = `Seuraava sarja →`;
-        } else if (currentSetSaved) {
-          saveBtn.disabled = false;
-          saveBtn.textContent = `Tyhjennä sarjaan #${nextSetNum} →`;
-        } else {
-          saveBtn.disabled = false;
-          saveBtn.textContent = `✓ Tallenna sarja #${nextSetNum}`;
-        }
+      if (finishBtn) {
+        const hasActivity = Boolean(dataChar) || currentReps.length > 0 || completedCount > 0;
+        finishBtn.disabled = !hasActivity;
+        finishBtn.textContent = '🏁 Lopeta treeni';
       }
     }
 
@@ -1572,19 +1565,34 @@
       updateSetButton();
     }
 
-    async function saveAndPrepareNextSet() {
-      if (currentReps.length === 0) return;
+    async function finishWorkout() {
+      // 1. Stop active set and save any unsaved reps
       if (setActive || zeroing) {
         await stopSetOnPin(true);
-      } else if (!currentSetSaved) {
+      } else if (currentReps.length > 0 && !currentSetSaved) {
         commitCurrentSetToWorkouts();
       }
-      // Clear currentReps immediately so screen resets to 0 / target for the next set
+
+      // 2. End Pin session cleanly (send 0x04 + 0x05 and disconnect) if connected
+      if (dataChar || (bleDevice && bleDevice.gatt && bleDevice.gatt.connected)) {
+        await disconnectPin();
+      }
+
+      // 3. Reset live set view and open the Calendar & CSV workout summary tab
+      const dateStr = document.getElementById('workoutDate').value || todayISO();
       currentReps = [];
       currentSetSaved = false;
       lastSavedSetRef = null;
+      selectedHistoryDate = dateStr;
+      document.getElementById('filterDateChk').checked = true;
       renderLiveSet();
-      updateSetButton();
+      renderCalendar();
+      renderHistoryList();
+
+      document.getElementById('tabLift').classList.add('hidden');
+      document.getElementById('tabHistory').classList.remove('hidden');
+      document.getElementById('navLiftBtn').classList.remove('active');
+      document.getElementById('navHistoryBtn').classList.add('active');
     }
 
     // --- Exercises Management ---
@@ -1811,7 +1819,7 @@
 
     document.getElementById('connectBtn').addEventListener('click', connectPin);
     document.getElementById('startSetBtn').addEventListener('click', toggleSetOnPin);
-    document.getElementById('saveSetBtn').addEventListener('click', saveAndPrepareNextSet);
+    document.getElementById('saveSetBtn').addEventListener('click', finishWorkout);
     document.getElementById('clearRepsBtn').addEventListener('click', () => {
       currentReps = [];
       currentSetSaved = false;

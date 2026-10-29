@@ -337,10 +337,10 @@ struct LiveSetView: View {
                         .buttonStyle(.borderedProminent)
                     }
 
-                    Button("Seuraava sarja →", action: finishSet)
+                    Button("🏁 Lopeta treeni", action: finishSet)
                         .buttonStyle(.borderedProminent)
                         .tint(.green)
-                        .disabled(reps.isEmpty)
+                        .disabled(reps.isEmpty && completedSetsToday == 0)
                 }
             }
             .padding()
