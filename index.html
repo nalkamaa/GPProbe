@@ -1898,14 +1898,14 @@
       squat: {
         id: 'squat',
         name: 'Jalkakyykky',
-        mvt: 0.23,
-        mvtText: '1RM kynnys (MVT): ~0.23 m/s',
+        mvt: 0.25,
+        mvtText: '1RM kynnys (MVT): ~0.25 m/s',
         zones: [
           {
             key: 'max',
             label: 'Maksimivoima',
             subLabel: '85–100% 1RM',
-            rangeText: '0.23 – 0.50 m/s',
+            rangeText: '0.25 – 0.50 m/s',
             minVel: 0.01,
             maxVel: 0.50,
             cssClass: 'zone-max',
@@ -1946,16 +1946,16 @@
       bench: {
         id: 'bench',
         name: 'Penkkipunnerrus / Sotilaspenkki',
-        mvt: 0.15,
-        mvtText: '1RM kynnys (MVT): ~0.15 m/s',
+        mvt: 0.20,
+        mvtText: '1RM kynnys (MVT): ~0.20 m/s',
         zones: [
           {
             key: 'max',
             label: 'Maksimivoima',
             subLabel: '85–100% 1RM',
-            rangeText: '0.15 – 0.45 m/s',
+            rangeText: '0.20 – 0.43 m/s',
             minVel: 0.01,
-            maxVel: 0.45,
+            maxVel: 0.43,
             cssClass: 'zone-max',
             icon: '🔴'
           },
@@ -1963,9 +1963,9 @@
             key: 'acc',
             label: 'Voima-alue',
             subLabel: '65–85% 1RM',
-            rangeText: '0.45 – 0.75 m/s',
-            minVel: 0.45,
-            maxVel: 0.75,
+            rangeText: '0.43 – 0.70 m/s',
+            minVel: 0.43,
+            maxVel: 0.70,
             cssClass: 'zone-acc',
             icon: '🟢'
           },
@@ -2680,42 +2680,99 @@
         why: 'Maksimoi tehon ja hermoston terävyyden, minimoi lihasvaurion.'
       },
       maxStrength: {
-        key: 'maxStrength', label: 'Kehittävä maksimivoima (80–90 % 1RM)', short: 'Maksimivoima',
-        pctRange: [80, 90], vl: { squat: 15, bench: 15, deadlift: 10, generic: 15 },
+        key: 'maxStrength', label: 'Kehittävä maksimivoima (78–86 % 1RM)', short: 'Maksimivoima',
+        pctRange: [78, 86], vl: { squat: 15, bench: 18, deadlift: 10, generic: 15 },
         why: 'Paras suhde voimankehityksen ja palautumisen välillä.'
       },
       baseStrength: {
         key: 'baseStrength', label: 'Perusvoima / voima-hypertrofia (70–80 % 1RM)', short: 'Perusvoima',
-        pctRange: [70, 80], vl: { squat: 20, bench: 25, deadlift: 15, generic: 20 },
+        pctRange: [70, 80], vl: { squat: 20, bench: 20, deadlift: 15, generic: 20 },
         why: 'Riittävä mekaaninen kuormitus ja volyymi ilman ylikuormitusta.'
       }
     };
 
-    // lv = väestön kuorma–nopeustaulukko [ %1RM, keskinopeus m/s ] (vaihteluvälien keskikohdat)
+    // lv = kalibroitu kuorma–nopeustaulukko [ %1RM, keskinopeus m/s ]
     const LIFT_ANALYSIS = {
       squat: {
-        id: 'squat', name: 'Jalkakyykky', mvt: 0.30, mvtFloor: 0.15, repCost: 0.06, minRomCm: 35, redVl: 25,
-        lv: [[60, 0.86], [70, 0.715], [75, 0.63], [80, 0.55], [85, 0.47], [90, 0.40], [95, 0.34], [100, 0.30]]
+        id: 'squat', name: 'Jalkakyykky', mvt: 0.25, mvtFloor: 0.15, repCost: 0.055, minRomCm: 35, redVl: 25, stickFail: 0.24, stickStep: 0.065,
+        lv: [[50, 0.825], [60, 0.745], [70, 0.665], [75, 0.625], [80, 0.560], [85, 0.490], [90, 0.395], [95, 0.320], [100, 0.250]]
       },
       bench: {
-        id: 'bench', name: 'Penkkipunnerrus', mvt: 0.165, mvtFloor: 0.08, repCost: 0.05, minRomCm: 20, redVl: 30,
-        lv: [[60, 0.72], [70, 0.575], [75, 0.50], [80, 0.43], [85, 0.36], [90, 0.285], [95, 0.22], [100, 0.165]]
+        id: 'bench', name: 'Penkkipunnerrus', mvt: 0.20, mvtFloor: 0.14, repCost: 0.060, minRomCm: 20, redVl: 28, stickFail: 0.17, stickStep: 0.075,
+        lv: [[50, 0.680], [60, 0.580], [70, 0.500], [75, 0.470], [80, 0.430], [85, 0.380], [90, 0.310], [95, 0.250], [100, 0.200]]
       },
       deadlift: {
-        id: 'deadlift', name: 'Maastaveto', mvt: 0.155, mvtFloor: 0.08, repCost: 0.05, minRomCm: 25, redVl: 15,
-        lv: [[60, 0.66], [70, 0.535], [75, 0.465], [80, 0.405], [85, 0.335], [90, 0.275], [95, 0.22], [100, 0.155]]
+        id: 'deadlift', name: 'Maastaveto', mvt: 0.155, mvtFloor: 0.08, repCost: 0.050, minRomCm: 25, redVl: 15, stickFail: 0.14, stickStep: 0.060,
+        lv: [[60, 0.660], [70, 0.535], [75, 0.465], [80, 0.405], [85, 0.335], [90, 0.275], [95, 0.220], [100, 0.155]]
       }
     };
     const GENERIC_RED_VL = 30;
     const TNG_PAUSE_MS = 800;
+    const DEFAULT_REF_MAX = {
+      squat: { weight: 140, reps: 5 },
+      bench: { weight: 105, reps: 5 }
+    };
 
     let vbtSettings = Object.assign(
-      { goal: 'maxStrength', velocityMetric: 'mv', autoStopOnCutoff: false, cutoffSound: true, mvtOverride: {}, barAxis: 'auto', mode: 'guided', cycle: null },
+      { goal: 'maxStrength', velocityMetric: 'mv', autoStopOnCutoff: false, cutoffSound: true, mvtOverride: {}, refMax: {}, barAxis: 'auto', mode: 'guided', cycle: null },
       loadJSON(KEY_VBT_SETTINGS, {}) || {}
     );
     if (!VBT_GOALS[vbtSettings.goal]) vbtSettings.goal = 'maxStrength';
     if (!vbtSettings.mvtOverride || typeof vbtSettings.mvtOverride !== 'object') vbtSettings.mvtOverride = {};
+    if (!vbtSettings.refMax || typeof vbtSettings.refMax !== 'object') vbtSettings.refMax = {};
+    Object.keys(DEFAULT_REF_MAX).forEach((k) => {
+      if (!vbtSettings.refMax[k] || !(Number(vbtSettings.refMax[k].weight) > 0)) {
+        vbtSettings.refMax[k] = { ...DEFAULT_REF_MAX[k] };
+      }
+    });
     function saveVbtSettings() { saveJSON(KEY_VBT_SETTINGS, vbtSettings); }
+
+    // Epley + Brzycki blend for reference series (e.g. 5x140 kg -> 160.4 kg, 5x105 kg -> 120.3 kg)
+    function calcRef1RM(weightKg, reps) {
+      const w = Number(weightKg), r = Number(reps);
+      if (!(w > 0) || !(r >= 1)) return null;
+      if (r === 1) return w;
+      const ep = w * (1 + r / 30);
+      const br = w * (36 / (37 - Math.min(12, r)));
+      return (ep + br) / 2;
+    }
+    function getRefMax(exerciseName) {
+      const k = getLiftKey(exerciseName);
+      if (!k || !vbtSettings.refMax || !vbtSettings.refMax[k]) return null;
+      const rm = vbtSettings.refMax[k];
+      const w = parseFloat(rm.weight), r = parseInt(rm.reps, 10) || 1;
+      if (!(w > 0) || !(r >= 1)) return null;
+      return { weight: w, reps: r, e1RM: calcRef1RM(w, r) };
+    }
+    function getAnchor1RM(exerciseName) {
+      const rm = getRefMax(exerciseName);
+      const baseAnchor = rm ? rm.e1RM : null;
+      const cfg = getLiftCfg(exerciseName);
+      if (!cfg) return baseAnchor;
+      // Opi automaattisesti myös treenihistorian raskaista tehdyistä sarjoista (1–8 toistoa, ≥78 % ankkurista),
+      // jolloin ankkuri nousee automaattisesti voimatasojen kehittyessä ilman että kevyet lämmittelyt vääristävät sitä
+      const minHeavyKg = baseAnchor ? baseAnchor * 0.78 : (cfg.id === 'bench' ? 75 : 100);
+      let bestProven = 0;
+      workouts.forEach((w) => {
+        (w.sets || []).forEach((s) => {
+          if (getLiftKey(s.exercise) !== cfg.id || !(s.weightKg >= minHeavyKg) || !s.reps || !s.reps.length) return;
+          const flagged = flagSuspectReps(s.reps, cfg);
+          const validCount = flagged.filter((x) => !x.suspect).length;
+          if (validCount >= 1 && validCount <= 8) {
+            const est = calcRef1RM(s.weightKg, validCount);
+            if (est && est > bestProven) bestProven = est;
+          }
+        });
+      });
+      if (baseAnchor && bestProven > baseAnchor) return bestProven;
+      return baseAnchor || (bestProven > 0 ? bestProven : null);
+    }
+    function taperedMvtShift(cfg, mvt, v) {
+      if (!cfg || mvt === null || mvt === undefined) return 0;
+      const v60 = cfg.lv.find((row) => row[0] === 60) ? cfg.lv.find((row) => row[0] === 60)[1] : 0.70;
+      const t = Math.max(0, Math.min(1, (v60 - v) / Math.max(0.1, v60 - cfg.mvt)));
+      return (mvt - cfg.mvt) * t;
+    }
 
     let vbtCutoffAlerted = false;
     let vbtFailureAlerted = false;
@@ -2802,7 +2859,7 @@
       return lo[1] + (pct - lo[0]) * (hi[1] - lo[1]) / (hi[0] - lo[0]);
     }
 
-    // --- Suspect rep detection (unrack / positioning / partial ROM) ---
+    // --- Suspect rep detection (unrack / positioning / partial ROM / bar-rack) ---
     function flagSuspectReps(reps, cfg) {
       const n = reps.length;
       const flags = new Array(n).fill(false);
@@ -2817,27 +2874,39 @@
           const others = vbtMedian(vs.slice(1));
           if (others && vs[0] < others * 0.5) flags[0] = true;
         }
-        // 2. Partial movement: ROM clearly below set median AND below lift-specific minimum
+        // 2. End-of-set bar-racking ghost movement (sudden >60% velocity cliff from fast rep to <0.22 m/s)
+        if (i === n - 1 && n >= 3 && vs[i] < 0.22 && vs[i - 1] > 0.45 && vs[i] < vs[i - 1] * 0.40) {
+          flags[i] = true;
+        }
+        // 3. Partial movement: ROM clearly below set median AND below lift-specific minimum
         if (medRom && roms[i] < medRom * 0.5 && roms[i] < minRom) flags[i] = true;
       });
       return flags;
     }
 
-    // --- Personal MVT: manual override > learned from completed reps > population default ---
+    // --- Personal MVT: manual override > learned from heavy completed reps > population default ---
     let _mvtCache = { sig: '', map: {} };
     function workoutsSignature() {
       let n = 0;
       workouts.forEach((w) => (w.sets || []).forEach((s) => { n += (s.reps || []).length; }));
-      return `${workouts.length}:${n}:${vbtSettings.velocityMetric}`;
+      const refSig = JSON.stringify(vbtSettings.refMax || {});
+      return `${workouts.length}:${n}:${vbtSettings.velocityMetric}:${refSig}`;
     }
     function learnedMvt(liftKey) {
       const sig = workoutsSignature();
       if (_mvtCache.sig !== sig) _mvtCache = { sig, map: {} };
       if (_mvtCache.map[liftKey] !== undefined) return _mvtCache.map[liftKey];
       const cfg = LIFT_ANALYSIS[liftKey];
+      const rm = vbtSettings.refMax && vbtSettings.refMax[liftKey] ? calcRef1RM(vbtSettings.refMax[liftKey].weight, vbtSettings.refMax[liftKey].reps) : null;
+      let maxW = 0;
+      workouts.forEach((w) => (w.sets || []).forEach((s) => {
+        if (getLiftKey(s.exercise) === liftKey && Number(s.weightKg) > maxW) maxW = Number(s.weightKg);
+      }));
+      const minHeavyKg = rm ? rm * 0.72 : maxW * 0.72;
       let minV = null;
       workouts.forEach((w) => (w.sets || []).forEach((s) => {
         if (getLiftKey(s.exercise) !== liftKey) return;
+        if ((Number(s.weightKg) || 0) < minHeavyKg) return;
         const reps = s.reps || [];
         const sus = flagSuspectReps(reps, cfg);
         reps.forEach((r, i) => {
@@ -2858,7 +2927,7 @@
       if (Number.isFinite(man) && man > 0) return { value: man, source: 'manual', label: 'oma asetus' };
       const learned = learnedMvt(k);
       if (learned !== null) return { value: learned, source: 'learned', label: 'opittu omista toistoista' };
-      return { value: cfg.mvt, source: 'default', label: 'väestökeskiarvo' };
+      return { value: cfg.mvt, source: 'default', label: 'kalibroitu oletus' };
     }
 
     // --- Core: analyse one set ---
@@ -2869,6 +2938,7 @@
       const redVl = cfg ? cfg.redVl : GENERIC_RED_VL;
       const mvtInfo = getEffectiveMvt(exercise);
       const mvt = mvtInfo ? mvtInfo.value : null;
+      const anchor1RM = getAnchor1RM(exercise);
       const n = reps.length;
       const vs = reps.map(repV);
       const suspect = flagSuspectReps(reps, cfg);
@@ -2890,23 +2960,56 @@
       });
       if (vBest === null && n > 0) { vBest = Math.max(...vs); vBestIdx = vs.indexOf(vBest); }
 
-      // Velocity cost per rep: from this set's own slope (best rep -> end) or lift default
-      let cost = cfg ? cfg.repCost : null, costSource = cfg ? 'default' : null;
-      const tail = perRep.filter((p) => p.idx >= vBestIdx && !p.suspect);
-      if (tail.length >= 3) {
-        const reg = vbtLinReg(tail.map((p) => p.idx), tail.map((p) => p.v));
-        if (reg && reg.slope < -0.005) { cost = Math.min(0.12, Math.max(0.02, -reg.slope)); costSource = 'set'; }
+      // Initial relative intensity (%1RM) from personal profile or velocity table, regularized by anchor1RM
+      let pctVel = null, pctSource = null;
+      const prof = opts.profile || null;
+      if (vBest && weightKg > 0) {
+        let pctRaw = null;
+        if (prof && prof.valid && prof.e1RM > 0) {
+          const loadAtV = (vBest - prof.intercept) / prof.slope;
+          pctRaw = Math.max(30, Math.min(105, loadAtV / prof.e1RM * 100));
+          pctSource = 'profile';
+        } else if (cfg) {
+          const shift = taperedMvtShift(cfg, mvt !== null ? mvt : cfg.mvt, vBest);
+          pctRaw = pctFromVelocityTable(cfg, vBest - shift);
+          pctSource = 'table';
+        }
+        if (anchor1RM && anchor1RM > 0) {
+          const pctAnchor = (weightKg / anchor1RM) * 100;
+          if (pctAnchor < 66) {
+            // Light warmup load: submaximal lifting effort is common, so anchor closely to known max
+            pctVel = pctRaw !== null
+              ? Math.max(pctAnchor - 4, Math.min(pctAnchor + 4, 0.82 * pctAnchor + 0.18 * pctRaw))
+              : pctAnchor;
+          } else {
+            // Reference & work loads: allow velocity to adjust daily intensity within realistic bounds (±6.5%)
+            const blended = pctRaw !== null ? (0.50 * pctRaw + 0.50 * pctAnchor) : pctAnchor;
+            pctVel = Math.max(pctAnchor - 6.0, Math.min(pctAnchor + 7.0, blended));
+          }
+          pctVel = Math.max(20, Math.min(105, pctVel));
+          if (!pctSource) pctSource = 'anchor';
+        } else {
+          pctVel = pctRaw;
+        }
       }
 
-      perRep.forEach((p) => {
-        if (mvt !== null && cost && !p.suspect) p.rir = Math.max(0, Math.floor((p.v - mvt) / cost + 1e-9));
-        if (p.suspect) p.quality = 'suspect';
-        else if (mvt !== null && p.v < mvt) p.quality = 'bad';
-        else if (p.vl !== null && p.vl > redVl) p.quality = 'bad';
-        else if (p.vl !== null && p.vl > cutoffPct) p.quality = 'warn';
-        else if (p.rir !== null && p.rir < 1) p.quality = 'warn';
-        else p.quality = 'good';
-      });
+      // Velocity cost per rep: combine observed set drop (best -> last & regression) with lift minimum floor
+      let cost = cfg ? cfg.repCost : null, costSource = cfg ? 'default' : null;
+      const tail = perRep.filter((p) => p.idx >= vBestIdx && !p.suspect);
+      if (tail.length >= 2) {
+        const span = Math.max(1, tail[tail.length - 1].idx - tail[0].idx);
+        const endDrop = Math.max(0, (tail[0].v - tail[tail.length - 1].v) / span);
+        const reg = tail.length >= 3 ? vbtLinReg(tail.map((p) => p.idx), tail.map((p) => p.v)) : null;
+        const regDrop = reg && reg.slope < -0.005 ? -reg.slope : 0;
+        const obsCost = Math.max(endDrop, regDrop);
+        const floorCost = cfg ? ((pctVel === null || pctVel >= 66) ? cfg.repCost * 0.82 : cfg.repCost * 0.60) : 0.035;
+        if (obsCost > 0.008) {
+          cost = Math.min(0.12, Math.max(floorCost, 0.65 * obsCost + 0.35 * (cfg ? cfg.repCost : 0.05)));
+          costSource = 'set';
+        } else if (cfg) {
+          cost = Math.max(floorCost, cfg.repCost);
+        }
+      }
 
       // --- Gpath Pin raw-trace metrics: sticking point, bar path vs best rep, tilt ---
       const rules = cfg ? TRACE_LIFT_RULES[cfg.id] : null;
@@ -2914,12 +3017,62 @@
       const bestTrRep = (vBestIdx >= 0 && reps[vBestIdx] && reps[vBestIdx].trace && reps[vBestIdx].trace.path)
         ? reps[vBestIdx] : reps.find((r, i) => r.trace && r.trace.path && !suspect[i]);
       const bestTr = bestTrRep ? bestTrRep.trace : null;
+
+      let validDone = 0;
       perRep.forEach((p) => {
         p.flags = [];
         p.pathDev = null;
+        if (p.suspect) { p.quality = 'suspect'; return; }
+        validDone++;
         const tr = reps[p.idx].trace;
-        if (!tr || p.suspect) return;
-        if (tr.stick && tr.stick.vmin < 0.10 && p.quality !== 'bad') {
+
+        // 1. Velocity-above-MVT RIR
+        if (mvt !== null && cost) {
+          p.rir = p.v <= mvt + cost * 0.35 ? 0 : Math.max(0, Math.floor((p.v - mvt) / cost + 0.15));
+        }
+
+        // 2. Raw-trace sticking point / mid-ROM minimum velocity RIR constraint
+        let vmin = null;
+        if (tr) {
+          const sv = tr.stick ? tr.stick.vmin : null;
+          const mv = tr.midMin ? tr.midMin.v : null;
+          if (sv !== null && mv !== null) vmin = Math.min(sv, mv);
+          else if (sv !== null) vmin = sv;
+          else if (mv !== null) vmin = mv;
+        }
+        if (vmin !== null && cfg) {
+          const vFail = cfg.stickFail || mvt || 0.18;
+          const vStep = cfg.stickStep || 0.065;
+          const rirTr = vmin <= vFail + 0.01 ? 0 : Math.max(0, Math.floor((vmin - vFail) / vStep + 0.2));
+          if (p.rir === null || rirTr < p.rir) p.rir = rirTr;
+        }
+
+        // 3. Velocity loss % RIR ceiling on work sets
+        if (p.rir !== null && p.vl !== null && (pctVel === null || pctVel >= 65)) {
+          const vlFail = cfg ? cfg.redVl * 1.55 : 44;
+          if (p.vl >= vlFail) p.rir = 0;
+          else if (p.vl >= redVl) p.rir = Math.min(p.rir, 1);
+          else if (p.vl >= cutoffPct) p.rir = Math.min(p.rir, 2);
+          else if (p.vl >= cutoffPct * 0.70) p.rir = Math.min(p.rir, 3);
+        }
+
+        // 4. Relative intensity (%1RM / anchor) max-reps ceiling on work sets
+        if (p.rir !== null && pctVel !== null && pctVel >= 65) {
+          const pc = Math.min(100, pctVel);
+          const maxRepsAtPct = 0.5 * (30 * (100 / pc - 1) + Math.max(1, 37 - 0.36 * pc));
+          const capByPct = Math.max(0, Math.round(maxRepsAtPct - validDone + 0.6));
+          p.rir = Math.min(p.rir, capByPct);
+        }
+
+        if (mvt !== null && p.v < mvt) p.quality = 'bad';
+        else if (p.vl !== null && p.vl > redVl) p.quality = 'bad';
+        else if (p.vl !== null && p.vl > cutoffPct) p.quality = 'warn';
+        else if (p.rir !== null && p.rir < 1) p.quality = 'warn';
+        else p.quality = 'good';
+
+        if (!tr) return;
+        const stickWarnV = cfg ? (cfg.stickFail || 0.18) : 0.12;
+        if (((tr.stick && tr.stick.vmin <= stickWarnV) || (vmin !== null && vmin <= stickWarnV * 0.92)) && p.quality !== 'bad') {
           p.flags.push('stick');
           if (p.rir !== null) p.rir = 0;
           if (p.quality === 'good') p.quality = 'warn';
@@ -2944,33 +3097,30 @@
 
       // Projected reps left / reps to cutoff
       let repsToCutoff = null;
-      if (lastValid && vCutoff !== null && cost) repsToCutoff = Math.max(0, Math.floor((lastValid.v - vCutoff) / cost + 1e-9));
+      if (lastValid && vCutoff !== null && cost) {
+        repsToCutoff = Math.max(0, Math.floor((lastValid.v - vCutoff) / cost + 1e-9));
+        if (rirEnd !== null) repsToCutoff = Math.min(repsToCutoff, rirEnd);
+      }
 
-      // Intensity (%1RM) from personal profile, else population table
-      let pct1RM = null, pctSource = null, e1RM = null;
-      const prof = opts.profile || null;
-      if (vBest && weightKg > 0) {
-        if (prof && prof.valid && prof.e1RM > 0) {
-          // personal profile: the load the profile predicts for today's vBest gives the
-          // day-adjusted relative intensity (faster than usual -> lower %1RM -> higher e1RM)
-          const loadAtV = (vBest - prof.intercept) / prof.slope;
-          pct1RM = Math.max(30, Math.min(110, loadAtV / prof.e1RM * 100));
-          pctSource = 'profile';
-          e1RM = weightKg / (pct1RM / 100);
-          if (!Number.isFinite(e1RM) || e1RM <= 0) e1RM = prof.e1RM;
-        } else if (cfg) {
-          // shift table so its 1RM velocity equals this lifter's effective MVT
-          const shift = (mvt !== null ? mvt : cfg.mvt) - cfg.mvt;
-          pct1RM = pctFromVelocityTable(cfg, vBest - shift);
-          pctSource = 'table';
-          e1RM = pct1RM ? weightKg / (pct1RM / 100) : null;
+      // Epley+Brzycki corrected with reps-in-reserve (reps to failure = reps done + RIR)
+      const epleyRir = (weightKg > 0 && valid.length > 0)
+        ? calcRef1RM(weightKg, valid.length + (rirEnd || 0)) : null;
+
+      // Finalize pct1RM & e1RM: blend velocity estimate with realized fatigue (epleyRir) on work sets
+      let pct1RM = pctVel, e1RM = null;
+      if (pctVel !== null && weightKg > 0) {
+        const e1RMVel = weightKg / (pctVel / 100);
+        if (pctVel >= 65 && valid.length >= 2 && epleyRir && ((vlFinal !== null && vlFinal >= 12) || (rirEnd !== null && rirEnd <= 3))) {
+          const wRir = (rirEnd !== null && rirEnd <= 1) || (vlFinal !== null && vlFinal >= redVl)
+            ? 0.65
+            : ((rirEnd !== null && rirEnd <= 2) || (vlFinal !== null && vlFinal >= cutoffPct - 3) ? 0.50 : 0.30);
+          e1RM = (1 - wRir) * e1RMVel + wRir * epleyRir;
+          pct1RM = Math.max(30, Math.min(105, (weightKg / e1RM) * 100));
+        } else {
+          e1RM = e1RMVel;
         }
       }
       const isWarmup = pct1RM !== null && pct1RM < 65;
-
-      // Epley corrected with reps-in-reserve (reps to failure = reps done + RIR)
-      const epleyRir = (weightKg > 0 && valid.length > 0)
-        ? weightKg * (1 + (valid.length + (rirEnd || 0)) / 30) : null;
 
       // --- Rep Quality Index (RQI) = 0.40·S_intensity + 0.40·S_fatigue + 0.20·S_path ---
       const roms = valid.map((p) => Number(reps[p.idx].rangeOfMotionCm) || 0).filter((x) => x > 0);
@@ -2983,8 +3133,9 @@
       const [pLo, pHi] = getGoal().pctRange;
       let sInt = null, vWin = null;
       if (cfg && vBest) {
-        const mvtShift = (mvt !== null ? mvt : cfg.mvt) - cfg.mvt;
-        const vAt = (pc) => (prof && prof.valid) ? prof.intercept + prof.slope * (prof.e1RM * pc / 100) : velocityFromPctTable(cfg, pc) + mvtShift;
+        const vAt = (pc) => (prof && prof.valid)
+          ? prof.intercept + prof.slope * (prof.e1RM * pc / 100)
+          : velocityFromPctTable(cfg, pc) + taperedMvtShift(cfg, mvt !== null ? mvt : cfg.mvt, velocityFromPctTable(cfg, pc));
         vWin = [vAt(pHi) - 0.03, vAt(pLo) + 0.03];
         const dist = vBest < vWin[0] ? vWin[0] - vBest : (vBest > vWin[1] ? vBest - vWin[1] : 0);
         sInt = Math.max(0, 100 - dist / 0.10 * 100);
@@ -3048,7 +3199,7 @@
         rirEnd, qualityReps, stopAfterRep, junkReps, effectiveReps, repsToCutoff, tng,
         pct1RM, pctSource, e1RM, epleyRir, isWarmup, romCv,
         score, scoreParts: parts, grade, gradeClass,
-        hasTrace, sInt, vWin, stickSummary, techFirst, tiltReps, rules
+        hasTrace, sInt, vWin, stickSummary, techFirst, tiltReps, rules, anchor1RM
       };
     }
 
@@ -3068,27 +3219,48 @@
     // --- Load–velocity profile (best rep of each load) & VBT e1RM at MVT ---
     function buildLVProfile(points, exercise) {
       const mvtInfo = getEffectiveMvt(exercise);
+      const anchor1RM = getAnchor1RM(exercise);
       const byLoad = new Map();
       points.forEach((p) => {
         const key = Math.round(p.load * 2) / 2;
         if (!byLoad.has(key) || byLoad.get(key).v < p.v) byLoad.set(key, { load: key, v: p.v, date: p.date });
       });
-      const pts = [...byLoad.values()].sort((a, b) => a.load - b.load);
+      const allPts = [...byLoad.values()].sort((a, b) => a.load - b.load);
+      // Exclude very light submaximal warm-up loads (<56% of anchor or max load) from linear regression
+      // so casual 20–50 kg warmups do not flatten the slope and inflate e1RM
+      const maxLoad = allPts.length ? allPts[allPts.length - 1].load : 0;
+      const minRegLoad = anchor1RM ? anchor1RM * 0.56 : maxLoad * 0.56;
+      const filteredPts = allPts.filter((p) => p.load >= minRegLoad);
+      const pts = filteredPts.length >= 2 ? filteredPts : allPts;
+
       const res = { points: pts, allPoints: points, valid: false, mvt: mvtInfo ? mvtInfo.value : null, mvtInfo };
-      if (pts.length < 2) { res.reason = 'Tarvitaan vähintään 2 eri kuormaa (mieluiten 3–4, n. 40–90 % 1RM).'; return res; }
+      if (pts.length < 2) { res.reason = 'Tarvitaan vähintään 2 eri kuormaa (mieluiten 3–4, n. 60–90 % 1RM).'; return res; }
       const span = pts[pts.length - 1].load - pts[0].load;
       const reg = vbtLinReg(pts.map((p) => p.load), pts.map((p) => p.v));
       if (!reg) { res.reason = 'Regressiota ei voitu laskea.'; return res; }
       Object.assign(res, reg);
       if (reg.slope >= 0) { res.reason = 'Nopeus ei laske kuorman kasvaessa – tarkista data.'; return res; }
       if (res.mvt === null) { res.reason = 'Liikkeelle ei ole MVT-arvoa (vain kyykky, penkki ja maastaveto).'; return res; }
-      res.e1RM = (res.mvt - reg.intercept) / reg.slope;
-      res.v0 = reg.intercept;
-      res.l0 = -reg.intercept / reg.slope;
+      let rawE1RM = (res.mvt - reg.intercept) / reg.slope;
+      // Regularize extrapolated e1RM against reference anchor so submaximal warmup slopes cannot runaway
+      if (anchor1RM && anchor1RM > 0 && Number.isFinite(rawE1RM)) {
+        const blended = 0.45 * rawE1RM + 0.55 * anchor1RM;
+        rawE1RM = Math.max(anchor1RM * 0.88, Math.min(anchor1RM * 1.07, blended));
+        const meanL = pts.reduce((s, p) => s + p.load, 0) / pts.length;
+        const meanV = pts.reduce((s, p) => s + p.v, 0) / pts.length;
+        if (rawE1RM > meanL + 5) {
+          res.slope = (res.mvt - meanV) / (rawE1RM - meanL);
+          res.intercept = meanV - res.slope * meanL;
+        }
+      }
+      res.e1RM = rawE1RM;
+      res.v0 = res.intercept;
+      res.l0 = -res.intercept / res.slope;
       res.spanKg = span;
-      res.valid = Number.isFinite(res.e1RM) && res.e1RM > pts[pts.length - 1].load * 0.9;
-      res.reliability = reg.r2 >= 0.95 && pts.length >= 3 ? 'Hyvä' : (reg.r2 >= 0.85 ? 'Kohtalainen' : 'Heikko');
-      if (!res.valid) res.reason = 'Profiili ei ole uskottava (e1RM alle raskaimman kuorman).';
+      const minSpan = getLiftKey(exercise) === 'bench' ? 12 : 15;
+      res.valid = Number.isFinite(res.e1RM) && span >= minSpan && res.e1RM > pts[pts.length - 1].load * 0.92 && res.e1RM < pts[pts.length - 1].load * 1.45;
+      res.reliability = reg.r2 >= 0.92 && pts.length >= 3 ? 'Hyvä' : (reg.r2 >= 0.80 ? 'Kohtalainen' : 'Heikko');
+      if (!res.valid) res.reason = span < minSpan ? `Kuormaväli (${span.toFixed(0)} kg) on liian kapea luotettavaan suoraan.` : 'Profiili ei ole uskottava (e1RM poikkeaa liikaa nostetuista kuormista).';
       return res;
     }
     function sessionProfile(exercise, dateStr) {
@@ -3105,14 +3277,14 @@
       const dates = [...new Set(setsForExercise(exercise, (d) => d <= onOrBeforeDate).map((x) => x.date))].sort().reverse();
       for (const d of dates.slice(0, 6)) {
         const p = sessionProfile(exercise, d);
-        if (p.valid && p.r2 >= 0.8) { p.date = d; p.method = 'session'; return p; }
+        if (p.valid && p.r2 >= 0.82 && p.points.length >= 3) { p.date = d; p.method = 'session'; return p; }
       }
       const from = new Date(onOrBeforeDate); from.setDate(from.getDate() - 28);
       const fromIso = from.toISOString().slice(0, 10);
       const sets = setsForExercise(exercise, (d) => d <= onOrBeforeDate && d >= fromIso);
       const pts = sets.map(({ date, set }) => ({ load: set.weightKg, v: analyzeSet(set.reps, set.exercise, set.weightKg).vBest, date })).filter((p) => p.v > 0);
       const p = buildLVProfile(pts, exercise);
-      if (p.valid && p.r2 >= 0.7) { p.date = dates[0]; p.method = 'pooled28'; return p; }
+      if (p.valid && p.r2 >= 0.75 && p.points.length >= 3) { p.date = dates[0]; p.method = 'pooled28'; return p; }
       return null;
     }
 
@@ -3120,14 +3292,15 @@
     function e1rmTrend(exercise) {
       const dates = [...new Set(setsForExercise(exercise).map((x) => x.date))].sort();
       return dates.map((d) => {
-        const p = sessionProfile(exercise, d);
-        if (p.valid && p.r2 >= 0.8) return { date: d, e1RM: p.e1RM, method: 'profiili' };
-        let best = null;
+        const workE1s = [];
         setsForExercise(exercise, (x) => x === d).forEach(({ set }) => {
           const a = analyzeSet(set.reps, set.exercise, set.weightKg);
-          if (a.e1RM && !a.isWarmup && (best === null || a.e1RM > best)) best = a.e1RM;
+          if (a.e1RM && !a.isWarmup) workE1s.push(a.e1RM);
         });
-        return best ? { date: d, e1RM: best, method: 'yksittäinen sarja' } : null;
+        if (workE1s.length) return { date: d, e1RM: vbtMedian(workE1s), method: workE1s.length >= 2 ? 'työsarjat' : 'yksittäinen sarja' };
+        const p = sessionProfile(exercise, d);
+        if (p.valid && p.r2 >= 0.82) return { date: d, e1RM: p.e1RM, method: 'profiili' };
+        return null;
       }).filter(Boolean);
     }
 
@@ -3393,6 +3566,7 @@
       const w = parseFloat(document.getElementById('weightInput').value) || 0;
       if (!cfg) { el.innerHTML = '<span style="color:var(--muted)">VBT-ennuste vain kyykylle, penkille ja maastavedolle</span>'; return; }
       const prof = recentProfile(exercise, document.getElementById('workoutDate').value || todayISO());
+      const anchor1RM = getAnchor1RM(exercise);
       if (prof && w > 0) {
         const pct = w / prof.e1RM * 100;
         const vExp = prof.intercept + prof.slope * w;
@@ -3400,11 +3574,21 @@
         const wLo = prof.e1RM * lo / 100, wHi = prof.e1RM * hi / 100;
         el.innerHTML = `~${Math.round(pct)} % 1RM · odotettu V<sub>best</sub> <strong>${fmtV(vExp)}</strong> m/s (±0.03)<br>
           <span style="color:var(--muted)">e1RM ${prof.e1RM.toFixed(0)} kg (${prof.method === 'session' ? 'profiili ' + fmtDateFi(prof.date) : '28 pv profiili'}) · tavoitealue ${Math.round(wLo)}–${Math.round(wHi)} kg</span>`;
+      } else if (anchor1RM && w > 0) {
+        const pct = w / anchor1RM * 100;
+        const mvt = getEffectiveMvt(exercise).value;
+        const shift = taperedMvtShift(cfg, mvt, pct);
+        const vExp = velocityFromPctTable(cfg, pct) + shift;
+        const [lo, hi] = getGoal().pctRange;
+        const wLo = anchor1RM * lo / 100, wHi = anchor1RM * hi / 100;
+        el.innerHTML = `~${Math.round(pct)} % 1RM · odotettu V<sub>best</sub> <strong>${fmtV(vExp)}</strong> m/s (±0.03)<br>
+          <span style="color:var(--muted)">Ankkuri-1RM ${anchor1RM.toFixed(0)} kg (oma sarjamaksimi) · tavoitealue ${Math.round(wLo)}–${Math.round(wHi)} kg</span>`;
       } else {
         const [lo, hi] = getGoal().pctRange;
         const mvt = getEffectiveMvt(exercise).value;
-        const shift = mvt - cfg.mvt;
-        el.innerHTML = `Tavoite ${lo}–${hi} % 1RM ≈ V<sub>best</sub> <strong>${fmtV(velocityFromPctTable(cfg, hi) + shift)}–${fmtV(velocityFromPctTable(cfg, lo) + shift)}</strong> m/s<br>
+        const shiftLo = taperedMvtShift(cfg, mvt, lo);
+        const shiftHi = taperedMvtShift(cfg, mvt, hi);
+        el.innerHTML = `Tavoite ${lo}–${hi} % 1RM ≈ V<sub>best</sub> <strong>${fmtV(velocityFromPctTable(cfg, hi) + shiftHi)}–${fmtV(velocityFromPctTable(cfg, lo) + shiftLo)}</strong> m/s<br>
           <span style="color:var(--muted)">Oma profiili puuttuu: tee 3–4 nousevaa kuormaa samana päivänä</span>`;
       }
     }
@@ -3643,6 +3827,17 @@
           <td style="white-space:nowrap;">${VBT_GOALS.peaking.vl[c.id]}/${VBT_GOALS.maxStrength.vl[c.id]}/${VBT_GOALS.baseStrength.vl[c.id]}</td>
         </tr>`;
       }).join('');
+      const refMaxRows = Object.values(LIFT_ANALYSIS).map((c) => {
+        const ex = c.id === 'squat' ? 'Jalkakyykky' : c.id === 'bench' ? 'Penkkipunnerrus' : 'Maastaveto';
+        const rm = getRefMax(ex) || { weight: '', reps: 5 };
+        const a1rm = rm.weight ? calcRef1RM(rm.weight, rm.reps) : null;
+        return `<tr>
+          <td>${c.id === 'bench' ? 'Penkki / sotilaspenkki' : c.name}</td>
+          <td><input type="number" step="2.5" min="20" max="400" inputmode="decimal" data-refmax-w="${c.id}" value="${rm.weight || ''}" placeholder="kg" style="width:64px; padding:5px 4px; font-size:12px;"></td>
+          <td><input type="number" step="1" min="1" max="15" inputmode="numeric" data-refmax-r="${c.id}" value="${rm.reps || 5}" placeholder="5" style="width:48px; padding:5px 4px; font-size:12px;"></td>
+          <td><strong>${a1rm ? a1rm.toFixed(1) + ' kg' : '--'}</strong></td>
+        </tr>`;
+      }).join('');
       el.innerHTML = `
         <strong style="font-size:14px;">⚙️ VBT-asetukset</strong>
         <div class="setup-grid" style="margin-top:8px;">
@@ -3665,6 +3860,13 @@
           <div class="row"><span class="small">Raakadata (${recentRawTraces.length} sarjaa muistissa)</span>
             <button type="button" id="anaRawExport" style="padding:6px 10px; font-size:12px;">Vie raakadata CSV</button></div>
         </div>
+        <div style="font-size:12px; font-weight:700; margin:10px 0 4px;">Oma sarjamaksimi (kalibrointiankkuri, esim. 5RM)</div>
+        <div style="overflow-x:auto;"><table class="ana-table">
+          <thead><tr><th>Liike</th><th>Sarjapaino (kg)</th><th>Toistot</th><th>Ankkuri-1RM</th></tr></thead>
+          <tbody>${refMaxRows}</tbody></table></div>
+        <div style="font-size:11px; color:var(--muted); margin-top:4px; line-height:1.4;">
+          Ankkuroi L–V-profiilin ja estää kevyiden lämmittelysarjojen nopeutta karkaamasta epärealistisiin e1RM- ja sarjapainoarvioihin. Päivän nopeus saa edelleen säätää arviota ±12–15 %.
+        </div>
         <div style="font-size:12px; font-weight:700; margin:10px 0 4px;">Failure-raja (MVT, m/s) ja VL-katkaisurajat</div>
         <div style="overflow-x:auto;"><table class="ana-table">
           <thead><tr><th>Liike</th><th>Oletus</th><th>Opittu</th><th>Oma</th><th>Käyt.</th><th>VL %<br>P/M/V</th></tr></thead>
@@ -3685,6 +3887,25 @@
           const v = parseFloat(String(inp.value).replace(',', '.'));
           if (Number.isFinite(v) && v > 0) vbtSettings.mvtOverride[k] = v; else delete vbtSettings.mvtOverride[k];
           saveVbtSettings(); onVbtSettingsChanged();
+        });
+      });
+      const saveRefMaxRow = (k) => {
+        const wInp = el.querySelector(`[data-refmax-w="${k}"]`);
+        const rInp = el.querySelector(`[data-refmax-r="${k}"]`);
+        const w = wInp ? parseFloat(String(wInp.value).replace(',', '.')) : NaN;
+        const r = rInp ? parseInt(rInp.value, 10) : 5;
+        if (!vbtSettings.refMax) vbtSettings.refMax = {};
+        if (Number.isFinite(w) && w > 0) {
+          vbtSettings.refMax[k] = { weight: w, reps: (Number.isFinite(r) && r >= 1 && r <= 15) ? r : 5 };
+        } else {
+          vbtSettings.refMax[k] = null;
+        }
+        saveVbtSettings(); onVbtSettingsChanged();
+      };
+      el.querySelectorAll('[data-refmax-w], [data-refmax-r]').forEach((inp) => {
+        inp.addEventListener('change', () => {
+          const k = inp.getAttribute('data-refmax-w') || inp.getAttribute('data-refmax-r');
+          saveRefMaxRow(k);
         });
       });
     }
@@ -3718,12 +3939,13 @@
       const [pLo, pHi] = g.pctRange;
       const mvt = getEffectiveMvt(exercise).value;
       const cutoff = getCutoffPct(exercise);
+      const anchor1RM = getAnchor1RM(exercise);
       const histProf = recentProfile(exercise, addDaysIso(dateStr, -1)); // vain aiemmat päivät
-      const shift = mvt - cfg.mvt;
 
-      // --- historia: e1RM-lähtötaso (42 pv) ja edellinen sessio ---
+      // --- historia: e1RM-lähtötaso (42 pv + kalibrointiankkuri) ja edellinen sessio ---
       const trend = e1rmTrend(exercise).filter((t) => t.date < dateStr && t.date >= addDaysIso(dateStr, -42));
-      const baseline = trend.length ? vbtMedian(trend.slice(-3).map((t) => t.e1RM)) : null;
+      const trendMed = trend.length ? vbtMedian(trend.slice(-3).map((t) => t.e1RM)) : null;
+      const baseline = trendMed && anchor1RM ? 0.65 * trendMed + 0.35 * anchor1RM : (trendMed || anchor1RM);
       const prevDates = [...new Set(setsForExercise(exercise, (d) => d < dateStr).map((x) => x.date))].sort().reverse();
       let last = null;
       for (const d of prevDates.slice(0, 8)) {
@@ -3741,42 +3963,65 @@
       const today = setsForExercise(exercise, (d) => d === dateStr)
         .map(({ set }) => ({ set, a: analyzeSet(set.reps, exercise, set.weightKg, { profile: histProf }) }))
         .filter((x) => x.a.vBest);
-      const pointE1rm = (w, v) => {
-        if (histProf && histProf.valid && histProf.slope < 0) return w + (mvt - v) / histProf.slope;
-        const pct = pctFromVelocityTable(cfg, v - shift);
-        return pct ? w / (pct / 100) : null;
-      };
-      // viitesarjat = 65–82 % sarjat ennen ensimmäistä raskaampaa (työ)sarjaa; työsarjat eivät muuta päivän e1RM:ää
+      // viitesarjat = nousevan lämmittelyn viimeiset 62–79 % sarjat ennen varsinaisia työsarjoja;
+      // toistuvat työsarjapainot tai raskaat (>79 %) työsarjat eivät muuta päivän viitesarjaa
+      const todayWeightCounts = new Map();
+      today.forEach((x) => todayWeightCounts.set(x.set.weightKg, (todayWeightCounts.get(x.set.weightKg) || 0) + 1));
       const refsAll = [];
       for (const x of today) {
         if (x.a.pct1RM === null) continue;
-        if (x.a.pct1RM > 82) { if (!refsAll.length && x.a.pct1RM <= REF_PCT_MAX) refsAll.push(x); break; }
-        if (x.a.pct1RM >= REF_PCT_MIN) refsAll.push(x);
+        if (x.a.pct1RM < 62) continue;
+        if (refsAll.length > 0) {
+          const prevRefW = refsAll[refsAll.length - 1].set.weightKg;
+          const isRepeatedWorkWeight = (todayWeightCounts.get(x.set.weightKg) || 0) >= 2;
+          const isHighFatigue = x.a.vlFinal !== null && x.a.vlFinal > cutoff + 5;
+          if (x.set.weightKg <= prevRefW || isRepeatedWorkWeight || x.a.pct1RM > 79 || isHighFatigue) break;
+        }
+        if (x.a.pct1RM <= REF_PCT_MAX) refsAll.push(x);
+      }
+      if (!refsAll.length) {
+        const firstValid = today.find((x) => x.a.pct1RM !== null && x.a.pct1RM >= 62 && x.a.pct1RM <= REF_PCT_MAX);
+        if (firstValid) refsAll.push(firstValid);
       }
       const refs = refsAll.sort((x, y) => y.set.weightKg - x.set.weightKg);
 
-      const prevE1rm = (histProf && histProf.valid) ? histProf.e1RM : (trend.length ? trend[trend.length - 1].e1RM : null);
+      const prevE1rm = (histProf && histProf.valid) ? histProf.e1RM : (baseline || anchor1RM);
       if (!refs.length) {
         const plan = { stage: 'needRef', exercise, cfg, goal: g, prevE1rm, baseline, last, todayCount: today.length };
         if (prevE1rm) {
           plan.refLoad = plateRound(prevE1rm * 0.75);
           plan.refRange = [plateRound(prevE1rm * 0.70), plateRound(prevE1rm * 0.80)];
         }
-        plan.refVel = [velocityFromPctTable(cfg, 80) + shift, velocityFromPctTable(cfg, 70) + shift];
+        const shift70 = taperedMvtShift(cfg, mvt, 70);
+        const shift80 = taperedMvtShift(cfg, mvt, 80);
+        plan.refVel = [velocityFromPctTable(cfg, 80) + shift80, velocityFromPctTable(cfg, 70) + shift70];
         if (histProf && histProf.valid) plan.refVel = [histProf.intercept + histProf.slope * prevE1rm * 0.80, histProf.intercept + histProf.slope * prevE1rm * 0.70];
         return plan;
       }
 
-      // --- päivän e1RM: raskain viitesarja (+ toiseksi raskain) historiallisella L–V-kulmalla, + päivän profiili ---
-      const ests = refs.slice(0, 1).map((x) => pointE1rm(x.set.weightKg, x.a.vBest)).filter((e) => e && Number.isFinite(e));
-      let e1RM = ests.reduce((s, e) => s + e, 0) / ests.length;
-      let e1Src = histProf && histProf.valid ? 'viitesarja + oma L–V-kulma' : 'viitesarja + väestötaulukko';
+      // --- päivän e1RM: raskain viitesarja (ankkuroitu analyzeSet.e1RM) + päivän L–V-profiili ---
       const ref = refs[0];
+      let e1RM = ref.a.e1RM || anchor1RM || (ref.set.weightKg / 0.75);
+      let e1Src = histProf && histProf.valid ? 'viitesarja + oma L–V-profiili' : (anchor1RM ? 'viitesarja + oma sarjamaksimi' : 'viitesarja + väestötaulukko');
       // päivän L–V-profiili vain lämmittely- ja viitesarjoista (ei väsyneitä työsarjoja)
       const sp = buildLVProfile(today.slice(0, today.indexOf(ref) + 1).map((x) => ({ load: x.set.weightKg, v: x.a.vBest, date: dateStr })), exercise);
-      if (sp.valid && sp.r2 >= 0.9 && sp.points.length >= 3) { e1RM = (e1RM + sp.e1RM) / 2; e1Src += ' + päivän profiili'; }
-      const slope = (histProf && histProf.valid && histProf.slope < 0) ? histProf.slope : null;
-      const predV = (L) => slope !== null ? ref.a.vBest + slope * (L - ref.set.weightKg) : velocityFromPctTable(cfg, L / e1RM * 100) + shift;
+      if (sp.valid && sp.r2 >= 0.85 && sp.points.length >= 2) {
+        e1RM = 0.55 * e1RM + 0.45 * sp.e1RM;
+        e1Src += ' + päivän profiili';
+      }
+      if (anchor1RM) {
+        e1RM = Math.max(anchor1RM * 0.85, Math.min(anchor1RM * 1.12, e1RM));
+      }
+      const slope = (sp.valid && sp.slope < 0) ? sp.slope : ((histProf && histProf.valid && histProf.slope < 0) ? histProf.slope : null);
+      const predV = (L) => {
+        const pctL = L / e1RM * 100;
+        const tableV = velocityFromPctTable(cfg, pctL) + taperedMvtShift(cfg, mvt, pctL);
+        if (slope !== null) {
+          const linV = ref.a.vBest + slope * (L - ref.set.weightKg);
+          return 0.65 * linV + 0.35 * tableV;
+        }
+        return tableV;
+      };
 
       // --- valmius suhteessa aiempiin treeneihin ---
       const readiness = baseline ? (e1RM - baseline) / baseline * 100 : null;
@@ -3785,13 +4030,13 @@
       const notes = [];
       if (readiness !== null && readiness <= -5) {
         targetPct -= 2.5; hiPct = (pLo + pHi) / 2;
-        notes.push(`Päivän e1RM on ${Math.abs(readiness).toFixed(1)} % alle viime treenien tason (${baseline.toFixed(0)} kg) → intensiteetti −2,5 %-yks. ja volyymi Prilepinin alarajalle.`);
+        notes.push(`Päivän e1RM on ${Math.abs(readiness).toFixed(1)} % alle vertailutason (${baseline.toFixed(0)} kg) → intensiteetti −2,5 %-yks. ja volyymi Prilepinin alarajalle.`);
       } else if (readiness !== null && readiness >= 3) {
-        notes.push(`Päivän e1RM on +${readiness.toFixed(1)} % yli viime treenien tason (${baseline.toFixed(0)} kg) → hyvä päivä, kuormat lasketaan päivän tasosta.`);
+        notes.push(`Päivän e1RM on +${readiness.toFixed(1)} % yli vertailutason (${baseline.toFixed(0)} kg) → hyvä päivä, kuormat lasketaan päivän tasosta.`);
       } else if (readiness !== null) {
         notes.push(`Valmius normaali (${readiness >= 0 ? '+' : ''}${readiness.toFixed(1)} % vs. ${baseline.toFixed(0)} kg).`);
       } else {
-        notes.push('Ei aiempaa e1RM-tasoa vertailuun (alle 42 pv historiaa) – suositus perustuu pelkkään viitesarjaan.');
+        notes.push('Ei aiempaa e1RM-tasoa vertailuun – suositus perustuu viitesarjaan.');
       }
 
       // --- kuorma: progressio edellisestä treenistä, rajattuna päivän tavoitealueeseen ---
@@ -3812,18 +4057,34 @@
         const ok = overVl === 0 && meanScore >= 65;
         const inc = liftIncrement(cfg);
         const progLoad = ok ? lastLoad + inc : (tooFatigued ? lastLoad - inc : lastLoad);
-        load = Math.min(hiLoad, Math.max(loLoad, progLoad));
+        // Salli hallittu progressio enintään 85 % e1RM:ään asti, jos edellinen treeni tehtiin jo >= tavoitealueen ylärajalla puhtaasti
+        const maxProgLoad = (lastLoad >= hiLoad - 2.5 && ok) ? Math.max(hiLoad, plateRound(e1RM * Math.min(85, hiPct + 5) / 100)) : hiLoad;
+        load = Math.min(maxProgLoad, Math.max(loLoad, progLoad));
         lastInfo = { date: last.date, load: lastLoad, reps: lastReps, sets: last.work.length, meanScore, ok, tooFatigued, progLoad };
         const why = ok ? `kaikki työsarjat VL-rajan sisällä ja RQI ka. ${meanScore.toFixed(0)} → +${inc} kg`
           : tooFatigued ? `sarjat menivät liian väsyneiksi (RQI ka. ${meanScore.toFixed(0)}) → −${inc} kg`
             : `${overVl} sarjaa ylitti VL-rajan → sama kuorma`;
         let txt = `Edellinen treeni ${fmtDateFi(last.date)}: ${lastInfo.sets} työsarjaa @ ${lastLoad} kg (${lastReps} toistoa): ${why} = ${progLoad} kg.`;
-        if (progLoad > hiLoad) txt += ` Rajattu päivän tavoitealueen ylärajaan ${hiLoad} kg (${Math.round(hiPct)} % päivän e1RM:stä).`;
-        else if (progLoad < loLoad) txt += ` Nostettu päivän tavoitealueen alarajaan ${loLoad} kg (${pLo} %) – päivän taso on noussut.`;
+        if (progLoad > maxProgLoad) txt += ` Rajattu päivän ylärajaan ${maxProgLoad} kg (${Math.round(maxProgLoad / e1RM * 100)} % päivän e1RM:stä).`;
+        else if (progLoad < loLoad) txt += ` Nostettu päivän tavoitealueen alarajaan ${loLoad} kg (${pLo} %).`;
         notes.push(txt);
       } else {
-        notes.push(`Ei aiempaa työsarjadataa → kuorma = ${Math.round(targetPct)} % päivän e1RM:stä.`);
+        notes.push(`Ei aiempaa työsarjadataa → kuorma = ${Math.round(targetPct)} % päivän e1RM:stä (${loLoad}–${hiLoad} kg).`);
       }
+
+      // Jos nostaja on jo aloittanut työsarjat viitesarjan jälkeen eri työsarjapainolla (esim. 135 kg tai 90–95 kg),
+      // suhteuta sarjamäärä ja Prilepin-alue todelliseen työsarjakuormaan
+      const refIdx = today.indexOf(ref);
+      const postRefWork = today.filter((x, i) => i > refIdx && !x.a.isWarmup && x.set.weightKg >= loLoad - 2.5);
+      if (postRefWork.length) {
+        const wCounts = new Map();
+        postRefWork.forEach((x) => wCounts.set(x.set.weightKg, (wCounts.get(x.set.weightKg) || 0) + 1));
+        const activeLoad = [...wCounts.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0][0];
+        if (Math.abs(activeLoad - load) >= 2.5 && activeLoad >= loLoad - 2.5 && activeLoad <= e1RM * 0.90) {
+          load = activeLoad;
+        }
+      }
+
       const pct = load / e1RM * 100;
       const row = prilepinRow(pct);
 
@@ -3837,37 +4098,119 @@
 
       // --- toistot / sarja: Prilepin ∩ VL-raja ∩ RIR-varmuus ---
       const v0 = predV(load);
-      // nopeuskustannus/toisto: malli (v0 − MVT) / maksimitoistot (Epley-käänteis) ja omat sarjat
+      // nopeuskustannus/toisto: huomioidaan lajikohtainen peruskustannus (cfg.repCost) ja omat työsarjat
       const maxReps = Math.max(1, 30 * (100 / pct - 1));
-      const costModel = Math.max(0.015, (v0 - mvt) / maxReps);
+      const costEpley = Math.max(0.025, (v0 - mvt) / maxReps);
+      const costBase = Math.max(costEpley, cfg.repCost * 0.58);
       const costObs = costsObs.length >= 2 ? vbtMedian(costsObs) : null;
-      const cost = costObs !== null ? (costModel + costObs) / 2 : costModel;
-      const costSrc = costObs !== null ? `malli ${costModel.toFixed(3)} + omat sarjat ${costObs.toFixed(3)} (n=${costsObs.length})` : `malli: (V₀ − MVT) / ~${maxReps.toFixed(1)} maksimitoistoa`;
+      const cost = costObs !== null ? Math.max(costBase, 0.50 * costBase + 0.50 * Math.min(cfg.repCost * 0.90, costObs)) : costBase;
+      const costSrc = costObs !== null ? `malli ${costBase.toFixed(3)} + omat sarjat ${costObs.toFixed(3)} (n=${costsObs.length})` : `malli ${costBase.toFixed(3)} m/s/toisto`;
       const vCut = v0 * (1 - cutoff / 100);
       const repsVL = Math.max(1, Math.floor((v0 - vCut) / cost + 1e-9) + 1);
       const rirMin = g.key === 'peaking' ? 1 : 2;
       const repsRIR = Math.max(1, Math.floor((v0 - mvt) / cost + 1e-9) + 1 - rirMin);
       let reps = Math.min(row.repsMax, repsVL, repsRIR);
       reps = Math.max(1, reps);
-      if (reps < row.repsMin) notes.push(`VBT rajoittaa: ennuste ${repsVL} toistoa ennen VL ${cutoff} % -rajaa → ${reps} toistoa/sarja ja enemmän sarjoja (Prilepin ${row.repsMin}–${row.repsMax}).`);
-      let sets = Math.max(2, Math.min(10, Math.round(volume / reps)));
+      if (reps < row.repsMin) notes.push(`VBT rajoittaa: ennuste ${repsVL} toistoa ennen VL ${cutoff} % -rajaa → ${reps} toistoa/sarja (Prilepin ${row.repsMin}–${row.repsMax}).`);
+      let sets = Math.max(2, Math.min(8, Math.round(volume / reps)));
+      // Rajoita raskaiden kolmosten (tai lyhyempien sarjojen, ≥70 % 1RM) oletussarjamäärä realistiseksi (enintään 4 sarjaa, esim. 4×3 6×3:n sijaan)
+      if (reps <= 3 && pct >= 70 && sets > 4) {
+        sets = 4;
+        volume = sets * reps;
+        notes.push(`Raskaiden ${reps} toiston sarjojen (${Math.round(pct)} % 1RM) maksimisarjamäärä rajattu ${sets} × ${reps} = ${volume} toistoon hermostollisen kuormituksen hallitsemiseksi.`);
+      } else if (pct >= 80 && sets > 4) {
+        sets = 4;
+        volume = sets * reps;
+      }
 
-      // --- tehty tänään ja sarjojen välinen väsymys ---
-      const refIdx = today.indexOf(ref);
-      const work = today.filter((x, i) => i > refIdx && x.set.weightKg >= load - 2.5);
+      // --- tehty tänään ja sarjojen välinen väsymys / autoregulaatio (painon tai toistojen pudotus) ---
+      const work = today.filter((x, i) => i > refIdx && !x.a.isWarmup);
       const doneReps = work.reduce((s, x) => s + x.a.valid.length, 0);
       const doneSets = work.length;
+      // Jos nostaja tekee sarjoissa säännöllisesti eri toistomäärää kuin alkuperäinen suositus (esim. 5 toiston sarjoja 4×5×140),
+      // huomioidaan nostajan käyttämä tavoitetoistomäärä ja -volyymi
+      if (work.length > 0) {
+        const firstWorkReps = work[0].a.valid.length;
+        if (firstWorkReps > reps && firstWorkReps <= 8) {
+          reps = firstWorkReps;
+          volume = sets * reps;
+        }
+      }
       let adjust = null;
       if (work.length) {
         const lastW = work[work.length - 1];
         const vExp = predV(lastW.set.weightKg);
-        if (lastW.a.vBest < vExp - 0.06) {
-          adjust = { type: 'down', load: plateRound(lastW.set.weightKg * 0.95), text: `Viimeisen työsarjan V<sub>best</sub> ${fmtV(lastW.a.vBest)} on > 0,06 m/s alle odotetun (${fmtV(vExp)}) → sarjojen välinen väsymys. Pudota ${plateRound(lastW.set.weightKg * 0.95)} kg:aan tai lopeta, jos Prilepinin alaraja (${row.rangeLo}) on täynnä.` };
-        } else if (lastW.a.vBest > vExp + 0.06 && lastW.set.weightKg + liftIncrement(cfg) <= plateRound(e1RM * pHi / 100)) {
-          adjust = { type: 'up', load: lastW.set.weightKg + liftIncrement(cfg), text: `Viimeinen työsarja kulki ${fmtV(lastW.a.vBest)} m/s (odotus ${fmtV(vExp)}) → voit nostaa ${lastW.set.weightKg + liftIncrement(cfg)} kg:aan.` };
-        }
-        if (lastW.a.vlFinal !== null && lastW.a.vlFinal > cutoff && lastW.a.valid.length < reps) {
-          notes.push(`Viimeisessä työsarjassa VL-raja tuli vastaan jo ${lastW.a.stopAfterRep !== null ? lastW.a.stopAfterRep : lastW.a.valid.length} toiston kohdalla → pidä ${Math.max(1, reps - 1)} toistoa/sarja.`);
+        const stickFail = cfg.stickFail || 0.18;
+        const inc = liftIncrement(cfg);
+        // Tarkista sarjojen välinen VL-kasvu ja kuolokohdan (V_min) hidastuminen
+        const highVlSets = work.filter((x) => x.a.vlFinal !== null && x.a.vlFinal >= cutoff - 1.5);
+        const stickSlowSets = work.filter((x) => {
+          const vmin = x.a.stickSummary ? x.a.stickSummary.vminMin : null;
+          return (vmin !== null && vmin <= stickFail + 0.05) || (x.a.rirEnd !== null && x.a.rirEnd <= 1);
+        });
+        const lastVmin = lastW.a.stickSummary ? lastW.a.stickSummary.vminMin : null;
+        const lastOverRed = lastW.a.vlFinal !== null && lastW.a.vlFinal >= lastW.a.redVl;
+        const lastOverCut = lastW.a.vlFinal !== null && lastW.a.vlFinal > cutoff;
+        const lastNearFail = lastW.a.rirEnd === 0 || (lastOverCut && lastVmin !== null && lastVmin <= stickFail + 0.05);
+        const missedReps = lastW.a.valid.length < reps;
+        const vDropBetween = (work.length >= 2 && (work[0].a.vBest - lastW.a.vBest) >= 0.055) || (lastW.a.vBest < vExp - 0.06);
+        const remSetsRaw = Math.max(0, sets - doneSets);
+        const remRepsRaw = Math.max(0, volume - doneReps);
+
+        if (remSetsRaw === 0 || remRepsRaw === 0) {
+          // Päivän suunniteltu sarja-/toistotavoite on jo täynnä
+          if (lastOverRed || lastNearFail) {
+            const whyStop = [];
+            if (lastW.a.vlFinal !== null) whyStop.push(`VL ${lastW.a.vlFinal.toFixed(1)} %`);
+            if (lastVmin !== null) whyStop.push(`kuolokohta V<sub>min</sub> ${fmtV(lastVmin)} m/s`);
+            if (lastW.a.rirEnd !== null) whyStop.push(`RIR ~${lastW.a.rirEnd}`);
+            adjust = {
+              type: 'down',
+              load: plateRound(lastW.set.weightKg - inc * 2),
+              reps,
+              text: `Päivän tavoite (${doneSets} sarjaa / ${doneReps} toistoa) ja sarjakapasiteetti täynnä (${whyStop.join(' · ')}). Lopeta liike tähän.`
+            };
+          }
+        } else if (lastOverRed || lastNearFail || missedReps || lastOverCut || vDropBetween || (doneSets >= 2 && (highVlSets.length >= 1 || stickSlowSets.length >= 1))) {
+          // Tavoitteesta on vielä sarjoja/toistoja jäljellä (esim. 3/4 sarjaa tehty 4×5×140:stä), mutta nykyinen kuorma×toistot on liian kova:
+          // Laske 1) kevennetty sarjapaino (back-off) täysille toistoille JA 2) lyhennetty toistomäärä samalla painolla
+          const severeFatigue = lastOverRed || lastNearFail || missedReps;
+          const dropKg = severeFatigue
+            ? Math.max(inc * 2, plateRound(lastW.set.weightKg * 0.065))
+            : Math.max(inc, plateRound(lastW.set.weightKg * 0.04));
+          const backoffLoad = Math.max(plateRound(e1RM * 0.65), lastW.set.weightKg - dropKg);
+          const safeStopRep = (lastW.a.stopAfterRep !== null && lastW.a.stopAfterRep < lastW.a.valid.length)
+            ? lastW.a.stopAfterRep
+            : (lastW.a.valid.length - (severeFatigue ? 2 : 1));
+          const reducedReps = Math.max(1, Math.min(reps - 1, safeStopRep));
+          const setsAtReduced = Math.min(remSetsRaw + 1, Math.max(1, Math.ceil(remRepsRaw / reducedReps)));
+
+          const whyReg = [];
+          if (missedReps) whyReg.push(`edellinen sarja jäi ${lastW.a.valid.length}/${reps} toistoon`);
+          if (lastW.a.vlFinal !== null && lastW.a.vlFinal >= cutoff - 1.5) whyReg.push(`VL ${lastW.a.vlFinal.toFixed(1)} %`);
+          if (lastVmin !== null && lastVmin <= stickFail + 0.06) whyReg.push(`kuolokohta V<sub>min</sub> ${fmtV(lastVmin)} m/s`);
+          if (lastW.a.rirEnd !== null && lastW.a.rirEnd <= 1) whyReg.push(`RIR ~${lastW.a.rirEnd}`);
+          if (!whyReg.length && vDropBetween) whyReg.push(`V<sub>best</sub> ${fmtV(lastW.a.vBest)} m/s hidastunut`);
+
+          adjust = {
+            type: 'down',
+            load: backoffLoad,
+            reps,
+            backoffOption: { load: backoffLoad, reps, sets: remSetsRaw },
+            repDropOption: { load: lastW.set.weightKg, reps: reducedReps, sets: setsAtReduced },
+            text: `Väsymysraja ${doneSets}. sarjassa (${whyReg.join(' · ')}) – jäljellä ${remSetsRaw} × ${reps} (${remRepsRaw} toistoa) päivän tavoitteesta:<br>` +
+              `• <strong>Vaihtoehto A (kevennä painoa):</strong> pudota <strong>${backoffLoad} kg × ${reps}</strong> (${remSetsRaw} ${remSetsRaw === 1 ? 'sarja' : 'sarjaa'})<br>` +
+              `• <strong>Vaihtoehto B (vähennä toistoja):</strong> pidä <strong>${lastW.set.weightKg} kg × ${reducedReps}</strong> (${setsAtReduced} ${setsAtReduced === 1 ? 'sarja' : 'sarjaa'})` +
+              (doneReps >= row.rangeLo && severeFatigue ? `<br>• <em>Prilepinin minimivolyymi (${row.rangeLo} toistoa) on jo täynnä, joten voit myös lopettaa liikkeen tähän.</em>` : '')
+          };
+          notes.push(`Autoregulaatio (${doneSets}/${sets} sarjaa tehty): täytä loppupäivän tavoite (${remRepsRaw} toistoa) joko keventämällä kuormaa ${backoffLoad} kg × ${reps} tai lyhentämällä sarjaa ${lastW.set.weightKg} kg × ${reducedReps}.`);
+        } else if (lastW.a.vBest > vExp + 0.06 && lastW.set.weightKg + inc <= plateRound(e1RM * pHi / 100)) {
+          adjust = {
+            type: 'up',
+            load: lastW.set.weightKg + inc,
+            reps,
+            text: `Viimeinen työsarja kulki ${fmtV(lastW.a.vBest)} m/s (odotus ${fmtV(vExp)}) → voit nostaa ${lastW.set.weightKg + inc} kg:aan.`
+          };
         }
       }
       const remainingSets = Math.max(0, sets - doneSets);
@@ -3886,31 +4229,39 @@
       if (plan.stage === 'needRef') {
         const vr = plan.refVel ? `${fmtV(Math.min(...plan.refVel))}–${fmtV(Math.max(...plan.refVel))} m/s` : '';
         return `${head}
-          <div class="vbt-verdict" style="margin-top:0;">Tee ensin <strong>viitesarja</strong> nousevan lämmittelyn päätteeksi: ${plan.refLoad ? `<strong>${plan.refLoad} kg × 2</strong> (≈75 %, alue ${plan.refRange[0]}–${plan.refRange[1]} kg)` : '~70–80 % 1RM × 2'} maksimaalisella tahdolla. Tavoitenopeus noin ${vr}.
+          <div class="vbt-verdict" style="margin-top:0;">Tee ensin <strong>viitesarja</strong> nousevan lämmittelyn päätteeksi: ${plan.refLoad ? `<strong>${plan.refLoad} kg × 2–3</strong> (≈75 %, alue ${plan.refRange[0]}–${plan.refRange[1]} kg)` : '~70–80 % 1RM × 2–3'} maksimaalisella tahdolla. Tavoitenopeus noin ${vr}.
           Sarjan jälkeen sovellus laskee päivän e1RM:n ja suosittelee työsarjat.</div>
-          ${plan.prevE1rm ? `<div style="font-size:11px; color:var(--muted);">Edellinen e1RM ${plan.prevE1rm.toFixed(0)} kg${plan.last ? ` · viimeisin treeni ${fmtDateFi(plan.last.date)}` : ''}${plan.todayCount ? ` · tänään ${plan.todayCount} sarjaa, ei vielä 65–88 % sarjaa` : ''}</div>` : `<div style="font-size:11px; color:var(--muted);">Ei aiempaa dataa: lämmittele nousevasti – ensimmäinen sarja, jonka nopeus osuu yllä olevaan väliin, toimii viitesarjana.</div>`}
-          ${opts.withButtons && plan.refLoad ? `<button type="button" class="primary" data-plan-apply="${plan.refLoad}|2" style="margin-top:8px; width:100%;">Käytä: ${plan.refLoad} kg × 2</button>` : ''}`;
+          ${plan.prevE1rm ? `<div style="font-size:11px; color:var(--muted);">Arvioitu 1RM ${plan.prevE1rm.toFixed(0)} kg${plan.last ? ` · viimeisin treeni ${fmtDateFi(plan.last.date)}` : ''}${plan.todayCount ? ` · tänään ${plan.todayCount} sarjaa, ei vielä 65–88 % sarjaa` : ''}</div>` : `<div style="font-size:11px; color:var(--muted);">Ei aiempaa dataa: lämmittele nousevasti – ensimmäinen sarja, jonka nopeus osuu yllä olevaan väliin, toimii viitesarjana.</div>`}
+          ${opts.withButtons && plan.refLoad ? `<button type="button" class="primary" data-plan-apply="${plan.refLoad}|3" style="margin-top:8px; width:100%;">Käytä: ${plan.refLoad} kg × 3</button>` : ''}`;
       }
       const rd = plan.readiness;
       const rdCls = rd === null ? '' : rd <= -5 ? 'red' : rd < -2 ? 'amber' : rd >= 3 ? 'green' : '';
       const doneFrac = Math.min(1, plan.doneReps / Math.max(1, plan.volume));
       const nextLoad = plan.adjust ? plan.adjust.load : plan.load;
+      const loadRangeTxt = (plan.loLoad && plan.hiLoad && plan.loLoad !== plan.hiLoad) ? ` (alue ${plan.loLoad}–${plan.hiLoad} kg)` : '';
       return `${head}
         <div class="vbt-kpi-grid">
           <div class="vbt-kpi"><span class="vbt-kpi-l">Päivän e1RM</span><span class="vbt-kpi-v">${plan.e1RM.toFixed(0)}</span><span class="vbt-kpi-s ${rdCls}">${rd === null ? 'ei vertailua' : (rd >= 0 ? '+' : '') + rd.toFixed(1) + ' % vs. ' + plan.baseline.toFixed(0)}</span></div>
-          <div class="vbt-kpi" style="grid-column: span 2;"><span class="vbt-kpi-l">Työsarjat</span><span class="vbt-kpi-v" style="color:#60a5fa;">${plan.sets} × ${plan.reps} @ ${plan.load} kg</span><span class="vbt-kpi-s">${Math.round(plan.pct)} % päivän e1RM · ${plan.sets * plan.reps} toistoa</span></div>
+          <div class="vbt-kpi" style="grid-column: span 2;"><span class="vbt-kpi-l">Työsarjat</span><span class="vbt-kpi-v" style="color:#60a5fa;">${plan.sets} × ${plan.reps} @ ${plan.load} kg</span><span class="vbt-kpi-s">${Math.round(plan.pct)} % päivän e1RM${loadRangeTxt} · ${plan.sets * plan.reps} toistoa</span></div>
           <div class="vbt-kpi"><span class="vbt-kpi-l">Nopeusohje</span><span class="vbt-kpi-v" style="font-size:16px;">${fmtV(plan.v0)}</span><span class="vbt-kpi-s">±0.03 · stop ${fmtV(plan.vCut)} (VL ${plan.cutoff} %)</span></div>
         </div>
         <div style="font-size:11px; color:var(--muted); margin:4px 0;">Prilepin ${plan.row.label}: ${plan.row.repsMin}–${plan.row.repsMax} toistoa/sarja, optimi ${plan.row.opt} (${plan.row.rangeLo}–${plan.row.rangeHi}) → tavoite <strong style="color:var(--text);">${plan.volume}</strong> toistoa</div>
         <div class="progress-bar" style="margin:4px 0;"><div class="progress-fill ${doneFrac >= 1 ? 'done' : ''}" style="width:${Math.round(doneFrac * 100)}%"></div></div>
-        <div style="font-size:12px; margin-bottom:4px;">Tehty: <strong>${plan.doneSets}</strong> sarjaa / <strong>${plan.doneReps}</strong> toistoa ≥ ${plan.load - 2.5} kg${plan.remainingReps > 0 ? ` · jäljellä ~${plan.remainingSets} × ${plan.reps}` : ' · <span class="green">volyymi täynnä ✓</span>'}</div>
+        <div style="font-size:12px; margin-bottom:4px;">Tehty: <strong>${plan.doneSets}</strong> sarjaa / <strong>${plan.doneReps}</strong> toistoa${plan.remainingSets > 0 && plan.remainingReps > 0 ? ` · jäljellä ~${plan.remainingSets} × ${plan.reps}` : ' · <span class="green">volyymi täynnä ✓</span>'}</div>
         ${plan.adjust ? `<div class="vbt-alert ${plan.adjust.type === 'down' ? 'amber' : ''}" style="${plan.adjust.type === 'up' ? 'background:rgba(34,197,94,0.14); border:1px solid rgba(34,197,94,0.5); color:#86efac;' : ''}">${plan.adjust.text}</div>` : ''}
         <ul style="font-size:12px; line-height:1.45; margin:6px 0 0; padding-left:18px;">
           <li>Päivän e1RM: viitesarja ${plan.ref.set.weightKg} kg @ ${fmtV(plan.ref.a.vBest)} m/s (${plan.e1Src}).</li>
           ${plan.notes.map((n) => `<li>${n}</li>`).join('')}
           <li>Toistot/sarja: min(Prilepin ${plan.row.repsMax}, VL-raja ${plan.repsVL}, RIR ≥ ${plan.goal.key === 'peaking' ? 1 : 2} → ${plan.repsRIR}) = ${plan.reps}. Nopeuskustannus ${plan.cost.toFixed(3)} m/s/toisto (${plan.costSrc}).</li>
         </ul>
-        ${opts.withButtons ? `<button type="button" class="primary" data-plan-apply="${nextLoad}|${plan.reps}" style="margin-top:8px; width:100%;">Käytä: ${nextLoad} kg × ${plan.reps}</button>` : ''}`;
+        ${opts.withButtons && plan.remainingSets > 0 ? (
+          plan.adjust && plan.adjust.backoffOption && plan.adjust.repDropOption
+            ? `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+                <button type="button" class="primary" data-plan-apply="${plan.adjust.backoffOption.load}|${plan.adjust.backoffOption.reps}" style="flex:1; font-size:12px;">Käytä A (kevennä): ${plan.adjust.backoffOption.load} kg × ${plan.adjust.backoffOption.reps}</button>
+                <button type="button" data-plan-apply="${plan.adjust.repDropOption.load}|${plan.adjust.repDropOption.reps}" style="flex:1; font-size:12px;">Käytä B (lyhennä): ${plan.adjust.repDropOption.load} kg × ${plan.adjust.repDropOption.reps}</button>
+              </div>`
+            : `<button type="button" class="primary" data-plan-apply="${nextLoad}|${plan.reps}" style="margin-top:8px; width:100%;">Käytä: ${nextLoad} kg × ${plan.reps}</button>`
+        ) : ''}`;
     }
 
     function renderDailyPlanCard() {
