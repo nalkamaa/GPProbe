@@ -173,13 +173,28 @@
     .stepper {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
       flex-shrink: 0;
     }
     .stepper button {
-      padding: 7px 8px;
-      min-width: 34px;
-      font-size: 13px;
+      padding: 8px 10px;
+      min-width: 48px;
+      min-height: 48px;
+      font-size: 14px;
+    }
+    .stepper-full {
+      width: 100%;
+      justify-content: space-between;
+    }
+    .stepper-full button {
+      flex: 1;
+      min-width: 48px;
+      min-height: 48px;
+    }
+    .stepper-full input[type="number"] {
+      flex: 1.2;
+      min-width: 64px;
+      min-height: 48px;
     }
     .set-badge {
       display: inline-flex;
@@ -198,70 +213,345 @@
       border-color: var(--green);
       color: #86efac;
     }
-    .readiness-banner {
-      width: 100%;
-      padding: 10px 12px;
-      border-radius: 10px;
-      font-size: 15px;
-      font-weight: 800;
-      text-align: center;
-      margin-bottom: 10px;
-      border: 2px solid var(--border);
-      background: var(--bg);
-      color: var(--muted);
-      transition: all 0.2s ease;
-    }
-    .readiness-banner.calibrating {
-      background: rgba(245, 158, 11, 0.18);
-      border-color: var(--amber);
-      color: #fde68a;
-    }
-    .readiness-banner.ready-to-start {
-      background: rgba(59, 130, 246, 0.2);
-      border-color: var(--accent);
-      color: #bfdbfe;
-    }
-    .readiness-banner.active-set {
-      background: rgba(34, 197, 94, 0.25);
-      border-color: var(--green);
-      color: #bbf7d0;
-      box-shadow: 0 0 14px rgba(34, 197, 94, 0.35);
-    }
     .card.hero.active-glow {
       border-color: var(--green);
       box-shadow: 0 0 16px rgba(34, 197, 94, 0.22);
     }
     .hero {
       text-align: center;
-      padding: 14px 12px;
+      padding: 16px 12px;
     }
     .hero-vel {
-      font-size: 56px;
+      font-size: 64px;
       font-weight: 800;
-      line-height: 1.05;
-      letter-spacing: -0.02em;
+      line-height: 1.02;
+      letter-spacing: -0.03em;
       font-variant-numeric: tabular-nums;
+      transition: color 0.15s ease;
     }
-    .hero-watts {
-      font-size: 28px;
+    .hero-unit {
+      font-size: 15px;
       font-weight: 700;
-      color: #60a5fa;
-      margin-top: 4px;
-      font-variant-numeric: tabular-nums;
-    }
-    .sub-metrics {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 6px;
-      margin-top: 14px;
-      padding-top: 12px;
-      border-top: 1px solid var(--border);
-    }
-    .sub-metric-val {
-      font-size: 16px;
-      font-weight: 700;
+      color: var(--muted);
       margin-top: 2px;
+      letter-spacing: 0.04em;
+    }
+    .hero-subline {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 8px;
       font-variant-numeric: tabular-nums;
+    }
+    .live-kpi-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .live-kpi-box {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    .live-kpi-label {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .live-kpi-val {
+      font-size: 28px;
+      font-weight: 800;
+      line-height: 1.15;
+      font-variant-numeric: tabular-nums;
+    }
+    .live-kpi-sub {
+      font-size: 11px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .mini-bars-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .mini-bars-wrap {
+      position: relative;
+      flex: 1;
+      display: flex;
+      align-items: flex-end;
+      gap: 5px;
+      height: 76px;
+      padding: 14px 8px 6px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow-x: auto;
+      min-width: 0;
+    }
+    .mini-bar-col {
+      flex: 1;
+      min-width: 14px;
+      max-width: 34px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 2px;
+      z-index: 2;
+    }
+    .mini-bar-val {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+    .mini-bar-fill {
+      width: 100%;
+      border-radius: 4px 4px 2px 2px;
+      background: var(--accent);
+      min-height: 6px;
+      transition: height 0.18s ease;
+    }
+    .mini-bar-fill.good { background: var(--green); }
+    .mini-bar-fill.warn { background: var(--amber); }
+    .mini-bar-fill.bad { background: var(--red); }
+    .mini-bar-fill.suspect { background: #64748b; }
+    .mini-bar-fill.ghost {
+      background: rgba(148, 163, 184, 0.12);
+      border: 1px dashed rgba(148, 163, 184, 0.28);
+    }
+    .mini-cutoff-line {
+      position: absolute;
+      left: 6px;
+      right: 6px;
+      border-top: 1.5px dashed rgba(245, 158, 11, 0.75);
+      pointer-events: none;
+      z-index: 1;
+    }
+    .mini-rep-count {
+      font-size: 22px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      flex-shrink: 0;
+      min-width: 56px;
+      text-align: center;
+    }
+    .main-action-btn {
+      width: 100%;
+      min-height: 62px;
+      padding: 14px 16px;
+      font-size: 18px;
+      font-weight: 800;
+      border-radius: 14px;
+      letter-spacing: 0.01em;
+    }
+    /* Lift tab state machine visibility */
+    #tabLift .only-active,
+    #tabLift .only-rest,
+    #tabLift .only-done { display: none; }
+    #tabLift[data-state="active"] .only-active { display: flex; }
+    #tabLift[data-state="active"] .hide-active { display: none !important; }
+    #tabLift[data-state="rest"] .only-rest { display: flex; }
+    #tabLift[data-state="done"] .only-done { display: flex; }
+    #tabLift[data-state="done"] .hide-done { display: none !important; }
+    /* Context row & settings trigger */
+    .context-pill-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 9px 11px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      text-align: left;
+    }
+    .context-pill-btn.date-warn {
+      border-color: var(--amber);
+      background: rgba(245, 158, 11, 0.14);
+      color: #fde68a;
+    }
+    .cycle-pill {
+      display: inline-flex;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      color: #93c5fd;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .plan-summary-line {
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.4;
+      color: var(--text);
+    }
+    .details-toggle {
+      margin-top: 8px;
+      font-size: 12px;
+    }
+    .details-toggle > summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-weight: 700;
+      padding: 6px 2px;
+      user-select: none;
+      list-style: none;
+    }
+    .details-toggle > summary::-webkit-details-marker { display: none; }
+    .details-toggle[open] > summary { color: #93c5fd; }
+    /* Bottom sheet */
+    .sheet-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 60;
+      padding: 12px 0 0;
+    }
+    .sheet-panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: 18px 18px 0 0;
+      width: 100%;
+      max-width: 540px;
+      max-height: 86vh;
+      overflow-y: auto;
+      padding: 14px 14px max(20px, env(safe-area-inset-bottom, 20px));
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .sheet-item-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      font-size: 15px;
+      min-height: 48px;
+      background: var(--bg);
+    }
+    /* Undo toast */
+    .undo-toast {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+      width: calc(100% - 24px);
+      max-width: 516px;
+      background: #0b1220;
+      border: 1px solid var(--accent);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+      border-radius: 12px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      z-index: 70;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .undo-toast button {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      padding: 7px 14px;
+      font-size: 13px;
+      min-height: 36px;
+      flex-shrink: 0;
+    }
+    /* Analysis sub-tabs */
+    .sub-tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 3px;
+      width: 100%;
+    }
+    .sub-tabs button {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      padding: 8px 4px;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 8px;
+      white-space: nowrap;
+      min-width: 0;
+    }
+    .sub-tabs button[data-ana-sub="asetukset"] {
+      flex: 0 0 42px;
+      font-size: 14px;
+    }
+    .sub-tabs button.active {
+      background: var(--card-alt);
+      color: var(--text);
+    }
+    .ana-set-row {
+      cursor: pointer;
+    }
+    .ana-set-row:hover td {
+      background: rgba(59, 130, 246, 0.14);
+    }
+    .today-set-compact {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 9px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-top: 6px;
+    }
+    .today-set-compact-main {
+      min-width: 0;
+      flex: 1;
+      cursor: pointer;
+    }
+    .today-set-compact-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .today-set-compact-actions button {
+      min-height: 36px;
+      padding: 6px 10px;
+      font-size: 12px;
     }
     .green { color: var(--green); }
     .amber { color: var(--amber); }
@@ -695,45 +985,73 @@
       <span id="batteryText" style="color: var(--muted); font-weight: 500; flex-shrink: 0;"></span>
     </div>
     <div class="top-actions">
-      <button type="button" id="reloadAppBtn" title="Päivitä sovellus" style="padding: 8px 9px;">🔄</button>
       <button type="button" id="soundBtn" title="Äänimerkit">🔊</button>
       <button type="button" id="connectBtn" class="primary">Yhdistä Pin</button>
+      <button type="button" id="moreMenuBtn" title="Lisää toimintoja" aria-label="Lisää toimintoja" style="padding: 8px 11px;">⋯</button>
     </div>
   </header>
 
   <!-- TAB 1: LIVE TRAINING -->
-  <main id="tabLift">
-    <div class="card setup-grid">
-      <div class="mode-switch" role="tablist" aria-label="Treenitila">
-        <button type="button" id="modeGuidedBtn" class="active">🎯 Ohjattu (VBT)</button>
-        <button type="button" id="modeFreeBtn">📝 Vapaa treeni</button>
-      </div>
-      <div class="row">
-        <label class="small" for="workoutDate">Päivä</label>
-        <input type="date" id="workoutDate" />
-      </div>
-
+  <main id="tabLift" data-state="idle">
+    <!-- Liike ja tiivistetty asetusrivi -->
+    <div id="liftContextCard" class="card setup-grid hide-active hide-done">
       <div class="row">
         <select id="exerciseSelect" aria-label="Liike"></select>
-        <button type="button" id="editExercisesBtn" class="primary" style="flex-shrink: 0;">+ Liikkeet</button>
+        <span id="setupCycleInfo" class="cycle-pill hidden"></span>
       </div>
 
-      <!-- Inline quick-add exercise bar (also accessible via + Liikkeet modal) -->
+      <!-- Inline quick-add exercise bar -->
       <form id="inlineExerciseForm" class="row hidden" style="background: var(--bg); padding: 8px; border-radius: 10px; border: 1px solid var(--accent);">
         <input type="text" id="inlineExerciseInput" placeholder="Uuden liikkeen nimi..." enterkeyhint="done" autocomplete="off" style="flex: 1; min-width: 0;" />
         <button type="submit" class="success" style="flex-shrink: 0;">Tallenna</button>
         <button type="button" id="cancelInlineExBtn" style="flex-shrink: 0; padding: 7px 9px;">✕</button>
       </form>
 
+      <button type="button" id="openLiftSettingsBtn" class="context-pill-btn">
+        <span id="liftSettingsSummary">⚙ Ohjattu · Maksimivoima · Tänään</span>
+        <span style="color: var(--muted);">▸</span>
+      </button>
+    </div>
+
+    <!-- C. LEVOSSA SARJAN JÄLKEEN -->
+    <div id="restSummaryCard" class="card only-rest" style="flex-direction: column; gap: 8px;">
+      <div class="row">
+        <strong id="restSetTitle" style="font-size: 14px; color: var(--green);">✓ Sarja tallennettu</strong>
+        <span id="restTimerBadge" class="set-badge saved" style="font-variant-numeric: tabular-nums;">⏱ 0:00</span>
+      </div>
+      <div id="restResultLine" style="font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;"></div>
+      <div id="restCompareLine" class="hidden" style="font-size: 12px; color: #93c5fd; font-variant-numeric: tabular-nums;"></div>
+      <div id="restFindingLine" class="hidden" style="font-size: 13px; line-height: 1.4;"></div>
+      <div id="restUnsavedActions" class="hidden">
+        <button type="button" id="saveUnsavedSetBtn" class="primary" style="width: 100%; min-height: 44px;">💾 Tallenna kesken jäänyt sarja</button>
+      </div>
+      <div class="row" style="align-items: flex-start; gap: 8px;">
+        <details id="restRepsDetails" class="details-toggle" style="flex: 1; margin-top: 0;">
+          <summary id="restRepsSummary">▸ Toistot (0)</summary>
+          <div id="repList" class="rep-list" style="margin-top: 6px;"></div>
+        </details>
+        <button type="button" id="restAnalyzeBtn" style="flex-shrink: 0; padding: 6px 12px; font-size: 13px; color: #93c5fd; border-color: rgba(59, 130, 246, 0.45);">Analysoi ›</button>
+      </div>
+    </div>
+
+    <!-- D. TREENIN LOPUSSA -->
+    <div id="doneSummaryCard" class="card only-done" style="flex-direction: column; gap: 10px;"></div>
+
+    <!-- Päivän suositus (Prilepin + VBT) -->
+    <div id="dailyPlanCard" class="card hidden hide-active hide-done"></div>
+
+    <!-- Paino- ja toistostepperit -->
+    <div id="steppersCard" class="card setup-grid hide-active hide-done">
       <div class="row">
         <label class="small" for="weightInput">Paino (kg)</label>
-        <div class="stepper">
-          <button type="button" data-weight-delta="-5">-5</button>
-          <button type="button" data-weight-delta="-2.5">-2.5</button>
-          <input type="number" id="weightInput" value="100" min="0" step="0.5" inputmode="decimal" />
-          <button type="button" data-weight-delta="2.5">+2.5</button>
-          <button type="button" data-weight-delta="5">+5</button>
-        </div>
+        <span id="weightContextHint" style="font-size: 12px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums;"></span>
+      </div>
+      <div class="stepper stepper-full">
+        <button type="button" data-weight-delta="-5">−5</button>
+        <button type="button" data-weight-delta="-2.5">−2.5</button>
+        <input type="number" id="weightInput" value="100" min="0" step="0.5" inputmode="decimal" />
+        <button type="button" data-weight-delta="2.5">+2.5</button>
+        <button type="button" data-weight-delta="5">+5</button>
       </div>
 
       <div class="row guided-only" id="targetRepsRow">
@@ -744,76 +1062,56 @@
           <button type="button" id="repPlusBtn">+</button>
         </div>
       </div>
-
-      <div class="row guided-only">
-        <label class="small" for="goalSelect">Tavoite</label>
-        <select id="goalSelect" aria-label="Harjoitustavoite">
-          <option value="peaking">Piikkaus (85–95 %)</option>
-          <option value="maxStrength">Kehittävä maksimivoima (80–90 %)</option>
-          <option value="baseStrength">Perusvoima / hypertrofia (70–80 %)</option>
-        </select>
-      </div>
-      <div class="guided-only" style="background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px;">
-        <div id="setupCycleInfo" style="margin-bottom: 3px; font-size: 12px; font-weight: 700; color: #93c5fd;"></div>
-        <div id="setupCutoffInfo" style="margin-bottom: 3px; color: #fcd34d; font-size: 12px; font-weight: 700;">VL-raja</div>
-        <div id="setupVbtForecast" class="setup-vbt"></div>
-      </div>
-
     </div>
 
-    <!-- Päivän suositus (Prilepin + VBT) -->
-    <div id="dailyPlanCard" class="card hidden"></div>
+    <!-- B. SARJAN AIKANA (HERO-NÄKYMÄ) -->
+    <div class="card hero progress-wrap only-active" id="liveSetCard" style="flex-direction: column;">
+      <div id="vbtLiveAlert" class="vbt-alert hidden" style="margin-top: 0; margin-bottom: 6px; width: 100%;"></div>
 
-    <!-- Tilanseuranta ja ohjausnapit -->
-    <div id="readinessBanner" class="readiness-banner">
-      ⚪ Yhdistä Pin yläkulmasta aloittaaksesi
-    </div>
+      <div id="heroVelVal" class="hero-vel">--</div>
+      <div class="hero-unit">m/s</div>
+      <div id="heroSubLine" class="hero-subline"></div>
 
-    <div class="action-bar">
-      <button type="button" id="startSetBtn" class="primary" disabled>▶ Aloita sarja</button>
-      <button type="button" id="stopSetBtn" class="danger" disabled>⏹ Lopeta sarja</button>
-    </div>
-
-    <!-- Sarjan palkkinäkymä tuotu suoraan Arvioitu 1RM alapuolelle -->
-    <div class="card progress-wrap" id="liveSetCard">
-      <div class="row">
-        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-          <span id="setNumberBadge" class="set-badge">Sarja #1</span>
-          <span id="repProgressLabel" style="font-weight: 700;">Toistot: 0 / 5</span>
+      <div class="live-kpi-pair guided-only" id="liveKpiPair">
+        <div class="live-kpi-box">
+          <span class="live-kpi-label">VL %</span>
+          <span id="liveKpiVl" class="live-kpi-val">--</span>
+          <span id="liveKpiVlSub" class="live-kpi-sub">raja -- %</span>
         </div>
-        <button type="button" id="clearRepsBtn" style="padding: 4px 8px; font-size: 12px;">Tyhjennä</button>
+        <div class="live-kpi-box">
+          <span class="live-kpi-label">RIR</span>
+          <span id="liveKpiRir" class="live-kpi-val">--</span>
+          <span id="liveKpiRirSub" class="live-kpi-sub">MVT --</span>
+        </div>
       </div>
 
-      <div id="liveMetricsRow" class="row hidden" style="font-size: 12px; color: var(--muted); padding: 2px 0;">
-        <span>Viimeisin: <strong id="liveLastVel" style="color: var(--text); font-size: 14px;">-- m/s</strong> (<span id="liveLastWatts">-- W</span>)</span>
-        <span>ROM: <strong id="liveLastRom" style="color: var(--text);">-- cm</strong> • Lasku: <span id="liveLastLowering">-- m/s</span></span>
+      <div class="mini-bars-row">
+        <div id="liveMiniBars" class="mini-bars-wrap"></div>
+        <span id="repProgressLabel" class="mini-rep-count">0 / 5</span>
       </div>
 
       <div class="progress-bar guided-only">
         <div id="repProgressFill" class="progress-fill"></div>
       </div>
-      <div id="vbtLiveCard" class="hidden"></div>
+      <div id="liveTraceWarn" class="hidden" style="font-size: 12px; color: var(--amber); margin-top: 4px;"></div>
+    </div>
 
-      <!-- Vapaa treeni: yksinkertainen palkkinäkymä -->
-      <div id="velBarChart" class="vel-chart free-only"></div>
-
-      <div id="repList" class="rep-list"></div>
+    <!-- Yksi iso koko leveyden päätoimintopainike -->
+    <div id="mainSetActionWrap" class="hide-done">
+      <button type="button" id="mainSetActionBtn" class="primary main-action-btn">🔌 Yhdistä Pin aloittaaksesi</button>
     </div>
 
     <!-- Today's completed sets on the live training tab -->
-    <div id="todaySetsCard" class="card hidden">
+    <div id="todaySetsCard" class="card hidden hide-active hide-done">
       <div class="row" style="margin-bottom: 4px;">
-        <div>
-          <strong id="todaySetsTitle" style="font-size: 14px;">Tallennetut sarjat tänään</strong>
-          <span style="display: block; font-size: 11px; color: var(--muted); margin-top: 1px;">Avaa palkit ja analyysi klikkaamalla sarjaa</span>
-        </div>
+        <strong id="todaySetsTitle" style="font-size: 14px;">Tallennetut sarjat tänään</strong>
         <span id="todaySetsCount" style="font-size: 12px; color: var(--muted);"></span>
       </div>
       <div id="todaySetsList"></div>
     </div>
 
-    <!-- Lopeta treeni -painike sivun alimpana -->
-    <button type="button" id="finishWorkoutBtn" class="success finish-workout-btn">🏁 Lopeta treeni</button>
+    <!-- Lopeta treeni -painike sivun alimpana (vain levossa/valmiustilassa) -->
+    <button type="button" id="finishWorkoutBtn" class="success finish-workout-btn hide-active hide-done">🏁 Lopeta treeni</button>
   </main>
 
   <!-- TAB 2: CALENDAR & CSV -->
@@ -846,7 +1144,7 @@
 
   <!-- TAB 3: SYVÄ VBT-ANALYYSI -->
   <main id="tabAnalysis" class="hidden">
-    <div class="card setup-grid">
+    <div id="anaFilterCard" class="card setup-grid">
       <div class="row">
         <label class="small" for="anaExerciseSelect">Liike</label>
         <select id="anaExerciseSelect"></select>
@@ -855,14 +1153,93 @@
         <label class="small" for="anaDateSelect">Päivä</label>
         <select id="anaDateSelect"></select>
       </div>
+      <div id="anaSubTabs" class="sub-tabs" role="tablist" aria-label="Analyysiosiot">
+        <button type="button" data-ana-sub="sessio" class="active">Sessio</button>
+        <button type="button" data-ana-sub="sarjat">Sarjat</button>
+        <button type="button" data-ana-sub="profiili">Profiili</button>
+        <button type="button" data-ana-sub="jakso">Jakso</button>
+        <button type="button" data-ana-sub="asetukset" title="VBT-asetukset">⚙</button>
+      </div>
     </div>
-    <div id="anaCycleCard" class="card"></div>
     <div id="anaSessionCard" class="card"></div>
-    <div id="anaPlanCard" class="card"></div>
-    <div id="anaProfileCard" class="card"></div>
-    <div id="anaTrendCard" class="card"></div>
-    <div id="anaSettingsCard" class="card"></div>
+    <div id="anaSetDetailCard" class="card hidden"></div>
+    <div id="anaProfileCard" class="card hidden"></div>
+    <div id="anaTrendCard" class="card hidden"></div>
+    <div id="anaCycleCard" class="card hidden"></div>
+    <div id="anaPlanCard" class="card hidden"></div>
+    <div id="anaSettingsCard" class="card hidden"></div>
   </main>
+
+  <!-- TREENIASETUKSET BOTTOM SHEET -->
+  <div id="liftSettingsSheet" class="sheet-backdrop hidden">
+    <div class="sheet-panel">
+      <div class="row">
+        <strong style="font-size: 15px;">⚙ Treeniasetukset</strong>
+        <button type="button" id="closeLiftSettingsBtn">Sulje</button>
+      </div>
+      <div>
+        <label class="small" style="display: block; margin-bottom: 6px;">Treenitila</label>
+        <div class="mode-switch" role="tablist" aria-label="Treenitila">
+          <button type="button" id="modeGuidedBtn" class="active">🎯 Ohjattu (VBT)</button>
+          <button type="button" id="modeFreeBtn">📝 Vapaa treeni</button>
+        </div>
+      </div>
+      <div class="row">
+        <label class="small" for="workoutDate">Treenipäivä</label>
+        <input type="date" id="workoutDate" />
+      </div>
+      <button type="button" id="editExercisesBtn" class="sheet-item-btn">
+        <span>🏋️ Hallitse liikkeitä</span>
+        <span style="color: var(--muted);">›</span>
+      </button>
+      <button type="button" id="gotoVbtSettingsBtn" class="sheet-item-btn">
+        <span>🎯 Harjoitustavoite &amp; VBT-asetukset</span>
+        <span style="color: var(--muted);">Analyysi ›</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- HEADER MORE (⋯) SHEET -->
+  <div id="moreMenuSheet" class="sheet-backdrop hidden">
+    <div class="sheet-panel">
+      <div class="row">
+        <strong style="font-size: 15px;">Toiminnot</strong>
+        <button type="button" id="closeMoreMenuBtn">Sulje</button>
+      </div>
+      <button type="button" id="menuOpenSettingsBtn" class="sheet-item-btn">
+        <span>⚙️ Treeniasetukset</span>
+        <span style="color: var(--muted);">›</span>
+      </button>
+      <button type="button" id="clearRepsBtn" class="sheet-item-btn danger hidden">
+        <span>🧹 Tyhjennä nykyinen sarja</span>
+        <span>✕</span>
+      </button>
+      <button type="button" id="reloadAppBtn" class="sheet-item-btn">
+        <span>🔄 Päivitä sovellus</span>
+        <span style="color: var(--muted);">↻</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- SET DEEP ANALYSIS BOTTOM SHEET (OPENED FROM TREENI) -->
+  <div id="setAnalysisSheet" class="sheet-backdrop hidden">
+    <div class="sheet-panel">
+      <div class="row" style="gap: 8px;">
+        <strong id="setAnalysisSheetTitle" style="font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Sarjan analyysi</strong>
+        <div style="display: flex; gap: 6px; flex-shrink: 0;">
+          <button type="button" id="setAnalysisOpenInTabBtn" class="primary" style="padding: 6px 10px; font-size: 12px;">Analyysissä ›</button>
+          <button type="button" id="closeSetAnalysisSheetBtn" style="padding: 6px 10px; font-size: 12px;">Sulje</button>
+        </div>
+      </div>
+      <div id="setAnalysisSheetBody"></div>
+    </div>
+  </div>
+
+  <!-- UNDO TOAST -->
+  <div id="undoToast" class="undo-toast hidden" role="status" aria-live="polite">
+    <span id="undoToastText">Poistettu</span>
+    <button type="button" id="undoToastBtn">Kumoa</button>
+  </div>
 
   <!-- EXERCISE MODAL -->
   <div id="exerciseModal" class="modal-backdrop hidden">
@@ -922,12 +1299,19 @@
     let bleDevice = null;
     let dataChar = null;
     let manualDisconnect = false;
+    let bleConnecting = false;
     let soundEnabled = true;
     let audioCtx = null;
     let audioUnlocked = false;
     let setActive = false;
     let zeroing = false;
     let activeSetToken = 0;
+    let workoutDoneState = false;
+    let restTimerInterval = null;
+    let restGoalAlerted = false;
+    let undoState = null;
+    let undoTimerId = null;
+    let activeSheetSetRef = null;
 
     let pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: 0 };
     let currentReps = [];
@@ -1161,12 +1545,110 @@
         { freq: 195, durationMs: 190, delayMs: 170, type: 'sawtooth', gain: 0.40 }
       ]);
     }
+    function soundRestComplete() {
+      playCue([
+        { freq: 659.25, durationMs: 120, delayMs: 0, gain: 0.36 },
+        { freq: 880.0, durationMs: 180, delayMs: 140, gain: 0.42 }
+      ]);
+    }
+    function speakRepVelocity(vel) {
+      if (!soundEnabled || !vbtSettings || !vbtSettings.voiceVelocity) return;
+      if (typeof window === 'undefined' || !('speechSynthesis' in window) || !Number.isFinite(vel)) return;
+      try {
+        const digits = ['nolla', 'yksi', 'kaksi', 'kolme', 'neljä', 'viisi', 'kuusi', 'seitsemän', 'kahdeksan', 'yhdeksän'];
+        const spoken = vel.toFixed(2).replace('.', '').split('').map((ch) => digits[Number(ch)] || ch).join(' ');
+        const u = new SpeechSynthesisUtterance(spoken);
+        u.lang = 'fi-FI';
+        u.rate = 1.15;
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(u);
+      } catch {}
+    }
+
+    function formatMMSS(sec) {
+      const s = Math.max(0, Math.floor(sec));
+      const m = Math.floor(s / 60);
+      const rem = String(s % 60).padStart(2, '0');
+      return `${m}:${rem}`;
+    }
+
+    function getLiftUiState() {
+      if (setActive || (zeroing && autoStartAfterZero)) return 'active';
+      if (currentReps.length > 0 && (currentSetSaved || !setActive)) return 'rest';
+      if (workoutDoneState) return 'done';
+      if (dataChar && !zeroing) return 'ready';
+      return 'idle';
+    }
 
     // --- BLE Communication, Screen Wake Lock & Keep-Alive ---
     function setStatus(text, mode) {
-      document.getElementById('statusText').textContent = text;
+      const st = document.getElementById('statusText');
       const dot = document.getElementById('statusDot');
-      dot.className = 'dot' + (mode ? ' ' + mode : '');
+      if (st) st.textContent = text;
+      if (dot) dot.className = 'dot' + (mode ? ' ' + mode : '');
+    }
+
+    function updateHeaderStatus() {
+      if (bleConnecting) return;
+      if (!dataChar) {
+        setStatus('Ei yhdistetty', '');
+        return;
+      }
+      if (zeroing) {
+        setStatus(`Kalibroidaan… ${zeroCountdownSec} s`, 'busy');
+        return;
+      }
+      const state = getLiftUiState();
+      const displaySetNum = getActiveSetDisplayNumber();
+      const nextNum = getCompletedSetsForCurrentDate().length + 1;
+      if (state === 'active') {
+        const w = (activeSetMeta && activeSetMeta.weightKg !== undefined)
+          ? activeSetMeta.weightKg
+          : (parseFloat(document.getElementById('weightInput').value) || 0);
+        setStatus(`● Sarja #${displaySetNum} · ${w} kg`, 'ready');
+      } else if (state === 'rest' && currentSetSaved && lastSetStoppedAt > 0) {
+        const elapsed = Math.floor((Date.now() - lastSetStoppedAt) / 1000);
+        setStatus(`✓ Sarja #${displaySetNum} tallennettu · lepo ${formatMMSS(elapsed)}`, 'ready');
+      } else {
+        setStatus(`Valmis · Sarja #${nextNum}`, 'ready');
+      }
+    }
+
+    function updateRestTimerDisplay() {
+      const state = getLiftUiState();
+      if (state !== 'rest' || !lastSetStoppedAt) return;
+      const elapsed = Math.floor((Date.now() - lastSetStoppedAt) / 1000);
+      const target = Math.max(30, parseInt((vbtSettings && vbtSettings.restTargetSec) || 180, 10) || 180);
+      const badge = document.getElementById('restTimerBadge');
+      if (badge) {
+        badge.textContent = `⏱ Lepo ${formatMMSS(elapsed)}`;
+        badge.className = elapsed >= target ? 'set-badge saved' : 'set-badge';
+      }
+      updateHeaderStatus();
+      if (vbtSettings && vbtSettings.restTimerSound && !restGoalAlerted && elapsed >= target) {
+        restGoalAlerted = true;
+        soundRestComplete();
+      }
+    }
+
+    function startRestTimer() {
+      stopRestTimer();
+      restGoalAlerted = false;
+      updateRestTimerDisplay();
+      restTimerInterval = setInterval(() => {
+        if (getLiftUiState() !== 'rest') {
+          stopRestTimer();
+          return;
+        }
+        updateRestTimerDisplay();
+      }, 1000);
+    }
+
+    function stopRestTimer() {
+      if (restTimerInterval) {
+        clearInterval(restTimerInterval);
+        restTimerInterval = null;
+      }
     }
 
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1338,20 +1820,19 @@
         setStartedAt = Date.now();
         activeSetMeta = snapshotCurrentSetMeta();
         startAudioKeepWarm();
-        const setNum = getActiveSetDisplayNumber();
-        setStatus(`🟢 Sarja #${setNum} käynnissä – tee toistoja!`, 'ready');
+        stopRestTimer();
         soundReady();
       } else {
-        const nextNum = getCompletedSetsForCurrentDate().length + 1;
-        setStatus(`✅ Pin valmis – paina Aloita sarja #${nextNum}`, 'ready');
         soundReady();
       }
+      updateHeaderStatus();
       renderLiveSet();
       updateSetButton();
     }
 
     async function disconnectPin() {
       manualDisconnect = true;
+      bleConnecting = false;
       activeSetToken++;
       clearZeroTimer();
       stopBleKeepAlive();
@@ -1374,10 +1855,10 @@
         }
       } catch {}
       dataChar = null;
+      document.getElementById('connectBtn').textContent = 'Yhdistä Pin';
+      updateHeaderStatus();
       renderLiveSet();
       updateSetButton();
-      document.getElementById('connectBtn').textContent = 'Yhdistä Pin';
-      setStatus('Ei yhdistetty', '');
     }
 
     async function releaseStaleConnections() {
@@ -1410,7 +1891,10 @@
         return;
       }
 
+      workoutDoneState = false;
       manualDisconnect = false;
+      bleConnecting = true;
+      updateSetButton();
       try {
         if (bleDevice) {
           try {
@@ -1423,7 +1907,7 @@
           await releaseStaleConnections();
         }
 
-        setStatus('Etsitään Piniä...', 'busy');
+        setStatus('Etsitään Piniä…', 'busy');
         bleDevice = await navigator.bluetooth.requestDevice({
           filters: [
             { namePrefix: 'GPATH' },
@@ -1437,36 +1921,45 @@
         bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
         await openGattSession();
       } catch (err) {
+        bleConnecting = false;
         releaseScreenWakeLock();
-        setStatus('Ei yhdistetty', '');
+        updateHeaderStatus();
+        updateSetButton();
         console.error(err);
       }
     }
 
     function updateSetButton() {
-      const startBtn = document.getElementById('startSetBtn');
-      const stopBtn = document.getElementById('stopSetBtn');
+      const mainBtn = document.getElementById('mainSetActionBtn');
       const finishBtn = document.getElementById('finishWorkoutBtn');
       const completedCount = getCompletedSetsForCurrentDate().length;
       const nextSetNum = completedCount + 1;
 
-      if (startBtn) {
-        startBtn.disabled = !dataChar || setActive || (zeroing && autoStartAfterZero);
-        if (zeroing) {
-          startBtn.textContent = autoStartAfterZero
-            ? `⏳ Kalibroidaan (${zeroCountdownSec} s)...`
-            : `▶ Aloita sarja #${nextSetNum}`;
+      if (mainBtn) {
+        if (!dataChar) {
+          mainBtn.disabled = bleConnecting;
+          mainBtn.className = 'primary main-action-btn';
+          mainBtn.textContent = bleConnecting ? '⏳ Yhdistetään Pin…' : '🔌 Yhdistä Pin aloittaaksesi';
+        } else if (zeroing && !autoStartAfterZero) {
+          mainBtn.disabled = true;
+          mainBtn.className = 'primary main-action-btn';
+          mainBtn.textContent = `⏳ Kalibroidaan (${zeroCountdownSec} s) – pidä paikallaan…`;
+        } else if (setActive || (zeroing && autoStartAfterZero)) {
+          mainBtn.disabled = false;
+          mainBtn.className = 'danger main-action-btn';
+          mainBtn.textContent = (zeroing && autoStartAfterZero)
+            ? `⏹ PERUUTA (${zeroCountdownSec} s)`
+            : '⏹ LOPETA SARJA';
         } else {
-          startBtn.textContent = `▶ Aloita sarja #${nextSetNum}`;
+          mainBtn.disabled = false;
+          mainBtn.className = 'primary main-action-btn';
+          mainBtn.textContent = `▶ ALOITA SARJA #${nextSetNum}`;
         }
       }
 
-      if (stopBtn) {
-        stopBtn.disabled = !setActive && !(zeroing && autoStartAfterZero);
-        stopBtn.textContent = '⏹ Lopeta sarja';
-      }
-
       if (finishBtn) {
+        const showFinish = Boolean(dataChar || completedCount > 0 || currentReps.length > 0);
+        finishBtn.classList.toggle('hidden', !showFinish);
         finishBtn.disabled = false;
         finishBtn.textContent = '🏁 Lopeta treeni';
       }
@@ -1477,6 +1970,7 @@
       zeroing = true;
       autoStartAfterZero = Boolean(autoStart);
       zeroCountdownSec = 3;
+      updateHeaderStatus();
       renderLiveSet();
       updateSetButton();
 
@@ -1486,6 +1980,7 @@
           return;
         }
         zeroCountdownSec = Math.max(1, zeroCountdownSec - 1);
+        updateHeaderStatus();
         renderLiveSet();
         updateSetButton();
       }, 1000);
@@ -1495,7 +1990,8 @@
 
     async function openGattSession() {
       if (!bleDevice) return;
-      setStatus('Yhdistetään...', 'busy');
+      bleConnecting = true;
+      setStatus('Yhdistetään…', 'busy');
       const server = await bleDevice.gatt.connect();
       const service = await server.getPrimaryService(SERVICE_UUID);
       dataChar = await service.getCharacteristic(CHAR_UUID);
@@ -1514,11 +2010,12 @@
       await sleep(50);
       await writeByte(CMD_BATTERY);
 
+      bleConnecting = false;
       pinStarted = false;
       setActive = false;
+      workoutDoneState = false;
       const token = ++activeSetToken;
       document.getElementById('connectBtn').textContent = 'Katkaise';
-      setStatus('Kalibroidaan Pin (3 s) – pidä paikallaan...', 'busy');
       beginZeroCountdown(token, false);
       await sleep(50);
       await writeByte(CMD_START);
@@ -1583,6 +2080,8 @@
       ensureAudio();
       startAudioKeepWarm();
       requestScreenWakeLock();
+      stopRestTimer();
+      workoutDoneState = false;
 
       // If previous set had reps, ensure it is saved before starting the new set, then clear currentReps!
       if (currentReps.length > 0) {
@@ -1599,12 +2098,14 @@
       vbtCutoffAlerted = false;
       vbtFailureAlerted = false;
       lastTraceStatus = '';
+      lastTraceFailed = false;
       setStartedAt = Date.now();
       lastRepAt = 0;
 
       // If initial 3s calibration on connect is still running, queue auto-start as soon as it finishes
       if (zeroing) {
         autoStartAfterZero = true;
+        updateHeaderStatus();
         renderLiveSet();
         updateSetButton();
         return;
@@ -1613,7 +2114,6 @@
       if (!pinStarted) {
         const token = ++activeSetToken;
         setActive = false;
-        setStatus('Kalibroidaan Pin (3 s) – pidä paikallaan...', 'busy');
         beginZeroCountdown(token, true);
         await writeByte(CMD_HELLO);
         await sleep(50);
@@ -1626,9 +2126,8 @@
         zeroing = false;
         setActive = true;
         setStartedAt = Date.now();
-        const setNum = getActiveSetDisplayNumber();
-        setStatus(`🟢 Sarja #${setNum} käynnissä – tee toistoja!`, 'ready');
         soundReady();
+        updateHeaderStatus();
         renderLiveSet();
         updateSetButton();
         writeByte(CMD_HELLO);
@@ -1652,14 +2151,12 @@
 
       renderLiveSet();
       updateSetButton();
-      if (dataChar) {
-        const nextNum = getCompletedSetsForCurrentDate().length + 1;
-        if (currentSetSaved && currentReps.length > 0) {
-          setStatus(`✓ Sarja tallennettu – valmis sarjaan #${nextNum}`, 'ready');
-        } else {
-          setStatus(`✅ Valmis – paina Aloita sarja #${nextNum}`, 'ready');
-        }
+      if (currentSetSaved && currentReps.length > 0) {
+        startRestTimer();
+      } else {
+        stopRestTimer();
       }
+      updateHeaderStatus();
     }
 
     async function toggleSetOnPin() {
@@ -1673,6 +2170,7 @@
 
     function onDisconnected() {
       activeSetToken++;
+      bleConnecting = false;
       clearZeroTimer();
       stopBleKeepAlive();
       stopAudioKeepWarm();
@@ -1686,13 +2184,18 @@
       document.getElementById('connectBtn').textContent = 'Yhdistä Pin';
       if (manualDisconnect) {
         releaseScreenWakeLock();
-        setStatus('Ei yhdistetty', '');
+        updateHeaderStatus();
         return;
       }
-      setStatus('Yhteys katkesi – yhdistetään...', 'busy');
+      bleConnecting = true;
+      setStatus('Yhteys katkesi – yhdistetään…', 'busy');
       setTimeout(async () => {
         if (bleDevice && !manualDisconnect) {
-          try { await openGattSession(); } catch { setStatus('Ei yhdistetty', ''); }
+          try { await openGattSession(); } catch { bleConnecting = false; updateHeaderStatus(); updateSetButton(); }
+        } else {
+          bleConnecting = false;
+          updateHeaderStatus();
+          updateSetButton();
         }
       }, 1200);
     }
@@ -1858,6 +2361,7 @@
           pauseMs: pauseMs
         });
         lastRepAt = Date.now();
+        setTimeout(() => speakRepVelocity(meanVel), 220);
         if (!isFreeMode() && vbtOnNewRep()) return; // set auto-stopped at the velocity-loss cutoff
 
         const targetReps = parseInt(document.getElementById('targetRepsInput').value, 10) || 5;
@@ -2162,6 +2666,7 @@
     let traceHeader = null;        // last b1 header
     const recentRawTraces = [];    // last 5 raw traces (memory only, for CSV export / debugging)
     let lastTraceStatus = '';
+    let lastTraceFailed = false;
 
     function handleTraceNotification(dv) {
       const type = dv.getUint8(0);
@@ -2222,6 +2727,7 @@
       recentRawTraces.push(raw);
       if (recentRawTraces.length > 5) recentRawTraces.shift();
       if (rows.length < 160 || buf.truncated) {
+        lastTraceFailed = true;
         lastTraceStatus = buf.truncated
           ? '⚠️ Raakadata katkesi (BLE-paketti liian suuri tälle laitteelle/selaimelle)'
           : `⚠️ Raakadata vajaa (${Math.round(coverage * 100)} %)`;
@@ -2232,9 +2738,12 @@
         attachTraceToRecentSet(raw);
       } catch (e) {
         console.warn('Trace analysis failed', e);
+        lastTraceFailed = true;
         lastTraceStatus = '⚠️ Raakadatan analyysi epäonnistui';
       }
       renderLiveSet();
+      if (!document.getElementById('tabAnalysis').classList.contains('hidden')) renderAnalysisTab();
+      refreshOpenSetAnalysisSheet();
     }
 
     // ---------- signal processing helpers ----------
@@ -2508,7 +3017,7 @@
         workouts.forEach((w) => (w.sets || []).forEach((s) => { if (recent(s.reps) && (!cand || s.reps[s.reps.length - 1].t > cand.reps[cand.reps.length - 1].t)) cand = s; }));
         if (cand) { targets.push(cand.reps); exercise = cand.exercise; }
       }
-      if (!targets.length) { lastTraceStatus = '📡 Raakadata vastaanotettu, mutta sarjaa ei löytynyt'; return; }
+      if (!targets.length) { lastTraceFailed = true; lastTraceStatus = '📡 Raakadata vastaanotettu, mutta sarjaa ei löytynyt'; return; }
       const ta = analyzeTrace(raw.rows, exercise);
       const map = matchTraceReps(ta.reps, targets[0]);
       let matched = 0;
@@ -2536,6 +3045,7 @@
         workouts.forEach((w) => (w.sets || []).forEach((s) => { if (targets.includes(s.reps)) s.traceMeta = meta; }));
       } else pendingTraceMeta = meta;
       saveJSON(KEY_WORKOUTS, workouts);
+      lastTraceFailed = false;
       lastTraceStatus = `📡 Raakadata analysoitu: ${matched}/${targets[0].length} toistoa (${ta.samples} näytettä${meta.barAxis ? ', tangon akseli ' + meta.barAxis.toUpperCase() : ', tangon akseli ei tunnistettu'})`;
       renderCalendar();
       renderHistoryList();
@@ -2714,7 +3224,20 @@
     };
 
     let vbtSettings = Object.assign(
-      { goal: 'maxStrength', velocityMetric: 'mv', autoStopOnCutoff: false, cutoffSound: true, mvtOverride: {}, refMax: {}, barAxis: 'auto', mode: 'guided', cycle: null },
+      {
+        goal: 'maxStrength',
+        velocityMetric: 'mv',
+        autoStopOnCutoff: false,
+        cutoffSound: true,
+        voiceVelocity: false,
+        restTargetSec: 180,
+        restTimerSound: true,
+        mvtOverride: {},
+        refMax: {},
+        barAxis: 'auto',
+        mode: 'guided',
+        cycle: null
+      },
       loadJSON(KEY_VBT_SETTINGS, {}) || {}
     );
     if (!VBT_GOALS[vbtSettings.goal]) vbtSettings.goal = 'maxStrength';
@@ -3483,33 +4006,90 @@
         </div>`;
     }
 
-    // --- Live VBT card ---
-    function renderVbtLiveCard() {
-      const el = document.getElementById('vbtLiveCard');
-      if (!el) return;
-      const exercise = (activeSetMeta && activeSetMeta.exercise) || getCurrentSelectedExerciseName();
-      const weightKg = (activeSetMeta && activeSetMeta.weightKg) || parseFloat(document.getElementById('weightInput').value) || 0;
-      if (!currentReps.length || isFreeMode()) { el.classList.add('hidden'); el.innerHTML = ''; return; }
-      const prof = getLiftCfg(exercise) ? recentProfile(exercise, document.getElementById('workoutDate').value || todayISO()) : null;
-      const a = analyzeSet(currentReps, exercise, weightKg, { profile: prof });
-      el.classList.remove('hidden');
-      let alert = '';
-      const lastP = a.valid[a.valid.length - 1];
-      if (!a.isWarmup && lastP) {
-        if (a.mvt !== null && lastP.rir === 0) {
-          alert = `<div class="vbt-alert red">⛔ Lähellä failurea (RIR ~0, ${fmtV(lastP.v)} m/s vs. MVT ${fmtV(a.mvt)}) – lopeta sarja.</div>`;
-        } else if (lastP.vl !== null && lastP.vl > a.cutoffPct) {
-          alert = `<div class="vbt-alert amber">🛑 VL ${lastP.vl.toFixed(0)} % > raja ${a.cutoffPct} % – katkaise sarja, laatu heikkenee.</div>`;
+    // --- Same-load historical comparison (RepOne-style) ---
+    function getRecentSameLoadHistory(exercise, weightKg, beforeDate, limit = 3) {
+      if (!exercise || !(weightKg > 0)) return [];
+      const out = [];
+      const sorted = [...workouts].sort((a, b) => b.date.localeCompare(a.date));
+      for (const w of sorted) {
+        if (beforeDate && w.date >= beforeDate) continue;
+        const matches = (w.sets || []).filter((s) =>
+          s.exercise === exercise &&
+          Math.abs((Number(s.weightKg) || 0) - weightKg) < 0.6 &&
+          s.reps && s.reps.length
+        );
+        if (!matches.length) continue;
+        let bestV = 0;
+        matches.forEach((s) => {
+          const a = analyzeSet(s.reps, s.exercise, s.weightKg);
+          if (a.vBest && a.vBest > bestV) bestV = a.vBest;
+        });
+        if (bestV > 0) {
+          out.push({ date: w.date, vBest: bestV });
+          if (out.length >= limit) break;
         }
       }
-      el.innerHTML = `
-        ${alert}
-        ${lastTraceStatus ? `<div style="font-size:11px; color:var(--muted); margin-top:4px;">${lastTraceStatus}</div>` : ''}
-        ${buildVbtKpiHTML(a, true)}
-        ${buildRepCurveSVG(a, { height: 170 })}
-        ${buildVbtLegendHTML()}
-        <p class="vbt-verdict">${buildVerdict(a, exercise)}</p>`;
-      return a;
+      return out;
+    }
+
+    // --- Unified mini-bars component (used in active set for both guided and free mode) ---
+    function buildMiniBarsHTML(reps, a, targetReps, isFree) {
+      const list = reps || [];
+      if (list.length === 0) {
+        if (isFree) {
+          return '<div style="width:100%; text-align:center; font-size:12px; color:var(--muted); align-self:center;">Odotetaan toistoja…</div>';
+        }
+        const slots = Math.min(12, Math.max(1, targetReps || 5));
+        return Array.from({ length: slots }, () =>
+          '<div class="mini-bar-col"><div class="mini-bar-fill ghost" style="height:46%;"></div></div>'
+        ).join('');
+      }
+      const vMax = Math.max(0.4, ...list.map((r) => repV(r)), (a && a.vBest) ? a.vBest : 0) * 1.1;
+      const vCut = (!isFree && a && a.vCutoff && !a.isWarmup) ? a.vCutoff : null;
+      const totalSlots = isFree ? list.length : Math.max(list.length, Math.min(targetReps || 5, 15));
+      let html = '';
+      if (vCut !== null && vCut > 0 && vCut < vMax) {
+        const bottomPct = Math.max(8, Math.min(92, Math.round((vCut / vMax) * 76) + 8));
+        html += `<div class="mini-cutoff-line" style="bottom:${bottomPct}%;"></div>`;
+      }
+      for (let i = 0; i < totalSlots; i++) {
+        if (i < list.length) {
+          const v = repV(list[i]);
+          const hPct = Math.max(14, Math.min(100, Math.round((v / vMax) * 100)));
+          const q = isFree ? 'good' : ((a && a.perRep[i]) ? a.perRep[i].quality : 'good');
+          html += `<div class="mini-bar-col"><span class="mini-bar-val">${v.toFixed(2)}</span><div class="mini-bar-fill ${q}" style="height:${hPct}%;"></div></div>`;
+        } else {
+          html += `<div class="mini-bar-col"><div class="mini-bar-fill ghost" style="height:44%;"></div></div>`;
+        }
+      }
+      return html;
+    }
+
+    // --- Single most important rest finding (max 1 line) ---
+    function buildShortRestFinding(a, exercise) {
+      if (!a || !a.n) return null;
+      if (a.mvt !== null && a.rirEnd === 0) {
+        return { text: '⛔ Lähellä failurea (RIR ~0) – kevennä kuormaa tai pidennä lepoa', cls: 'red' };
+      }
+      if (a.techFirst) {
+        return { text: `⚠ Tankoreitti poikkesi toistolla ${a.techFirst.idx + 1}${a.techFirst.pathDev !== null ? ' (' + a.techFirst.pathDev.toFixed(1) + ' cm)' : ''}`, cls: 'amber' };
+      }
+      if (a.tiltReps && a.tiltReps.length) {
+        return { text: `⚠ Tanko kallistui yli ${TILT_WARN_DEG}° toistolla ${a.tiltReps.join(', ')}`, cls: 'amber' };
+      }
+      if (a.stopAfterRep !== null && !a.isWarmup) {
+        return { text: `🛑 VL-raja ${a.cutoffPct} % ylittyi toistolla ${a.stopAfterRep + 1} (${a.junkReps} ylitystoistoa)`, cls: 'amber' };
+      }
+      if (a.stickSummary && a.stickSummary.vminMin < 0.12) {
+        return { text: `⚠ Kuolokohta ${a.stickSummary.hAvg.toFixed(0)} cm pohjasta · Vmin ${fmtV(a.stickSummary.vminMin)} m/s`, cls: 'amber' };
+      }
+      if (a.isWarmup) {
+        return { text: `Lämmittelysarja (~${Math.round(a.pct1RM)} % 1RM)`, cls: '' };
+      }
+      if (a.vlFinal !== null) {
+        return { text: `✓ Laadukas sarja · VL ${a.vlFinal.toFixed(0)} % pysyi rajan (${a.cutoffPct} %) sisällä`, cls: 'green' };
+      }
+      return null;
     }
 
     // Called right after a new rep was pushed during an active set. Returns true if the set was auto-stopped.
@@ -3538,64 +4118,138 @@
       ]);
     }
 
-    // --- Setup card forecast for the chosen weight ---
-    function renderSetupVbtForecast() {
-      const el = document.getElementById('setupVbtForecast');
-      const goalSel = document.getElementById('goalSelect');
-      const cycInfo = document.getElementById('setupCycleInfo');
-      const cycKey = cycleGoalKey();
-      if (goalSel) {
-        const want = cycKey || vbtSettings.goal;
-        if (goalSel.value !== want) goalSel.value = want;
-        goalSel.disabled = !!cycKey;
-        goalSel.title = cycKey ? 'Jaksosuunnittelija ohjaa tavoitetta (Analyysi → Jaksosuunnittelija)' : '';
-      }
-      if (cycInfo) {
-        const t = cycleBadgeText();
-        cycInfo.textContent = t;
-        cycInfo.style.display = t ? '' : 'none';
-      }
-      const cutEl = document.getElementById('setupCutoffInfo');
-      const exercise = getCurrentSelectedExerciseName();
-      if (cutEl) {
-        const mvtInfo = getEffectiveMvt(exercise);
-        cutEl.textContent = `VL-raja ${getCutoffPct(exercise)} %` + (mvtInfo ? ` · MVT ${fmtV(mvtInfo.value)} m/s` : '');
-      }
-      if (!el) return;
+    // --- Forecast details & concise setup summary ---
+    function buildSetupForecastData(exercise, w, dateStr) {
       const cfg = getLiftCfg(exercise);
-      const w = parseFloat(document.getElementById('weightInput').value) || 0;
-      if (!cfg) { el.innerHTML = '<span style="color:var(--muted)">VBT-ennuste vain kyykylle, penkille ja maastavedolle</span>'; return; }
-      const prof = recentProfile(exercise, document.getElementById('workoutDate').value || todayISO());
+      if (!cfg) {
+        return { shortExpected: '', detailHtml: '<span style="color:var(--muted)">VBT-ennuste vain kyykylle, penkille ja maastavedolle</span>' };
+      }
+      const prof = recentProfile(exercise, dateStr);
       const anchor1RM = getAnchor1RM(exercise);
       if (prof && w > 0) {
         const pct = w / prof.e1RM * 100;
         const vExp = prof.intercept + prof.slope * w;
         const [lo, hi] = getGoal().pctRange;
         const wLo = prof.e1RM * lo / 100, wHi = prof.e1RM * hi / 100;
-        el.innerHTML = `~${Math.round(pct)} % 1RM · odotettu V<sub>best</sub> <strong>${fmtV(vExp)}</strong> m/s (±0.03)<br>
-          <span style="color:var(--muted)">e1RM ${prof.e1RM.toFixed(0)} kg (${prof.method === 'session' ? 'profiili ' + fmtDateFi(prof.date) : '28 pv profiili'}) · tavoitealue ${Math.round(wLo)}–${Math.round(wHi)} kg</span>`;
-      } else if (anchor1RM && w > 0) {
+        return {
+          shortExpected: `odotettu ~${fmtV(vExp)} m/s`,
+          detailHtml: `~${Math.round(pct)} % 1RM · odotettu V<sub>best</sub> <strong>${fmtV(vExp)}</strong> m/s (±0.03)<br><span style="color:var(--muted)">e1RM ${prof.e1RM.toFixed(0)} kg (${prof.method === 'session' ? 'profiili ' + fmtDateFi(prof.date) : '28 pv profiili'}) · tavoitealue ${Math.round(wLo)}–${Math.round(wHi)} kg</span>`
+        };
+      }
+      if (anchor1RM && w > 0) {
         const pct = w / anchor1RM * 100;
         const mvt = getEffectiveMvt(exercise).value;
         const shift = taperedMvtShift(cfg, mvt, pct);
         const vExp = velocityFromPctTable(cfg, pct) + shift;
         const [lo, hi] = getGoal().pctRange;
         const wLo = anchor1RM * lo / 100, wHi = anchor1RM * hi / 100;
-        el.innerHTML = `~${Math.round(pct)} % 1RM · odotettu V<sub>best</sub> <strong>${fmtV(vExp)}</strong> m/s (±0.03)<br>
-          <span style="color:var(--muted)">Ankkuri-1RM ${anchor1RM.toFixed(0)} kg (oma sarjamaksimi) · tavoitealue ${Math.round(wLo)}–${Math.round(wHi)} kg</span>`;
-      } else {
-        const [lo, hi] = getGoal().pctRange;
-        const mvt = getEffectiveMvt(exercise).value;
-        const shiftLo = taperedMvtShift(cfg, mvt, lo);
-        const shiftHi = taperedMvtShift(cfg, mvt, hi);
-        el.innerHTML = `Tavoite ${lo}–${hi} % 1RM ≈ V<sub>best</sub> <strong>${fmtV(velocityFromPctTable(cfg, hi) + shiftHi)}–${fmtV(velocityFromPctTable(cfg, lo) + shiftLo)}</strong> m/s<br>
-          <span style="color:var(--muted)">Oma profiili puuttuu: tee 3–4 nousevaa kuormaa samana päivänä</span>`;
+        return {
+          shortExpected: `odotettu ~${fmtV(vExp)} m/s`,
+          detailHtml: `~${Math.round(pct)} % 1RM · odotettu V<sub>best</sub> <strong>${fmtV(vExp)}</strong> m/s (±0.03)<br><span style="color:var(--muted)">Ankkuri-1RM ${anchor1RM.toFixed(0)} kg · tavoitealue ${Math.round(wLo)}–${Math.round(wHi)} kg</span>`
+        };
+      }
+      const [lo, hi] = getGoal().pctRange;
+      const mvt = getEffectiveMvt(exercise).value;
+      const shiftLo = taperedMvtShift(cfg, mvt, lo);
+      const shiftHi = taperedMvtShift(cfg, mvt, hi);
+      return {
+        shortExpected: `alue ~${fmtV(velocityFromPctTable(cfg, hi) + shiftHi)}–${fmtV(velocityFromPctTable(cfg, lo) + shiftLo)} m/s`,
+        detailHtml: `Tavoite ${lo}–${hi} % 1RM ≈ V<sub>best</sub> <strong>${fmtV(velocityFromPctTable(cfg, hi) + shiftHi)}–${fmtV(velocityFromPctTable(cfg, lo) + shiftLo)}</strong> m/s<br><span style="color:var(--muted)">Oma profiili puuttuu: tee 3–4 nousevaa kuormaa samana päivänä</span>`
+      };
+    }
+
+    function renderContextAndSteppers() {
+      const exercise = getCurrentSelectedExerciseName();
+      const dateStr = document.getElementById('workoutDate').value || todayISO();
+      const w = parseFloat(document.getElementById('weightInput').value) || 0;
+
+      // Cycle 1-line badge
+      const cycEl = document.getElementById('setupCycleInfo');
+      if (cycEl) {
+        const st = getCycleState(dateStr);
+        if (!st || isFreeMode()) {
+          cycEl.classList.add('hidden');
+          cycEl.textContent = '';
+        } else {
+          cycEl.classList.remove('hidden');
+          if (st.notStarted) cycEl.textContent = `Alkaa ${fmtDateFi(st.startDate)}`;
+          else if (st.finished) cycEl.textContent = 'Jakso päättynyt';
+          else cycEl.textContent = `${st.phase.label} vk ${st.weekInBlock}/${st.weeks}`;
+        }
+      }
+
+      // Settings summary pill
+      const sumEl = document.getElementById('liftSettingsSummary');
+      const sumBtn = document.getElementById('openLiftSettingsBtn');
+      const isToday = dateStr === todayISO();
+      if (sumEl) {
+        const modeTxt = isFreeMode() ? 'Vapaa' : 'Ohjattu';
+        const goalTxt = isFreeMode() ? '' : ` · ${getGoal().short}`;
+        const dateTxt = isToday ? 'Tänään' : `⚠️ Päivä: ${fmtDateFi(dateStr)} (ei tänään)`;
+        sumEl.textContent = `⚙ ${modeTxt}${goalTxt} · ${dateTxt}`;
+      }
+      if (sumBtn) {
+        sumBtn.classList.toggle('date-warn', !isToday);
+      }
+
+      // Weight hint (expected velocity + same load history)
+      const hintEl = document.getElementById('weightContextHint');
+      if (hintEl) {
+        const parts = [];
+        if (!isFreeMode()) {
+          const fc = buildSetupForecastData(exercise, w, dateStr);
+          if (fc.shortExpected) parts.push(fc.shortExpected);
+        }
+        const prevLoads = getRecentSameLoadHistory(exercise, w, dateStr, 3);
+        if (prevLoads.length) {
+          parts.push(`edelliset: ${prevLoads.map((p) => fmtV(p.vBest)).join(' · ')} m/s`);
+        }
+        hintEl.textContent = parts.join(' · ');
       }
     }
 
     // ===================== ANALYYSI-VÄLILEHTI =====================
     let anaExercise = null;
     let anaDate = null;
+    let anaSubTab = 'sessio';
+    let anaSelectedSetIdx = 0;
+
+    function setAnaSubTab(sub) {
+      anaSubTab = sub || 'sessio';
+      const tabs = document.getElementById('anaSubTabs');
+      if (tabs) {
+        tabs.querySelectorAll('[data-ana-sub]').forEach((btn) => {
+          btn.classList.toggle('active', btn.getAttribute('data-ana-sub') === anaSubTab);
+        });
+      }
+      const sessEl = document.getElementById('anaSessionCard');
+      const setEl = document.getElementById('anaSetDetailCard');
+      const profEl = document.getElementById('anaProfileCard');
+      const trendEl = document.getElementById('anaTrendCard');
+      const cycEl = document.getElementById('anaCycleCard');
+      const planEl = document.getElementById('anaPlanCard');
+      const setgEl = document.getElementById('anaSettingsCard');
+
+      if (sessEl) sessEl.classList.toggle('hidden', anaSubTab !== 'sessio');
+      if (setEl) setEl.classList.toggle('hidden', anaSubTab !== 'sarjat');
+      if (profEl) profEl.classList.toggle('hidden', anaSubTab !== 'profiili');
+      if (trendEl) trendEl.classList.toggle('hidden', anaSubTab !== 'profiili' || !trendEl.innerHTML.trim());
+      if (cycEl) cycEl.classList.toggle('hidden', anaSubTab !== 'jakso');
+      if (planEl) planEl.classList.toggle('hidden', anaSubTab !== 'jakso' || !planEl.innerHTML.trim());
+      if (setgEl) setgEl.classList.toggle('hidden', anaSubTab !== 'asetukset');
+    }
+
+    function openSetInAnalysis(dateStr, workoutSetIdx) {
+      const w = workouts.find((x) => x.date === dateStr);
+      if (!w || !w.sets || !w.sets[workoutSetIdx]) return;
+      const targetSet = w.sets[workoutSetIdx];
+      anaExercise = targetSet.exercise;
+      anaDate = dateStr;
+      const exSets = setsForExercise(anaExercise, (d) => d === anaDate);
+      const matchIdx = exSets.findIndex((x) => x.sIdx === workoutSetIdx || x.set === targetSet);
+      anaSelectedSetIdx = matchIdx >= 0 ? matchIdx : 0;
+      showTab('analysis', 'sarjat');
+    }
 
     function exercisesWithData() {
       const set = new Set();
@@ -3671,20 +4325,57 @@
       return s;
     }
 
+    function renderAnaSetDetailCard(sets) {
+      const setEl = document.getElementById('anaSetDetailCard');
+      if (!setEl) return;
+      if (!sets || !sets.length) {
+        setEl.innerHTML = '<div style="color:var(--muted); text-align:center;">Ei tallennettuja sarjoja valitulle liikkeelle ja päivälle.</div>';
+        return;
+      }
+      if (anaSelectedSetIdx < 0) anaSelectedSetIdx = 0;
+      if (anaSelectedSetIdx >= sets.length) anaSelectedSetIdx = sets.length - 1;
+      const item = sets[anaSelectedSetIdx];
+      const s = item.set;
+      const optionsHtml = sets.map((x, i) =>
+        `<option value="${i}" ${i === anaSelectedSetIdx ? 'selected' : ''}>Sarja #${i + 1} · ${x.set.weightKg} kg × ${(x.set.reps || []).length}</option>`
+      ).join('');
+      setEl.innerHTML = `
+        <div class="row" style="gap: 6px; margin-bottom: 4px;">
+          <button type="button" id="anaPrevSetBtn" ${anaSelectedSetIdx <= 0 ? 'disabled' : ''} style="min-width:44px; min-height:40px;">‹</button>
+          <select id="anaSetSelect" aria-label="Valitse sarja" style="flex:1; font-size:14px; font-weight:700;">${optionsHtml}</select>
+          <button type="button" id="anaNextSetBtn" ${anaSelectedSetIdx >= sets.length - 1 ? 'disabled' : ''} style="min-width:44px; min-height:40px;">›</button>
+        </div>
+        ${buildSetAnalysisHTML(s, { dateStr: item.date, workoutSetIdx: item.sIdx, showTraceStatus: true, allowRepDelete: true, allowSetDelete: true })}
+      `;
+      const prevBtn = setEl.querySelector('#anaPrevSetBtn');
+      const nextBtn = setEl.querySelector('#anaNextSetBtn');
+      const selEl = setEl.querySelector('#anaSetSelect');
+      if (prevBtn) prevBtn.addEventListener('click', () => { anaSelectedSetIdx = Math.max(0, anaSelectedSetIdx - 1); renderAnaSetDetailCard(sets); });
+      if (nextBtn) nextBtn.addEventListener('click', () => { anaSelectedSetIdx = Math.min(sets.length - 1, anaSelectedSetIdx + 1); renderAnaSetDetailCard(sets); });
+      if (selEl) selEl.addEventListener('change', (e) => { anaSelectedSetIdx = parseInt(e.target.value, 10) || 0; renderAnaSetDetailCard(sets); });
+      bindSetAnalysisActions(setEl, item.date, item.sIdx);
+    }
+
     function renderAnalysisTab() {
       const exSel = document.getElementById('anaExerciseSelect');
       const dateSel = document.getElementById('anaDateSelect');
       const sessionEl = document.getElementById('anaSessionCard');
+      const setEl = document.getElementById('anaSetDetailCard');
       const profEl = document.getElementById('anaProfileCard');
       const trendEl = document.getElementById('anaTrendCard');
+      const planEl = document.getElementById('anaPlanCard');
       if (!exSel) return;
       const exList = exercisesWithData();
       if (!exList.length) {
         exSel.innerHTML = ''; dateSel.innerHTML = '';
         sessionEl.innerHTML = '<div style="color:var(--muted); text-align:center;">Ei vielä tallennettuja sarjoja analysoitavaksi.</div>';
-        profEl.innerHTML = ''; trendEl.innerHTML = '';
+        if (setEl) setEl.innerHTML = '<div style="color:var(--muted); text-align:center;">Ei vielä tallennettuja sarjoja analysoitavaksi.</div>';
+        profEl.innerHTML = '<div style="color:var(--muted); text-align:center;">Ei vielä tallennettuja sarjoja profiiliin.</div>';
+        trendEl.innerHTML = '';
+        if (planEl) planEl.innerHTML = '';
         renderCycleCard();
         renderVbtSettingsCard();
+        setAnaSubTab(anaSubTab);
         return;
       }
       if (!anaExercise || !exList.includes(anaExercise)) {
@@ -3712,11 +4403,11 @@
       const rows = analyses.map(({ set, a }, i) => {
         const vlTxt = a.vlFinal === null ? '--' : a.vlFinal.toFixed(0) + ' %';
         const vlCls = (a.vlFinal === null || a.isWarmup) ? '' : (a.vlFinal > a.redVl ? 'red' : a.vlFinal > a.cutoffPct ? 'amber' : 'green');
-        return `<tr>
+        return `<tr class="ana-set-row" data-ana-set-idx="${i}">
           <td>${i + 1}</td><td>${set.weightKg}</td><td>${a.pct1RM !== null ? Math.round(a.pct1RM) : '--'}</td>
           <td>${fmtV(a.vBest)}</td><td class="${vlCls}">${vlTxt}</td>
           <td>${a.rirEnd === null ? '--' : (a.rirEnd >= 10 ? '10+' : a.rirEnd)}</td><td>${a.valid.length}${a.junkReps && !a.isWarmup ? `<span class="amber"> (${a.junkReps})</span>` : ''}</td>
-          <td class="${a.isWarmup ? '' : a.gradeClass}">${a.isWarmup ? 'LÄ' : a.score}</td></tr>`;
+          <td class="${a.isWarmup ? '' : a.gradeClass}">${a.isWarmup ? 'LÄ' : a.score} <span style="color:var(--muted);">›</span></td></tr>`;
       }).join('');
 
       const readyHtml = ready
@@ -3730,20 +4421,34 @@
         else readinessAdvice = 'Valmius normaali – toteuta suunniteltu ohjelma.';
       }
 
+      const stickWork = work.map((x) => x.a.stickSummary).filter(Boolean);
+      const stickPill = stickWork.length
+        ? (() => {
+            const h = stickWork.reduce((acc, x) => acc + x.hAvg, 0) / stickWork.length;
+            const vm = Math.min(...stickWork.map((x) => x.vminMin));
+            return `<div class="stat-pill"><span class="stat-pill-label">Kuolokohta (työsarjat)</span><span class="stat-pill-val" style="font-size:13px;">${h.toFixed(0)} cm · V<sub>min</sub> <span class="${vm < 0.10 ? 'red' : ''}">${fmtV(vm)}</span></span></div>`;
+          })()
+        : '';
+
       sessionEl.innerHTML = `
         <div class="row" style="margin-bottom:6px;"><strong style="font-size:14px;">📋 Session analyysi · ${fmtDateFi(anaDate)}</strong>
           <span style="font-size:11px; color:var(--muted);">${getGoal().short} · ${metricLabel()}</span></div>
-        <div class="stat-pill-grid">
+        <div class="stat-pill-grid" style="grid-template-columns: repeat(2, 1fr);">
           <div class="stat-pill"><span class="stat-pill-label">Työsarjat / kaikki</span><span class="stat-pill-val">${work.length} / ${analyses.length}</span></div>
-          <div class="stat-pill"><span class="stat-pill-label">RQI työsarjat (ka.)</span><span class="stat-pill-val ${avgScore === null ? '' : avgScore >= 70 ? 'green' : avgScore >= 50 ? 'amber' : 'red'}">${avgScore === null ? '--' : avgScore}</span></div>
-          <div class="stat-pill"><span class="stat-pill-label">Laadukkaat toistot (työ)</span><span class="stat-pill-val">${goodReps}</span></div>
-          <div class="stat-pill"><span class="stat-pill-label">Yli VL-rajan (hukka)</span><span class="stat-pill-val ${junk ? 'amber' : 'green'}">${junk}</span></div>
-          <div class="stat-pill"><span class="stat-pill-label">Efektiiviset toistot</span><span class="stat-pill-val">${cfg ? effReps : '--'}</span></div>
-          <div class="stat-pill"><span class="stat-pill-label">Tonnimäärä</span><span class="stat-pill-val">${Math.round(tonnage)} kg</span></div>
           ${readyHtml}
-          <div class="stat-pill"><span class="stat-pill-label">Toistoja yhteensä</span><span class="stat-pill-val">${totalReps}</span></div>
-          ${(() => { const st = work.map((x) => x.a.stickSummary).filter(Boolean); if (!st.length) return ''; const h = st.reduce((acc, x) => acc + x.hAvg, 0) / st.length; const vm = Math.min(...st.map((x) => x.vminMin)); return `<div class="stat-pill"><span class="stat-pill-label">Kuolokohta (työsarjat)</span><span class="stat-pill-val" style="font-size:13px;">${h.toFixed(0)} cm · V<sub>min</sub> <span class="${vm < 0.10 ? 'red' : ''}">${fmtV(vm)}</span></span></div>`; })()}
+          <div class="stat-pill"><span class="stat-pill-label">Yli VL-rajan (hukka)</span><span class="stat-pill-val ${junk ? 'amber' : 'green'}">${junk}</span></div>
+          <div class="stat-pill"><span class="stat-pill-label">Tonnimäärä</span><span class="stat-pill-val">${Math.round(tonnage)} kg</span></div>
         </div>
+        <details class="details-toggle">
+          <summary>▸ Lisätilastot (${stickPill ? 5 : 4})</summary>
+          <div class="stat-pill-grid" style="margin-top:6px;">
+            <div class="stat-pill"><span class="stat-pill-label">RQI työsarjat (ka.)</span><span class="stat-pill-val ${avgScore === null ? '' : avgScore >= 70 ? 'green' : avgScore >= 50 ? 'amber' : 'red'}">${avgScore === null ? '--' : avgScore}</span></div>
+            <div class="stat-pill"><span class="stat-pill-label">Laadukkaat toistot</span><span class="stat-pill-val">${goodReps}</span></div>
+            <div class="stat-pill"><span class="stat-pill-label">Efektiiviset toistot</span><span class="stat-pill-val">${cfg ? effReps : '--'}</span></div>
+            <div class="stat-pill"><span class="stat-pill-label">Toistoja yhteensä</span><span class="stat-pill-val">${totalReps}</span></div>
+            ${stickPill}
+          </div>
+        </details>
         ${readinessAdvice ? `<p class="vbt-verdict">${readinessAdvice}</p>` : ''}
         <div style="overflow-x:auto; margin-top:8px;">
           <table class="ana-table">
@@ -3751,15 +4456,22 @@
             <tbody>${rows}</tbody>
           </table>
         </div>
-        <div style="font-size:11px; color:var(--muted); margin-top:6px; line-height:1.4;">LÄ = lämmittely (&lt; 65 % 1RM, ei laatuluokitusta). Suluissa VL-rajan jälkeen tehdyt toistot. Efektiiviset toistot = toistot, joissa RIR ≤ 4.</div>`;
+        <div style="font-size:11px; color:var(--muted); margin-top:6px; line-height:1.4;">Napauta sarjariviä avataksesi sarjan syväanalyysin. LÄ = lämmittely (&lt; 65 % 1RM).</div>`;
+
+      sessionEl.querySelectorAll('.ana-set-row').forEach((tr) => {
+        tr.addEventListener('click', () => {
+          anaSelectedSetIdx = parseInt(tr.getAttribute('data-ana-set-idx'), 10) || 0;
+          setAnaSubTab('sarjat');
+        });
+      });
+
+      renderAnaSetDetailCard(sets);
 
       // Daily plan (Prilepin + VBT)
-      const planEl = document.getElementById('anaPlanCard');
       if (planEl) {
         const plan = cfg ? computeDailyPlan(anaExercise, anaDate) : null;
-        planEl.classList.toggle('hidden', !plan);
-        planEl.innerHTML = plan ? buildDailyPlanHTML(plan) + `
-          <details style="margin-top:8px;"><summary style="font-size:12px; color:var(--muted); cursor:pointer;">Prilepinin taulukko</summary>
+        planEl.innerHTML = plan ? buildDailyPlanHTML(plan, { fullDetails: true }) + `
+          <details class="details-toggle"><summary>▸ Prilepinin taulukko</summary>
             <table class="ana-table" style="margin-top:4px;"><thead><tr><th>%1RM</th><th>Toistot/sarja</th><th>Optimi</th><th>Väli</th></tr></thead>
             <tbody>${PRILEPIN.map((r) => `<tr><td>${r.label}</td><td>${r.repsMin}–${r.repsMax}</td><td>${r.opt}</td><td>${r.rangeLo}–${r.rangeHi}</td></tr>`).join('')}</tbody></table>
             <div style="font-size:11px; color:var(--muted); margin-top:4px; line-height:1.4;">%1RM lasketaan päivän nopeuspohjaisesta e1RM:stä, ei vanhasta testimaksimista. Toistot/sarja rajataan lisäksi VL-katkaisurajalla ja RIR-varmuudella, joten nopeasti väsyvä nostaja saa automaattisesti lyhyempiä sarjoja ja enemmän sarjoja.</div>
@@ -3796,7 +4508,7 @@
           <div class="row" style="margin-bottom:4px;"><strong style="font-size:14px;">📈 Kuorma–nopeusprofiili</strong>
             <span style="font-size:11px; color:var(--muted);">${sp.points.length >= 2 ? fmtDateFi(anaDate) : (prof ? (prof.method === 'session' ? fmtDateFi(prof.date) : '28 pv yhdistetty') : fmtDateFi(anaDate))}</span></div>
           ${body}
-          <div style="font-size:11px; color:var(--muted); margin-top:6px; line-height:1.4;">Jokaisen kuorman paras toisto (${metricLabel()}) → lineaarinen regressio → kuorma, jolla nopeus = MVT ${fmtV(getEffectiveMvt(anaExercise).value)} m/s (${getEffectiveMvt(anaExercise).label}). Paras tarkkuus: 3–4 kuormaa välillä 40–90 % 1RM, nostettu maksimaalisella tahdolla.</div>`;
+          <div style="font-size:11px; color:var(--muted); margin-top:6px; line-height:1.4;">Jokaisen kuorman paras toisto (${metricLabel()}) → lineaarinen regressio → kuorma, jolla nopeus = MVT ${fmtV(getEffectiveMvt(anaExercise).value)} m/s (${getEffectiveMvt(anaExercise).label}).</div>`;
         const tr = e1rmTrend(anaExercise);
         trendEl.innerHTML = tr.length
           ? `<div class="row" style="margin-bottom:4px;"><strong style="font-size:14px;">🏆 e1RM-kehitys</strong><span style="font-size:11px; color:var(--muted);">● profiili ○ yksittäinen sarja</span></div>
@@ -3809,11 +4521,14 @@
       }
       renderCycleCard();
       renderVbtSettingsCard();
+      setAnaSubTab(anaSubTab);
     }
 
     function renderVbtSettingsCard() {
       const el = document.getElementById('anaSettingsCard');
       if (!el) return;
+      const cycKey = cycleGoalKey();
+      const effectiveGoal = cycKey || vbtSettings.goal;
       const liftRows = Object.values(LIFT_ANALYSIS).map((c) => {
         const ex = c.id === 'squat' ? 'Jalkakyykky' : c.id === 'bench' ? 'Penkkipunnerrus' : 'Maastaveto';
         const eff = getEffectiveMvt(ex);
@@ -3842,7 +4557,8 @@
         <strong style="font-size:14px;">⚙️ VBT-asetukset</strong>
         <div class="setup-grid" style="margin-top:8px;">
           <div class="row"><label class="small" for="anaGoalSelect">Harjoitustavoite</label>
-            <select id="anaGoalSelect">${Object.values(VBT_GOALS).map((g) => `<option value="${g.key}" ${g.key === vbtSettings.goal ? 'selected' : ''}>${g.label}</option>`).join('')}</select></div>
+            <select id="anaGoalSelect" ${cycKey ? 'disabled' : ''}>${Object.values(VBT_GOALS).map((g) => `<option value="${g.key}" ${g.key === effectiveGoal ? 'selected' : ''}>${g.label}</option>`).join('')}</select></div>
+          ${cycKey ? '<div style="font-size:11px; color:#93c5fd;">Jaksosuunnittelija ohjaa tavoitetta automaattisesti (Jakso-välilehti).</div>' : ''}
           <div class="row"><label class="small" for="anaMetricSelect">Analyysinopeus</label>
             <select id="anaMetricSelect">
               <option value="mv" ${vbtSettings.velocityMetric === 'mv' ? 'selected' : ''}>MV – koko konsentrinen keskinopeus</option>
@@ -3850,6 +4566,10 @@
             </select></div>
           <label class="row" style="justify-content:flex-start; gap:8px; font-size:13px;"><input type="checkbox" id="anaCutoffSound" ${vbtSettings.cutoffSound ? 'checked' : ''}> Äänimerkki, kun VL-raja ylittyy tai RIR ~0</label>
           <label class="row" style="justify-content:flex-start; gap:8px; font-size:13px;"><input type="checkbox" id="anaAutoStop" ${vbtSettings.autoStopOnCutoff ? 'checked' : ''}> Lopeta sarja automaattisesti VL-rajalla</label>
+          <label class="row" style="justify-content:flex-start; gap:8px; font-size:13px;"><input type="checkbox" id="anaVoiceVelocity" ${vbtSettings.voiceVelocity ? 'checked' : ''}> Lue toiston nopeus ääneen (puhesynteesi)</label>
+          <div class="row"><label class="small" for="anaRestTargetSec">Lepoajastin (s)</label>
+            <input type="number" id="anaRestTargetSec" min="30" max="600" step="15" inputmode="numeric" value="${vbtSettings.restTargetSec || 180}" style="width:76px;"></div>
+          <label class="row" style="justify-content:flex-start; gap:8px; font-size:13px;"><input type="checkbox" id="anaRestTimerSound" ${vbtSettings.restTimerSound !== false ? 'checked' : ''}> Äänimerkki lepoajan täyttyessä</label>
           <div class="row"><label class="small" for="anaBarAxis">Tangon akseli (Pin)</label>
             <select id="anaBarAxis">
               <option value="auto" ${(vbtSettings.barAxis || 'auto') === 'auto' ? 'selected' : ''}>Automaattinen (painovoimasta)</option>
@@ -3864,21 +4584,30 @@
         <div style="overflow-x:auto;"><table class="ana-table">
           <thead><tr><th>Liike</th><th>Sarjapaino (kg)</th><th>Toistot</th><th>Ankkuri-1RM</th></tr></thead>
           <tbody>${refMaxRows}</tbody></table></div>
-        <div style="font-size:11px; color:var(--muted); margin-top:4px; line-height:1.4;">
-          Ankkuroi L–V-profiilin ja estää kevyiden lämmittelysarjojen nopeutta karkaamasta epärealistisiin e1RM- ja sarjapainoarvioihin. Päivän nopeus saa edelleen säätää arviota ±12–15 %.
-        </div>
         <div style="font-size:12px; font-weight:700; margin:10px 0 4px;">Failure-raja (MVT, m/s) ja VL-katkaisurajat</div>
         <div style="overflow-x:auto;"><table class="ana-table">
           <thead><tr><th>Liike</th><th>Oletus</th><th>Opittu</th><th>Oma</th><th>Käyt.</th><th>VL %<br>P/M/V</th></tr></thead>
           <tbody>${liftRows}</tbody></table></div>
-        <div style="font-size:11px; color:var(--muted); margin-top:6px; line-height:1.45;">
-          <strong>Opittu MVT</strong> = hitain loppuun asti suoritettu toisto (epäilyttävät liikkeet poistettu) – jos se alittaa väestöoletuksen, sitä käytetään automaattisesti. Oma arvo ohittaa molemmat (esim. aidon 1RM-noston nopeus).
-          VL-rajat: P = piikkaus, M = kehittävä maksimivoima, V = perusvoima/hypertrofia. <strong>MPV</strong> poistaa jarrutusvaiheen kevyillä kuormilla (&lt; 80 % 1RM); raskailla kuormilla MV ≈ MPV.
-        </div>`;
+        <details class="details-toggle">
+          <summary>▸ Ohjeet ja selitykset</summary>
+          <div style="font-size:11px; color:var(--muted); margin-top:6px; line-height:1.45;">
+            <p style="margin:0 0 6px;">Ankkuri-1RM ankkuroi L–V-profiilin ja estää kevyiden lämmittelysarjojen nopeutta karkaamasta epärealistisiin e1RM- ja sarjapainoarvioihin. Päivän nopeus saa edelleen säätää arviota ±12–15 %.</p>
+            <p style="margin:0;"><strong>Opittu MVT</strong> = hitain loppuun asti suoritettu toisto (epäilyttävät liikkeet poistettu) – jos se alittaa väestöoletuksen, sitä käytetään automaattisesti. Oma arvo ohittaa molemmat (esim. aidon 1RM-noston nopeus). VL-rajat: P = piikkaus, M = kehittävä maksimivoima, V = perusvoima/hypertrofia. <strong>MPV</strong> poistaa jarrutusvaiheen kevyillä kuormilla (&lt; 80 % 1RM); raskailla kuormilla MV ≈ MPV.</p>
+          </div>
+        </details>`;
       el.querySelector('#anaGoalSelect').addEventListener('change', (e) => { vbtSettings.goal = e.target.value; saveVbtSettings(); onVbtSettingsChanged(); });
       el.querySelector('#anaMetricSelect').addEventListener('change', (e) => { vbtSettings.velocityMetric = e.target.value; saveVbtSettings(); onVbtSettingsChanged(); });
       el.querySelector('#anaCutoffSound').addEventListener('change', (e) => { vbtSettings.cutoffSound = e.target.checked; saveVbtSettings(); });
       el.querySelector('#anaAutoStop').addEventListener('change', (e) => { vbtSettings.autoStopOnCutoff = e.target.checked; saveVbtSettings(); });
+      el.querySelector('#anaVoiceVelocity').addEventListener('change', (e) => { vbtSettings.voiceVelocity = e.target.checked; saveVbtSettings(); });
+      el.querySelector('#anaRestTargetSec').addEventListener('change', (e) => {
+        const val = Math.max(30, Math.min(600, parseInt(e.target.value, 10) || 180));
+        vbtSettings.restTargetSec = val;
+        e.target.value = val;
+        restGoalAlerted = false;
+        saveVbtSettings();
+      });
+      el.querySelector('#anaRestTimerSound').addEventListener('change', (e) => { vbtSettings.restTimerSound = e.target.checked; saveVbtSettings(); });
       el.querySelector('#anaBarAxis').addEventListener('change', (e) => { vbtSettings.barAxis = e.target.value; saveVbtSettings(); });
       el.querySelector('#anaRawExport').addEventListener('click', exportRawTracesCSV);
       el.querySelectorAll('[data-mvt-lift]').forEach((inp) => {
@@ -4198,6 +4927,7 @@
             reps,
             backoffOption: { load: backoffLoad, reps, sets: remSetsRaw },
             repDropOption: { load: lastW.set.weightKg, reps: reducedReps, sets: setsAtReduced },
+            shortReason: `⚠ Väsymysraja ${doneSets}. sarjassa (${whyReg.join(' · ')})`,
             text: `Väsymysraja ${doneSets}. sarjassa (${whyReg.join(' · ')}) – jäljellä ${remSetsRaw} × ${reps} (${remRepsRaw} toistoa) päivän tavoitteesta:<br>` +
               `• <strong>Vaihtoehto A (kevennä painoa):</strong> pudota <strong>${backoffLoad} kg × ${reps}</strong> (${remSetsRaw} ${remSetsRaw === 1 ? 'sarja' : 'sarjaa'})<br>` +
               `• <strong>Vaihtoehto B (vähennä toistoja):</strong> pidä <strong>${lastW.set.weightKg} kg × ${reducedReps}</strong> (${setsAtReduced} ${setsAtReduced === 1 ? 'sarja' : 'sarjaa'})` +
@@ -4225,53 +4955,101 @@
 
     function buildDailyPlanHTML(plan, opts = {}) {
       if (!plan) return '';
-      const head = `<div class="row" style="margin-bottom:6px;"><strong style="font-size:14px;">🧠 Päivän suositus · ${plan.exercise}</strong><span style="font-size:11px; color:var(--muted);">${plan.goal.short} · Prilepin + VBT</span></div>`;
+      const dateStr = opts.dateStr || (document.getElementById('workoutDate') ? document.getElementById('workoutDate').value : todayISO()) || todayISO();
+      const curWeight = parseFloat(document.getElementById('weightInput') ? document.getElementById('weightInput').value : 0) || 0;
+      const forecastHtml = buildSetupForecastData(plan.exercise, curWeight, dateStr).detailHtml;
+
+      if (opts.fullDetails) {
+        const head = `<div class="row" style="margin-bottom:6px;"><strong style="font-size:14px;">🧠 Päivän suositus · ${plan.exercise}</strong><span style="font-size:11px; color:var(--muted);">${plan.goal.short} · Prilepin + VBT</span></div>`;
+        if (plan.stage === 'needRef') {
+          const vr = plan.refVel ? `${fmtV(Math.min(...plan.refVel))}–${fmtV(Math.max(...plan.refVel))} m/s` : '';
+          return `${head}
+            <div class="vbt-verdict" style="margin-top:0;">Tee ensin <strong>viitesarja</strong> nousevan lämmittelyn päätteeksi: ${plan.refLoad ? `<strong>${plan.refLoad} kg × 2–3</strong> (≈75 %, alue ${plan.refRange[0]}–${plan.refRange[1]} kg)` : '~70–80 % 1RM × 2–3'} maksimaalisella tahdolla. Tavoitenopeus noin ${vr}.
+            Sarjan jälkeen sovellus laskee päivän e1RM:n ja suosittelee työsarjat.</div>
+            ${plan.prevE1rm ? `<div style="font-size:11px; color:var(--muted);">Arvioitu 1RM ${plan.prevE1rm.toFixed(0)} kg${plan.last ? ` · viimeisin treeni ${fmtDateFi(plan.last.date)}` : ''}${plan.todayCount ? ` · tänään ${plan.todayCount} sarjaa, ei vielä 65–88 % sarjaa` : ''}</div>` : `<div style="font-size:11px; color:var(--muted);">Ei aiempaa dataa: lämmittele nousevasti – ensimmäinen sarja, jonka nopeus osuu yllä olevaan väliin, toimii viitesarjana.</div>`}`;
+        }
+        const rd = plan.readiness;
+        const rdCls = rd === null ? '' : rd <= -5 ? 'red' : rd < -2 ? 'amber' : rd >= 3 ? 'green' : '';
+        const doneFrac = Math.min(1, plan.doneReps / Math.max(1, plan.volume));
+        const loadRangeTxt = (plan.loLoad && plan.hiLoad && plan.loLoad !== plan.hiLoad) ? ` (alue ${plan.loLoad}–${plan.hiLoad} kg)` : '';
+        return `${head}
+          <div class="vbt-kpi-grid">
+            <div class="vbt-kpi"><span class="vbt-kpi-l">Päivän e1RM</span><span class="vbt-kpi-v">${plan.e1RM.toFixed(0)}</span><span class="vbt-kpi-s ${rdCls}">${rd === null ? 'ei vertailua' : (rd >= 0 ? '+' : '') + rd.toFixed(1) + ' % vs. ' + plan.baseline.toFixed(0)}</span></div>
+            <div class="vbt-kpi" style="grid-column: span 2;"><span class="vbt-kpi-l">Työsarjat</span><span class="vbt-kpi-v" style="color:#60a5fa;">${plan.sets} × ${plan.reps} @ ${plan.load} kg</span><span class="vbt-kpi-s">${Math.round(plan.pct)} % päivän e1RM${loadRangeTxt} · ${plan.sets * plan.reps} toistoa</span></div>
+            <div class="vbt-kpi"><span class="vbt-kpi-l">Nopeusohje</span><span class="vbt-kpi-v" style="font-size:16px;">${fmtV(plan.v0)}</span><span class="vbt-kpi-s">±0.03 · stop ${fmtV(plan.vCut)} (VL ${plan.cutoff} %)</span></div>
+          </div>
+          <div style="font-size:11px; color:var(--muted); margin:4px 0;">Prilepin ${plan.row.label}: ${plan.row.repsMin}–${plan.row.repsMax} toistoa/sarja, optimi ${plan.row.opt} (${plan.row.rangeLo}–${plan.row.rangeHi}) → tavoite <strong style="color:var(--text);">${plan.volume}</strong> toistoa</div>
+          <div class="progress-bar" style="margin:4px 0;"><div class="progress-fill ${doneFrac >= 1 ? 'done' : ''}" style="width:${Math.round(doneFrac * 100)}%"></div></div>
+          <div style="font-size:12px; margin-bottom:4px;">Tehty: <strong>${plan.doneSets}</strong> sarjaa / <strong>${plan.doneReps}</strong> toistoa${plan.remainingSets > 0 && plan.remainingReps > 0 ? ` · jäljellä ~${plan.remainingSets} × ${plan.reps}` : ' · <span class="green">volyymi täynnä ✓</span>'}</div>
+          ${plan.adjust ? `<div class="vbt-alert ${plan.adjust.type === 'down' ? 'amber' : ''}" style="${plan.adjust.type === 'up' ? 'background:rgba(34,197,94,0.14); border:1px solid rgba(34,197,94,0.5); color:#86efac;' : ''}">${plan.adjust.text}</div>` : ''}
+          <ul style="font-size:12px; line-height:1.45; margin:6px 0 0; padding-left:18px;">
+            <li>Päivän e1RM: viitesarja ${plan.ref.set.weightKg} kg @ ${fmtV(plan.ref.a.vBest)} m/s (${plan.e1Src}).</li>
+            ${plan.notes.map((n) => `<li>${n}</li>`).join('')}
+            <li>Toistot/sarja: min(Prilepin ${plan.row.repsMax}, VL-raja ${plan.repsVL}, RIR ≥ ${plan.goal.key === 'peaking' ? 1 : 2} → ${plan.repsRIR}) = ${plan.reps}. Nopeuskustannus ${plan.cost.toFixed(3)} m/s/toisto (${plan.costSrc}).</li>
+          </ul>`;
+      }
+
+      // Compact action-first mode for Treeni tab
       if (plan.stage === 'needRef') {
         const vr = plan.refVel ? `${fmtV(Math.min(...plan.refVel))}–${fmtV(Math.max(...plan.refVel))} m/s` : '';
-        return `${head}
-          <div class="vbt-verdict" style="margin-top:0;">Tee ensin <strong>viitesarja</strong> nousevan lämmittelyn päätteeksi: ${plan.refLoad ? `<strong>${plan.refLoad} kg × 2–3</strong> (≈75 %, alue ${plan.refRange[0]}–${plan.refRange[1]} kg)` : '~70–80 % 1RM × 2–3'} maksimaalisella tahdolla. Tavoitenopeus noin ${vr}.
-          Sarjan jälkeen sovellus laskee päivän e1RM:n ja suosittelee työsarjat.</div>
-          ${plan.prevE1rm ? `<div style="font-size:11px; color:var(--muted);">Arvioitu 1RM ${plan.prevE1rm.toFixed(0)} kg${plan.last ? ` · viimeisin treeni ${fmtDateFi(plan.last.date)}` : ''}${plan.todayCount ? ` · tänään ${plan.todayCount} sarjaa, ei vielä 65–88 % sarjaa` : ''}</div>` : `<div style="font-size:11px; color:var(--muted);">Ei aiempaa dataa: lämmittele nousevasti – ensimmäinen sarja, jonka nopeus osuu yllä olevaan väliin, toimii viitesarjana.</div>`}
-          ${opts.withButtons && plan.refLoad ? `<button type="button" class="primary" data-plan-apply="${plan.refLoad}|3" style="margin-top:8px; width:100%;">Käytä: ${plan.refLoad} kg × 3</button>` : ''}`;
+        return `
+          ${opts.withButtons && plan.refLoad ? `<button type="button" class="primary" data-plan-apply="${plan.refLoad}|3" style="width:100%; min-height:46px; font-size:15px; margin-bottom:8px;">Käytä: ${plan.refLoad} kg × 3</button>` : ''}
+          <div class="plan-summary-line">🧠 Viitesarja: ${plan.refLoad ? `<strong>${plan.refLoad} kg × 2–3</strong> (≈75 %)` : '~70–80 % 1RM × 2–3'} · odotettu ${vr}</div>
+          <details class="details-toggle plan-why" ${opts.whyOpen ? 'open' : ''}>
+            <summary>▸ Miksi?</summary>
+            <div style="font-size:12px; line-height:1.45; color:var(--muted); margin-top:4px;">
+              Tee ensin viitesarja nousevan lämmittelyn päätteeksi (${plan.refLoad ? `${plan.refRange[0]}–${plan.refRange[1]} kg` : '70–80 %'}) maksimaalisella tahdolla, jotta sovellus laskee päivän e1RM:n ja työsarjat.
+              ${plan.prevE1rm ? `<div style="margin-top:4px;">Arvioitu 1RM ${plan.prevE1rm.toFixed(0)} kg${plan.last ? ` · viimeisin ${fmtDateFi(plan.last.date)}` : ''}</div>` : ''}
+              <div style="margin-top:4px;">${forecastHtml}</div>
+            </div>
+          </details>`;
       }
+
       const rd = plan.readiness;
-      const rdCls = rd === null ? '' : rd <= -5 ? 'red' : rd < -2 ? 'amber' : rd >= 3 ? 'green' : '';
+      const rdTxt = rd === null ? '' : ` · valmius <span class="${rd <= -5 ? 'red' : rd < -2 ? 'amber' : rd >= 3 ? 'green' : ''}">${rd >= 0 ? '+' : ''}${rd.toFixed(1)} %</span>`;
       const doneFrac = Math.min(1, plan.doneReps / Math.max(1, plan.volume));
       const nextLoad = plan.adjust ? plan.adjust.load : plan.load;
-      const loadRangeTxt = (plan.loLoad && plan.hiLoad && plan.loLoad !== plan.hiLoad) ? ` (alue ${plan.loLoad}–${plan.hiLoad} kg)` : '';
-      return `${head}
-        <div class="vbt-kpi-grid">
-          <div class="vbt-kpi"><span class="vbt-kpi-l">Päivän e1RM</span><span class="vbt-kpi-v">${plan.e1RM.toFixed(0)}</span><span class="vbt-kpi-s ${rdCls}">${rd === null ? 'ei vertailua' : (rd >= 0 ? '+' : '') + rd.toFixed(1) + ' % vs. ' + plan.baseline.toFixed(0)}</span></div>
-          <div class="vbt-kpi" style="grid-column: span 2;"><span class="vbt-kpi-l">Työsarjat</span><span class="vbt-kpi-v" style="color:#60a5fa;">${plan.sets} × ${plan.reps} @ ${plan.load} kg</span><span class="vbt-kpi-s">${Math.round(plan.pct)} % päivän e1RM${loadRangeTxt} · ${plan.sets * plan.reps} toistoa</span></div>
-          <div class="vbt-kpi"><span class="vbt-kpi-l">Nopeusohje</span><span class="vbt-kpi-v" style="font-size:16px;">${fmtV(plan.v0)}</span><span class="vbt-kpi-s">±0.03 · stop ${fmtV(plan.vCut)} (VL ${plan.cutoff} %)</span></div>
-        </div>
-        <div style="font-size:11px; color:var(--muted); margin:4px 0;">Prilepin ${plan.row.label}: ${plan.row.repsMin}–${plan.row.repsMax} toistoa/sarja, optimi ${plan.row.opt} (${plan.row.rangeLo}–${plan.row.rangeHi}) → tavoite <strong style="color:var(--text);">${plan.volume}</strong> toistoa</div>
-        <div class="progress-bar" style="margin:4px 0;"><div class="progress-fill ${doneFrac >= 1 ? 'done' : ''}" style="width:${Math.round(doneFrac * 100)}%"></div></div>
-        <div style="font-size:12px; margin-bottom:4px;">Tehty: <strong>${plan.doneSets}</strong> sarjaa / <strong>${plan.doneReps}</strong> toistoa${plan.remainingSets > 0 && plan.remainingReps > 0 ? ` · jäljellä ~${plan.remainingSets} × ${plan.reps}` : ' · <span class="green">volyymi täynnä ✓</span>'}</div>
-        ${plan.adjust ? `<div class="vbt-alert ${plan.adjust.type === 'down' ? 'amber' : ''}" style="${plan.adjust.type === 'up' ? 'background:rgba(34,197,94,0.14); border:1px solid rgba(34,197,94,0.5); color:#86efac;' : ''}">${plan.adjust.text}</div>` : ''}
-        <ul style="font-size:12px; line-height:1.45; margin:6px 0 0; padding-left:18px;">
-          <li>Päivän e1RM: viitesarja ${plan.ref.set.weightKg} kg @ ${fmtV(plan.ref.a.vBest)} m/s (${plan.e1Src}).</li>
-          ${plan.notes.map((n) => `<li>${n}</li>`).join('')}
-          <li>Toistot/sarja: min(Prilepin ${plan.row.repsMax}, VL-raja ${plan.repsVL}, RIR ≥ ${plan.goal.key === 'peaking' ? 1 : 2} → ${plan.repsRIR}) = ${plan.reps}. Nopeuskustannus ${plan.cost.toFixed(3)} m/s/toisto (${plan.costSrc}).</li>
-        </ul>
-        ${opts.withButtons && plan.remainingSets > 0 ? (
-          plan.adjust && plan.adjust.backoffOption && plan.adjust.repDropOption
-            ? `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
-                <button type="button" class="primary" data-plan-apply="${plan.adjust.backoffOption.load}|${plan.adjust.backoffOption.reps}" style="flex:1; font-size:12px;">Käytä A (kevennä): ${plan.adjust.backoffOption.load} kg × ${plan.adjust.backoffOption.reps}</button>
-                <button type="button" data-plan-apply="${plan.adjust.repDropOption.load}|${plan.adjust.repDropOption.reps}" style="flex:1; font-size:12px;">Käytä B (lyhennä): ${plan.adjust.repDropOption.load} kg × ${plan.adjust.repDropOption.reps}</button>
-              </div>`
-            : `<button type="button" class="primary" data-plan-apply="${nextLoad}|${plan.reps}" style="margin-top:8px; width:100%;">Käytä: ${nextLoad} kg × ${plan.reps}</button>`
-        ) : ''}`;
+      const actionHtml = opts.withButtons && plan.remainingSets > 0 ? (
+        plan.adjust && plan.adjust.backoffOption && plan.adjust.repDropOption
+          ? `${plan.adjust.shortReason ? `<div class="vbt-alert amber" style="margin-top:0; margin-bottom:8px;">${plan.adjust.shortReason}</div>` : ''}
+             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+               <button type="button" class="primary" data-plan-apply="${plan.adjust.backoffOption.load}|${plan.adjust.backoffOption.reps}" style="flex:1; min-height:46px; font-size:13px;">Käytä A: ${plan.adjust.backoffOption.load} kg × ${plan.adjust.backoffOption.reps}</button>
+               <button type="button" data-plan-apply="${plan.adjust.repDropOption.load}|${plan.adjust.repDropOption.reps}" style="flex:1; min-height:46px; font-size:13px;">Käytä B: ${plan.adjust.repDropOption.load} kg × ${plan.adjust.repDropOption.reps}</button>
+             </div>`
+          : `${plan.adjust && plan.adjust.type === 'up' ? `<div style="font-size:12px; color:#86efac; font-weight:700; margin-bottom:6px;">✓ Hyvä nopeus → suositus nostaa ${nextLoad} kg:aan</div>` : ''}
+             <button type="button" class="primary" data-plan-apply="${nextLoad}|${plan.reps}" style="width:100%; min-height:46px; font-size:15px; margin-bottom:8px;">Käytä: ${nextLoad} kg × ${plan.reps}</button>`
+      ) : (plan.adjust && plan.adjust.type === 'down' && plan.adjust.text ? `<div class="vbt-alert amber" style="margin-top:0; margin-bottom:8px;">${plan.adjust.text}</div>` : '');
+
+      return `
+        ${actionHtml}
+        <div class="plan-summary-line">Tänään ${plan.sets} × ${plan.reps} @ ${plan.load} kg · stop &lt; ${fmtV(plan.vCut)} m/s${rdTxt}</div>
+        <div class="progress-bar" style="margin:8px 0 6px;"><div class="progress-fill ${doneFrac >= 1 ? 'done' : ''}" style="width:${Math.round(doneFrac * 100)}%"></div></div>
+        <div style="font-size:12px; color:var(--muted);">Tehty <strong style="color:var(--text);">${plan.doneSets}/${plan.sets}</strong> sarjaa (${plan.doneReps}/${plan.volume} toistoa)${plan.remainingSets > 0 && plan.remainingReps > 0 ? ` · jäljellä ~${plan.remainingSets} × ${plan.reps}` : ' · <span class="green">volyymi täynnä ✓</span>'}</div>
+        <details class="details-toggle plan-why" ${opts.whyOpen ? 'open' : ''}>
+          <summary>▸ Miksi?</summary>
+          <div style="margin-top:6px;">
+            ${plan.adjust && plan.adjust.backoffOption ? `<div class="vbt-alert amber" style="margin-top:0; margin-bottom:6px; font-weight:500;">${plan.adjust.text}</div>` : ''}
+            <div style="font-size:12px; margin-bottom:6px;">${forecastHtml}</div>
+            <div style="font-size:11px; color:var(--muted); margin-bottom:4px;">Prilepin ${plan.row.label}: ${plan.row.repsMin}–${plan.row.repsMax} toistoa/sarja, optimi ${plan.row.opt} (${plan.row.rangeLo}–${plan.row.rangeHi}) → tavoite ${plan.volume} toistoa.</div>
+            <ul style="font-size:12px; line-height:1.45; margin:4px 0 0; padding-left:18px; color:var(--muted);">
+              <li>Päivän e1RM ${plan.e1RM.toFixed(0)} kg: viitesarja ${plan.ref.set.weightKg} kg @ ${fmtV(plan.ref.a.vBest)} m/s (${plan.e1Src}).</li>
+              ${plan.notes.map((n) => `<li>${n}</li>`).join('')}
+              <li>Toistot/sarja: min(Prilepin ${plan.row.repsMax}, VL ${plan.repsVL}, RIR ${plan.repsRIR}) = ${plan.reps}. Kustannus ${plan.cost.toFixed(3)} m/s/toisto.</li>
+            </ul>
+          </div>
+        </details>`;
     }
 
     function renderDailyPlanCard() {
       const el = document.getElementById('dailyPlanCard');
       if (!el) return;
       const ex = getCurrentSelectedExerciseName();
-      const plan = (getLiftCfg(ex) && !isFreeMode()) ? computeDailyPlan(ex, document.getElementById('workoutDate').value || todayISO()) : null;
+      const dateStr = document.getElementById('workoutDate').value || todayISO();
+      const plan = (getLiftCfg(ex) && !isFreeMode()) ? computeDailyPlan(ex, dateStr) : null;
       if (!plan) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+      const whyOpen = !!(el.querySelector('details.plan-why') && el.querySelector('details.plan-why').open);
       el.classList.remove('hidden');
-      el.innerHTML = buildDailyPlanHTML(plan, { withButtons: true });
+      el.innerHTML = buildDailyPlanHTML(plan, { withButtons: true, whyOpen, dateStr });
     }
     function applyPlanToSetup(load, reps) {
       const w = document.getElementById('weightInput');
@@ -4559,32 +5337,102 @@
       if (!reps || reps.length === 0) {
         return `
           <div style="width:100%; height:100%; min-height:80px; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:13px; text-align:center; padding: 12px 0;">
-            📊 Ei vielä toistoja nykyisessä sarjassa – aloita sarja ja tee toistoja!
+            📊 Ei vielä toistoja.
           </div>
         `;
       }
       const maxVel = Math.max(0.01, ...reps.map((r) => r.meanVelocity));
       return reps.map((r, idx) => {
         const heightPct = Math.max(10, Math.round((r.meanVelocity / maxVel) * 100));
-        const zoneClass = '';
-        const zoneTitle = `${r.meanVelocity.toFixed(2)} m/s`;
         return `
-          <div class="vel-col" title="${zoneTitle}">
+          <div class="vel-col" title="${r.meanVelocity.toFixed(2)} m/s">
             <span class="vel-col-val">${r.meanVelocity.toFixed(2)}</span>
-            <div class="vel-col-bar ${zoneClass}" style="height: ${heightPct}%;"></div>
+            <div class="vel-col-bar" style="height: ${heightPct}%;"></div>
             <span class="vel-col-lbl">#${idx + 1}</span>
           </div>
         `;
       }).join('');
     }
 
-    let openTodaySetIndices = new Set();
+    // --- Undo Toast & Safe Deletion ---
+    function findSetCoordinates(targetSetRef) {
+      if (!targetSetRef) return null;
+      for (const w of workouts) {
+        const sIdx = (w.sets || []).indexOf(targetSetRef);
+        if (sIdx !== -1) return { date: w.date, sIdx };
+      }
+      return null;
+    }
+
+    function captureUndoSnapshot(label) {
+      return {
+        label,
+        workouts: JSON.parse(JSON.stringify(workouts)),
+        currentReps: JSON.parse(JSON.stringify(currentReps)),
+        currentSetSaved,
+        lastSetStoppedAt,
+        workoutDoneState,
+        activeSetMeta: activeSetMeta ? { ...activeSetMeta } : null,
+        lastSavedCoords: lastSavedSetRef ? findSetCoordinates(lastSavedSetRef) : null
+      };
+    }
+
+    function hideUndoToast() {
+      if (undoTimerId) {
+        clearTimeout(undoTimerId);
+        undoTimerId = null;
+      }
+      undoState = null;
+      const toast = document.getElementById('undoToast');
+      if (toast) toast.classList.add('hidden');
+    }
+
+    function showUndoToast(label, snapshot) {
+      if (undoTimerId) clearTimeout(undoTimerId);
+      undoState = snapshot;
+      const toast = document.getElementById('undoToast');
+      const txt = document.getElementById('undoToastText');
+      if (txt) txt.textContent = label || 'Poistettu';
+      if (toast) toast.classList.remove('hidden');
+      undoTimerId = setTimeout(hideUndoToast, 6000);
+    }
+
+    function performUndo() {
+      if (!undoState) return;
+      const snap = undoState;
+      hideUndoToast();
+      workouts = snap.workouts;
+      currentReps = snap.currentReps;
+      currentSetSaved = snap.currentSetSaved;
+      lastSetStoppedAt = snap.lastSetStoppedAt;
+      workoutDoneState = snap.workoutDoneState;
+      activeSetMeta = snap.activeSetMeta;
+      lastSavedSetRef = null;
+      if (snap.lastSavedCoords) {
+        const w = workouts.find((x) => x.date === snap.lastSavedCoords.date);
+        if (w && w.sets && w.sets[snap.lastSavedCoords.sIdx]) {
+          lastSavedSetRef = w.sets[snap.lastSavedCoords.sIdx];
+        }
+      }
+      saveJSON(KEY_WORKOUTS, workouts);
+      if (getLiftUiState() === 'rest' && currentSetSaved && lastSetStoppedAt > 0) {
+        startRestTimer();
+      } else {
+        stopRestTimer();
+      }
+      renderLiveSet();
+      renderCalendar();
+      renderHistoryList();
+      if (!document.getElementById('tabAnalysis').classList.contains('hidden')) renderAnalysisTab();
+      refreshOpenSetAnalysisSheet();
+    }
 
     function deleteSavedSet(dateStr, setIdx) {
       const wIdx = workouts.findIndex((w) => w.date === dateStr);
       if (wIdx === -1) return;
       const w = workouts[wIdx];
       if (!w.sets || setIdx < 0 || setIdx >= w.sets.length) return;
+      const snap = captureUndoSnapshot('Sarja poistettu');
       const [removed] = w.sets.splice(setIdx, 1);
       if (w.sets.length === 0) {
         workouts.splice(wIdx, 1);
@@ -4593,21 +5441,88 @@
         currentReps = [];
         currentSetSaved = false;
         lastSavedSetRef = null;
+        stopRestTimer();
       }
-      const updated = new Set();
-      openTodaySetIndices.forEach((i) => {
-        if (i < setIdx) updated.add(i);
-        else if (i > setIdx) updated.add(i - 1);
-      });
-      openTodaySetIndices = updated;
-
+      if (activeSheetSetRef && activeSheetSetRef.dateStr === dateStr) {
+        if (activeSheetSetRef.setIdx === setIdx) {
+          closeSetAnalysisSheet();
+        } else if (activeSheetSetRef.setIdx > setIdx) {
+          activeSheetSetRef.setIdx--;
+        }
+      }
       saveJSON(KEY_WORKOUTS, workouts);
+      showUndoToast('Sarja poistettu', snap);
       renderLiveSet();
       renderCalendar();
       renderHistoryList();
+      if (!document.getElementById('tabAnalysis').classList.contains('hidden')) renderAnalysisTab();
     }
 
-    function buildSetAnalysisHTML(s) {
+    function deleteRepFromSavedSet(dateStr, setIdx, repIdx) {
+      const wIdx = workouts.findIndex((w) => w.date === dateStr);
+      if (wIdx === -1) return;
+      const w = workouts[wIdx];
+      if (!w.sets || !w.sets[setIdx] || !w.sets[setIdx].reps) return;
+      const s = w.sets[setIdx];
+      if (repIdx < 0 || repIdx >= s.reps.length) return;
+
+      const snap = captureUndoSnapshot('Toisto poistettu');
+      s.reps.splice(repIdx, 1);
+      if (lastSavedSetRef === s) {
+        currentReps = s.reps.map((r) => ({ ...r }));
+      }
+      if (s.reps.length === 0) {
+        w.sets.splice(setIdx, 1);
+        if (w.sets.length === 0) workouts.splice(wIdx, 1);
+        if (lastSavedSetRef === s) {
+          currentReps = [];
+          currentSetSaved = false;
+          lastSavedSetRef = null;
+          stopRestTimer();
+        }
+        if (activeSheetSetRef && activeSheetSetRef.dateStr === dateStr && activeSheetSetRef.setIdx === setIdx) {
+          closeSetAnalysisSheet();
+        }
+      }
+      saveJSON(KEY_WORKOUTS, workouts);
+      showUndoToast('Toisto poistettu', snap);
+      renderLiveSet();
+      renderCalendar();
+      renderHistoryList();
+      if (!document.getElementById('tabAnalysis').classList.contains('hidden')) renderAnalysisTab();
+      refreshOpenSetAnalysisSheet();
+    }
+
+    function deleteLiveRep(idx) {
+      if (idx < 0 || idx >= currentReps.length) return;
+      const snap = captureUndoSnapshot('Toisto poistettu');
+      currentReps.splice(idx, 1);
+      if (lastSavedSetRef && Array.isArray(lastSavedSetRef.reps)) {
+        lastSavedSetRef.reps.splice(idx, 1);
+        if (lastSavedSetRef.reps.length === 0) {
+          const coords = findSetCoordinates(lastSavedSetRef);
+          if (coords) {
+            const wIdx = workouts.findIndex((w) => w.date === coords.date);
+            if (wIdx !== -1) {
+              workouts[wIdx].sets.splice(coords.sIdx, 1);
+              if (workouts[wIdx].sets.length === 0) workouts.splice(wIdx, 1);
+            }
+          }
+          lastSavedSetRef = null;
+          currentSetSaved = false;
+          stopRestTimer();
+        }
+        saveJSON(KEY_WORKOUTS, workouts);
+        renderCalendar();
+        renderHistoryList();
+      }
+      showUndoToast('Toisto poistettu', snap);
+      renderLiveSet();
+      if (!document.getElementById('tabAnalysis').classList.contains('hidden')) renderAnalysisTab();
+      refreshOpenSetAnalysisSheet();
+    }
+
+    function buildSetAnalysisHTML(s, opts = {}) {
       const reps = s.reps || [];
       const count = reps.length;
       if (count === 0) {
@@ -4617,76 +5532,9 @@
       const avgVel = count ? reps.reduce((a, r) => a + (r.meanVelocity || 0), 0) / count : 0;
       const bestWatt = Math.max(0, ...reps.map((r) => r.power || 0));
       const avgRom = count ? reps.reduce((a, r) => a + (r.rangeOfMotionCm || 0), 0) / count : 0;
-      const dropPct = calcVelocityDropPct(reps, s.exercise);
-      const est1RM = calcEpley1RM(s.weightKg, count);
       const setA = analyzeSet(reps, s.exercise, s.weightKg);
 
-      const zone = classifyVbtVelocity(s.exercise, avgVel) || getVbtZoneForVelocity(s.exercise, avgVel);
-
-      let zoneTitle = 'Voima-alue';
-      let zoneSub = '';
-      let zoneDesc = '';
-      let zoneIcon = '🎯';
-      let zoneClass = 'zone-acc';
-
-      if (zone) {
-        zoneTitle = zone.label;
-        zoneSub = zone.subLabel || (zone.rangeText ? `Liikenopeusalue: ${zone.rangeText}` : '');
-        zoneIcon = zone.icon || '🎯';
-        zoneClass = zone.cssClass || 'zone-acc';
-
-        switch (zone.key) {
-          case 'max':
-            zoneDesc = 'Sarja kohdistui <strong>maksimivoima-alueelle</strong>. Suuri ulkoinen vastus kehittää maksimaalista voimantuottoa, nopeiden motoristen yksiköiden rekrytointia ja hermolihasjärjestelmän käskytyskykyä.';
-            break;
-          case 'acc':
-            zoneDesc = 'Sarja kohdistui <strong>voima-alueelle (perusvoima)</strong>. Ihanteellinen kuormitusalue voimatason ja lihasmassan (hypertrofia) kasvattamiseen sekä suoritusvarmuuden kehittämiseen.';
-            break;
-          case 'str-spd':
-            zoneDesc = 'Sarja kohdistui <strong>nopeusvoiman voimapainotteiselle alueelle</strong> (tehoalue). Kehittää dynaamista tehoa (Watt), kykyä liikuttaa vastusta suurella kiihtyvyydellä ja parantaa voiman siirtonopeutta.';
-            break;
-          case 'spd-str':
-            zoneDesc = 'Sarja kohdistui <strong>nopeusvoiman räjähtävälle alueelle</strong>. Maksimoi liikenopeuden ja hermoston syttymisnopeuden (RFD). Kehittää räjähtävyyttä ja elastista voimantuottoa.';
-            break;
-          default:
-            zoneDesc = `Sarja kohdistui alueelle <strong>${zone.label}</strong>.`;
-            break;
-        }
-      }
-
-      // Toistojen jakauma osa-alueittain
-      const zoneCounts = {};
-      reps.forEach((r) => {
-        const rz = classifyVbtVelocity(s.exercise, r.meanVelocity) || getVbtZoneForVelocity(s.exercise, r.meanVelocity);
-        if (rz) {
-          if (!zoneCounts[rz.key]) {
-            zoneCounts[rz.key] = { label: rz.label, icon: rz.icon, count: 0, cssClass: rz.cssClass };
-          }
-          zoneCounts[rz.key].count++;
-        }
-      });
-
-      const zonePillsHtml = Object.values(zoneCounts).map((zc) => {
-        return `<span class="vbt-zone-badge ${zc.cssClass}" style="font-size:11px; padding:3px 8px;">${zc.icon} ${zc.label}: <strong>${zc.count} ${zc.count === 1 ? 'toisto' : 'toistoa'}</strong></span>`;
-      }).join(' ');
-
-      // Fatigue assessment
-      let dropDesc = '';
-      if (dropPct !== null) {
-        const cut = setA.cutoffPct;
-        const red = setA.redVl;
-        if (dropPct <= cut) {
-          dropDesc = `Nopeuden lasku pysyi tavoitteen (${getGoal().short}) VL-rajan ${cut} % sisällä – hermostollinen laatu säilyi, väsymys ja palautumistarve pienet.`;
-        } else if (dropPct <= red) {
-          dropDesc = `VL-raja ${cut} % ylittyi – viimeiset toistot kerryttivät enemmän väsymystä kuin maksimivoimaärsykettä. Katkaise sarja aiemmin.`;
-        } else {
-          dropDesc = `Nopeuden lasku yli ${red} % – keskushermoston väsymys ja tekniikan hajoamisen riski. Harjoitusvaikutus siirtyy kohti voimakestävyyttä ja palautuminen pitenee.`;
-        }
-      }
-
-      // Rep table
       const repListRows = reps.map((r, rIdx) => {
-        const rZone = classifyVbtVelocity(s.exercise, r.meanVelocity) || getVbtZoneForVelocity(s.exercise, r.meanVelocity);
         const pr = setA.perRep[rIdx];
         const repDrop = pr && pr.vl !== null ? pr.vl : null;
         const qDot = pr ? `<span class="q-dot" style="border-color:${Q_COLORS[pr.quality]}" title="${pr.quality}"></span>` : '';
@@ -4696,26 +5544,40 @@
           : (repDrop === null || (pr && pr.v >= pr.bestSoFar && rIdx === setA.vBestIdx))
             ? '<span style="color:var(--muted); font-size:11px;">paras</span>'
             : `<span class="${repDrop > setA.cutoffPct ? (repDrop > setA.redVl ? 'red' : 'amber') : 'green'}" style="font-size:11px; font-weight:600;">VL ${repDrop.toFixed(0)} %</span> ${rirHtml}`;
-        const zoneBadge = rZone ? `<span class="vbt-zone-badge ${rZone.cssClass}" style="font-size:10px; padding:2px 6px;">${rZone.icon} ${rZone.label}</span>` : '';
+        const delBtn = opts.allowRepDelete
+          ? `<button type="button" data-del-set-rep="${rIdx}" title="Poista toisto" style="padding: 3px 8px; font-size: 11px; border-radius: 6px; background: transparent; border: 1px solid var(--border); color: var(--muted);">✕</button>`
+          : '';
         return `
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; background:rgba(15,23,42,0.55); border:1px solid rgba(51,65,85,0.4); padding:5px 8px; border-radius:7px; font-size:12px; font-variant-numeric:tabular-nums; flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; background:rgba(15,23,42,0.55); border:1px solid rgba(51,65,85,0.4); padding:6px 8px; border-radius:7px; font-size:12px; font-variant-numeric:tabular-nums; flex-wrap:wrap;">
             <span style="font-weight:700; color:var(--muted); width:38px;">${qDot}#${rIdx + 1}</span>
             <strong style="color:var(--text);">${r.meanVelocity.toFixed(2)} m/s</strong>
             <span style="color:var(--muted); font-size:11px;">${(r.power || 0).toFixed(0)} W</span>
             <span style="color:var(--muted); font-size:11px;">${(r.rangeOfMotionCm || 0).toFixed(0)} cm</span>
             <div>${dropHtml}</div>
             ${pr && pr.rqi !== null && pr.rqi !== undefined ? `<span style="color:var(--muted); font-size:11px;">RQI ${Math.round(pr.rqi)}</span>` : ''}
+            ${delBtn}
           </div>
         `;
       }).join('');
 
-      return `
-        <div class="today-set-detail-content" style="display:flex; flex-direction:column; gap:10px; margin-top:8px; padding-top:10px; border-top:1px solid var(--border);">
-          
-          <!-- Syvä VBT-laatuanalyysi -->
-          ${buildVbtSetBlockHTML(s, s._date)}
+      const meta = s.traceMeta;
+      const traceStatusHtml = opts.showTraceStatus && (meta || lastTraceStatus)
+        ? `<div style="font-size:11px; color:var(--muted);">${
+            meta
+              ? `📡 Pin 80 Hz: ${meta.matched}/${count} toistoa · ${meta.samples} näytettä${meta.barAxis ? ' · akseli ' + meta.barAxis.toUpperCase() : ''}`
+              : lastTraceStatus
+          }</div>`
+        : '';
 
-          <!-- Tilastoruudukko -->
+      const delSetHtml = opts.allowSetDelete
+        ? `<button type="button" class="danger" data-del-this-set="1" style="width:100%; min-height:44px; margin-top:4px;">🗑 Poista tämä sarja</button>`
+        : '';
+
+      return `
+        <div class="today-set-detail-content" style="display:flex; flex-direction:column; gap:10px; margin-top:6px;">
+          ${traceStatusHtml}
+          ${buildVbtSetBlockHTML(s, opts.dateStr || s._date)}
+
           <div class="stat-pill-grid">
             <div class="stat-pill">
               <span class="stat-pill-label">Keskinopeus</span>
@@ -4735,7 +5597,6 @@
             </div>
           </div>
 
-          <!-- Toistokohtainen erittely -->
           <div>
             <div class="row" style="margin-bottom:4px;">
               <span style="font-size:12px; font-weight:700; color:var(--text);">Toistoerittely</span>
@@ -4745,9 +5606,222 @@
               ${repListRows}
             </div>
           </div>
-
+          ${delSetHtml}
         </div>
       `;
+    }
+
+    function bindSetAnalysisActions(containerEl, dateStr, workoutSetIdx) {
+      if (!containerEl) return;
+      containerEl.querySelectorAll('[data-del-set-rep]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const rIdx = parseInt(btn.getAttribute('data-del-set-rep'), 10);
+          deleteRepFromSavedSet(dateStr, workoutSetIdx, rIdx);
+        });
+      });
+      const delSetBtn = containerEl.querySelector('[data-del-this-set]');
+      if (delSetBtn) {
+        delSetBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          deleteSavedSet(dateStr, workoutSetIdx);
+        });
+      }
+    }
+
+    function openSetAnalysisSheet(dateStr, workoutSetIdx) {
+      const w = workouts.find((x) => x.date === dateStr);
+      if (!w || !w.sets || !w.sets[workoutSetIdx]) return;
+      const s = w.sets[workoutSetIdx];
+      activeSheetSetRef = { dateStr, setIdx: workoutSetIdx };
+      const titleEl = document.getElementById('setAnalysisSheetTitle');
+      const bodyEl = document.getElementById('setAnalysisSheetBody');
+      if (titleEl) titleEl.textContent = `Sarja #${workoutSetIdx + 1} · ${s.exercise} (${s.weightKg} kg)`;
+      if (bodyEl) {
+        bodyEl.innerHTML = buildSetAnalysisHTML(s, {
+          dateStr,
+          workoutSetIdx,
+          showTraceStatus: true,
+          allowRepDelete: true,
+          allowSetDelete: true
+        });
+        bindSetAnalysisActions(bodyEl, dateStr, workoutSetIdx);
+      }
+      document.getElementById('setAnalysisSheet').classList.remove('hidden');
+    }
+
+    function closeSetAnalysisSheet() {
+      activeSheetSetRef = null;
+      const sh = document.getElementById('setAnalysisSheet');
+      if (sh) sh.classList.add('hidden');
+    }
+
+    function refreshOpenSetAnalysisSheet() {
+      const sh = document.getElementById('setAnalysisSheet');
+      if (!sh || sh.classList.contains('hidden') || !activeSheetSetRef) return;
+      const { dateStr, setIdx } = activeSheetSetRef;
+      const w = workouts.find((x) => x.date === dateStr);
+      if (!w || !w.sets || !w.sets[setIdx]) {
+        closeSetAnalysisSheet();
+        return;
+      }
+      openSetAnalysisSheet(dateStr, setIdx);
+    }
+
+    function renderRestSummaryCard() {
+      if (getLiftUiState() !== 'rest') return;
+      const meta = (lastSavedSetRef) || activeSetMeta || snapshotCurrentSetMeta();
+      const dateStr = document.getElementById('workoutDate').value || todayISO();
+      const displaySetNum = getActiveSetDisplayNumber();
+      const titleEl = document.getElementById('restSetTitle');
+      const timerBadge = document.getElementById('restTimerBadge');
+      const unsavedBox = document.getElementById('restUnsavedActions');
+      const resultEl = document.getElementById('restResultLine');
+      const compEl = document.getElementById('restCompareLine');
+      const findEl = document.getElementById('restFindingLine');
+      const repsSumEl = document.getElementById('restRepsSummary');
+      const listEl = document.getElementById('repList');
+      const analyzeBtn = document.getElementById('restAnalyzeBtn');
+
+      if (currentSetSaved) {
+        if (titleEl) {
+          titleEl.textContent = `✓ Sarja #${displaySetNum} tallennettu`;
+          titleEl.style.color = 'var(--green)';
+        }
+        if (timerBadge) timerBadge.classList.remove('hidden');
+        if (unsavedBox) unsavedBox.classList.add('hidden');
+        updateRestTimerDisplay();
+      } else {
+        if (titleEl) {
+          titleEl.textContent = `● Sarja #${displaySetNum} kesken (ei tallennettu)`;
+          titleEl.style.color = 'var(--amber)';
+        }
+        if (timerBadge) timerBadge.classList.add('hidden');
+        if (unsavedBox) unsavedBox.classList.remove('hidden');
+      }
+
+      const ex = meta.exercise || getCurrentSelectedExerciseName();
+      const wKg = Number(meta.weightKg) || 0;
+      const prof = (!isFreeMode() && getLiftCfg(ex)) ? recentProfile(ex, dateStr) : null;
+      const a = analyzeSet(currentReps, ex, wKg, { profile: prof });
+      const bestV = a.vBest || Math.max(0, ...currentReps.map((r) => r.meanVelocity || 0));
+
+      const metricsParts = [`${wKg} kg × ${currentReps.length}`, `paras ${fmtV(bestV)} m/s`];
+      if (!isFreeMode()) {
+        if (a.vlFinal !== null) metricsParts.push(`VL ${a.vlFinal.toFixed(0)} %`);
+        if (a.rirEnd !== null) metricsParts.push(`RIR ~${a.rirEnd >= 10 ? '10+' : a.rirEnd}`);
+      }
+      if (resultEl) resultEl.textContent = metricsParts.join(' · ');
+
+      // Same-load history comparison
+      const prevLoads = getRecentSameLoadHistory(ex, wKg, dateStr, 3);
+      if (compEl) {
+        if (prevLoads.length && bestV > 0) {
+          const avgPrev = prevLoads.reduce((s, x) => s + x.vBest, 0) / prevLoads.length;
+          const deltaPct = ((bestV - avgPrev) / avgPrev) * 100;
+          compEl.classList.remove('hidden');
+          compEl.textContent = `Vs. edelliset @ ${wKg} kg: ${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(1)} % (${fmtV(bestV)} vs ${fmtV(avgPrev)} m/s)`;
+        } else {
+          compEl.classList.add('hidden');
+          compEl.textContent = '';
+        }
+      }
+
+      // Max 1 finding line
+      if (findEl) {
+        const finding = isFreeMode() ? null : buildShortRestFinding(a, ex);
+        if (finding) {
+          findEl.className = finding.cls;
+          findEl.classList.remove('hidden');
+          findEl.textContent = finding.text;
+        } else {
+          findEl.classList.add('hidden');
+          findEl.textContent = '';
+        }
+      }
+
+      if (analyzeBtn) {
+        const coords = lastSavedSetRef ? findSetCoordinates(lastSavedSetRef) : null;
+        analyzeBtn.classList.toggle('hidden', !coords);
+      }
+
+      if (repsSumEl) repsSumEl.textContent = `▸ Toistot (${currentReps.length})`;
+      if (listEl) {
+        listEl.innerHTML = '';
+        const maxVel = Math.max(0.01, ...currentReps.map((r) => r.meanVelocity));
+        currentReps.forEach((r, idx) => {
+          const div = document.createElement('div');
+          div.className = 'rep-item';
+          const lowHtml = r.loweringVelocity !== null
+            ? `<span class="${isControlled(r.loweringVelocity) ? 'green' : 'red'}">↓ ${r.loweringVelocity.toFixed(2)} m/s</span>`
+            : `<span style="color:var(--muted)">↓ …</span>`;
+          const pr = a ? a.perRep[idx] : null;
+          const widthPct = Math.max(6, Math.round((r.meanVelocity / maxVel) * 100));
+          const qDot = pr ? `<span class="q-dot" style="border-color:${Q_COLORS[pr.quality]}"></span>` : '';
+          const vsFirstHtml = isFreeMode() ? '' : (pr && pr.suspect)
+            ? `<span style="color:#64748b; font-size:12px;">epäilyttävä</span>`
+            : (!pr || pr.vl === null || idx === a.vBestIdx)
+              ? `<span style="color:var(--muted); font-size:12px;">paras</span>`
+              : `<span class="${pr.vl > a.redVl ? 'red' : (pr.vl > a.cutoffPct ? 'amber' : 'green')}" style="font-size:12px; font-weight:600;">VL ${pr.vl.toFixed(0)} %</span>`
+                + (pr.rir !== null ? ` <span style="color:var(--muted); font-size:12px;">RIR ~${pr.rir >= 10 ? '10+' : pr.rir}</span>` : '');
+
+          div.innerHTML = `
+            <div class="rep-item-top" style="flex-wrap: wrap;">
+              <span class="rep-num">${qDot}#${idx + 1}</span>
+              <span><strong>${r.meanVelocity.toFixed(2)} m/s</strong> (${r.power.toFixed(0)} W)</span>
+              ${vsFirstHtml}
+              ${lowHtml}
+              <span style="color:var(--muted)">${r.rangeOfMotionCm.toFixed(0)} cm</span>
+              <button type="button" data-del-live-rep="${idx}" title="Poista toisto" style="padding: 4px 8px; font-size: 12px; border-radius: 6px; background: transparent; border: 1px solid var(--border); color: var(--muted); min-width:34px; min-height:32px;">✕</button>
+            </div>
+            <div class="rep-bar-track">
+              <div class="rep-bar-fill" style="width: ${widthPct}%;"></div>
+            </div>
+          `;
+          div.querySelector('[data-del-live-rep]').addEventListener('click', () => deleteLiveRep(idx));
+          listEl.appendChild(div);
+        });
+      }
+    }
+
+    function renderDoneSummaryCard() {
+      const card = document.getElementById('doneSummaryCard');
+      if (!card || getLiftUiState() !== 'done') return;
+      const dateStr = document.getElementById('workoutDate').value || todayISO();
+      const sets = getCompletedSetsForCurrentDate();
+      const totalReps = sets.reduce((sum, s) => sum + ((s.reps && s.reps.length) || 0), 0);
+      const tonnage = sets.reduce((sum, s) => sum + ((s.weightKg || 0) * ((s.reps && s.reps.length) || 0)), 0);
+      let overVlCount = 0;
+      let bestE1 = null;
+      sets.forEach((s) => {
+        const a = analyzeSet(s.reps, s.exercise, s.weightKg);
+        if (!a.isWarmup && a.vlFinal !== null && a.vlFinal > a.cutoffPct) overVlCount++;
+        if (a.e1RM && (!bestE1 || a.e1RM > bestE1.e1RM)) bestE1 = { ex: s.exercise, e1RM: a.e1RM };
+      });
+      card.innerHTML = `
+        <div class="row">
+          <strong style="font-size:15px; color:var(--green);">🏁 Treeni valmis · ${fmtDateFi(dateStr)}</strong>
+          <span style="font-size:12px; color:var(--muted);">${sets.length} sarjaa</span>
+        </div>
+        <div class="stat-pill-grid" style="grid-template-columns: repeat(2, 1fr);">
+          <div class="stat-pill"><span class="stat-pill-label">Sarjat / toistot</span><span class="stat-pill-val">${sets.length} / ${totalReps}</span></div>
+          <div class="stat-pill"><span class="stat-pill-label">Tonnimäärä</span><span class="stat-pill-val">${Math.round(tonnage)} kg</span></div>
+          <div class="stat-pill"><span class="stat-pill-label">Paras e1RM</span><span class="stat-pill-val" style="color:#60a5fa;">${bestE1 ? bestE1.e1RM.toFixed(0) + ' kg' : '--'}</span></div>
+          <div class="stat-pill"><span class="stat-pill-label">VL-rajan ylityksiä</span><span class="stat-pill-val ${overVlCount ? 'amber' : 'green'}">${overVlCount}</span></div>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;">
+          <button type="button" id="doneOpenAnaBtn" class="primary" style="flex:1; min-height:48px;">📈 Avaa Analyysi</button>
+          <button type="button" id="resumeWorkoutBtn" style="flex:1; min-height:48px;">▶ Aloita uusi sarja</button>
+        </div>
+      `;
+      card.querySelector('#doneOpenAnaBtn').addEventListener('click', () => {
+        anaDate = dateStr;
+        showTab('analysis', 'sessio');
+      });
+      card.querySelector('#resumeWorkoutBtn').addEventListener('click', () => {
+        workoutDoneState = false;
+        renderLiveSet();
+      });
     }
 
     function renderTodaySetsOnLiftTab() {
@@ -4764,57 +5838,44 @@
       }
 
       card.classList.remove('hidden');
-      countEl.textContent = `${sets.length} sarjaa valmiina`;
+      countEl.textContent = `${sets.length} sarjaa`;
       listEl.innerHTML = sets.map((s, idx) => {
         const count = s.reps ? s.reps.length : 0;
-        const bestVel = Math.max(0, ...s.reps.map((r) => r.meanVelocity || 0));
-        const avgVel = count ? s.reps.reduce((a, r) => a + (r.meanVelocity || 0), 0) / count : 0;
+        const bestVel = count ? Math.max(0, ...s.reps.map((r) => r.meanVelocity || 0)) : 0;
         const dropPct = calcVelocityDropPct(s.reps, s.exercise);
         const qa = analyzeSet(s.reps, s.exercise, s.weightKg);
-        const dropText = (dropPct !== null ? ` • VL ${dropPct.toFixed(0)} %` : '')
-          + (qa.n ? ` • ${qa.isWarmup ? 'Lämmittely' : `Laatu <strong class="${qa.gradeClass}">${qa.score}</strong>`}` : '')
-          + (qa.rirEnd !== null ? ` • RIR ~${qa.rirEnd}` : '');
-        const rmText = qa.e1RM ? ` • e1RM <strong style="color:#60a5fa;">${qa.e1RM.toFixed(0)} kg</strong>` : '';
-        const vbtText = (s.free ? ' • 📝 vapaa' : '') + (qa.pct1RM !== null ? ` • ~${Math.round(qa.pct1RM)} % 1RM` : '');
-        const isOpen = openTodaySetIndices.has(idx);
-
+        const parts = [
+          `<strong>#${idx + 1}</strong> ${s.exercise}`,
+          `${s.weightKg} × ${count}`
+        ];
+        if (bestVel > 0) parts.push(`${bestVel.toFixed(2)} m/s`);
+        if (!s.free && dropPct !== null) parts.push(`VL ${dropPct.toFixed(0)} %`);
+        if (!s.free && qa.rirEnd !== null) parts.push(`RIR ~${qa.rirEnd >= 10 ? '10+' : qa.rirEnd}`);
         return `
-          <div class="today-set-item ${isOpen ? 'expanded' : ''}" data-today-idx="${idx}">
-            <div class="today-set-header">
-              <div class="row" style="gap: 8px;">
-                <div style="display:flex; align-items:center; gap:6px; min-width:0;">
-                  <span class="today-set-chevron">${isOpen ? '▼' : '▶'}</span>
-                  <strong style="font-size: 13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Sarja #${idx + 1}: ${s.exercise}</strong>
-                </div>
-                <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
-                  <span style="color: var(--muted); font-size: 12px;">${s.weightKg} kg • ${count}/${s.targetReps} toistoa</span>
-                  <button type="button" class="danger" data-del-set-idx="${idx}" title="Poista sarja" style="padding: 3px 8px; font-size: 11px; border-radius: 6px;">🗑 Poista</button>
-                </div>
-              </div>
-              <div class="row" style="font-size: 12px; color: var(--muted); margin-top: 3px; align-items: center;">
-                <div style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                  Paras: ${bestVel.toFixed(2)} m/s${vbtText}${dropText}${rmText}
-                </div>
-                <span class="today-set-hint" style="font-size: 11px; color: var(--accent); font-weight: 600; flex-shrink:0;">
-                  ${isOpen ? 'Sulje ▲' : 'Palkit & analyysi ▼'}
-                </span>
-              </div>
+          <div class="today-set-compact" data-today-idx="${idx}">
+            <div class="today-set-compact-main">
+              <div style="font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${parts.join(' · ')}</div>
             </div>
-            ${isOpen ? buildSetAnalysisHTML(Object.assign({ _date: dateStr }, s)) : ''}
+            <div class="today-set-compact-actions">
+              <button type="button" data-analyze-set-idx="${idx}" style="color:#93c5fd; border-color:rgba(59,130,246,0.45);">Analysoi ›</button>
+              <button type="button" class="danger" data-del-set-idx="${idx}" title="Poista sarja" aria-label="Poista sarja">🗑</button>
+            </div>
           </div>
         `;
       }).join('');
 
-      listEl.querySelectorAll('.today-set-item').forEach((itemEl) => {
-        itemEl.addEventListener('click', (e) => {
-          if (e.target.closest('[data-del-set-idx]')) return;
-          const idx = parseInt(itemEl.getAttribute('data-today-idx'), 10);
-          if (openTodaySetIndices.has(idx)) {
-            openTodaySetIndices.delete(idx);
-          } else {
-            openTodaySetIndices.add(idx);
-          }
-          renderTodaySetsOnLiftTab();
+      listEl.querySelectorAll('[data-analyze-set-idx]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const idx = parseInt(btn.getAttribute('data-analyze-set-idx'), 10);
+          openSetAnalysisSheet(dateStr, idx);
+        });
+      });
+
+      listEl.querySelectorAll('.today-set-compact-main').forEach((rowMain) => {
+        rowMain.addEventListener('click', () => {
+          const idx = parseInt(rowMain.closest('.today-set-compact').getAttribute('data-today-idx'), 10);
+          openSetAnalysisSheet(dateStr, idx);
         });
       });
 
@@ -4827,237 +5888,170 @@
       });
     }
 
-    function renderVbtZoneBox(exerciseName, lastVel) {
-      const box = document.getElementById('vbtZoneBox');
-      const titleEl = document.getElementById('vbtTitleLabel');
-      const mvtEl = document.getElementById('vbtMvtLabel');
-      const gridEl = document.getElementById('vbtZoneGrid');
-      const liveBadge = document.getElementById('liveVbtBadge');
-      if (!box || !gridEl) return;
-
-      const profile = getVbtProfileForExercise(exerciseName);
-      if (!profile) {
-        box.classList.add('hidden');
-        gridEl.innerHTML = '';
-        if (liveBadge) {
-          liveBadge.classList.add('hidden');
-          liveBadge.textContent = '';
-        }
-        return;
-      }
-
-      box.classList.remove('hidden');
-      titleEl.textContent = `🎯 Voiman osa-alueet (${exerciseName})`;
-      const effMvt = getEffectiveMvt(exerciseName);
-      mvtEl.textContent = effMvt ? `Failure-raja (MVT): ${fmtV(effMvt.value)} m/s · ${effMvt.label}` : profile.mvtText;
-
-      const activeZone = classifyVbtVelocity(exerciseName, lastVel);
-
-      gridEl.innerHTML = profile.zones.map((z) => {
-        const isSelected = selectedTargetVbtZoneKey === z.key;
-        const isHit = activeZone && activeZone.key === z.key;
-        const cls = 'vbt-zone-row'
-          + (isSelected ? ' target-selected' : '')
-          + (isHit ? ' active-hit' : '');
-        return `
-          <div class="${cls}" data-zone-key="${z.key}">
-            <div style="display:flex; align-items:center; gap:6px; min-width:0;">
-              <span>${z.icon}</span>
-              <div style="display:flex; flex-direction:column; min-width:0;">
-                <strong style="font-size:12px; color:var(--text);">${z.label}${isSelected ? ' (Tavoite)' : ''}${isHit ? ' ✓' : ''}</strong>
-                <span style="font-size:11px; color:var(--muted);">Kuorma: ${z.subLabel}</span>
-              </div>
-            </div>
-            <strong style="font-size:12px; white-space:nowrap;">${z.rangeText}</strong>
-          </div>
-        `;
-      }).join('');
-
-      gridEl.querySelectorAll('.vbt-zone-row').forEach((rowEl) => {
-        rowEl.addEventListener('click', () => {
-          const key = rowEl.getAttribute('data-zone-key');
-          selectedTargetVbtZoneKey = (selectedTargetVbtZoneKey === key) ? null : key;
-          renderLiveSet();
-        });
-      });
-
-      if (liveBadge) {
-        if (activeZone && lastVel !== null && lastVel !== undefined) {
-          liveBadge.className = `vbt-zone-badge ${activeZone.cssClass}`;
-          const mvtNote = (effMvt && lastVel < effMvt.value) ? ' (alle MVT!)' : '';
-          liveBadge.textContent = `${activeZone.icon} ${activeZone.label}${mvtNote}`;
-          liveBadge.classList.remove('hidden');
-        } else if (selectedTargetVbtZoneKey) {
-          const targetZ = profile.zones.find((z) => z.key === selectedTargetVbtZoneKey);
-          if (targetZ) {
-            liveBadge.className = `vbt-zone-badge ${targetZ.cssClass}`;
-            liveBadge.textContent = `🎯 Tavoite: ${targetZ.label} (${targetZ.rangeText})`;
-            liveBadge.classList.remove('hidden');
-          } else {
-            liveBadge.classList.add('hidden');
-          }
-        } else {
-          liveBadge.classList.add('hidden');
-          liveBadge.textContent = '';
-        }
-      }
-    }
-
     function renderLiveSet() {
       const weightKg = parseFloat(document.getElementById('weightInput').value) || 0;
       const target = parseInt(document.getElementById('targetRepsInput').value, 10) || 5;
       const count = currentReps.length;
       const last = currentReps[count - 1];
-      const displaySetNum = getActiveSetDisplayNumber();
-      const currentExercise = getCurrentSelectedExerciseName();
+      const currentExercise = (activeSetMeta && setActive && activeSetMeta.exercise) ? activeSetMeta.exercise : getCurrentSelectedExerciseName();
+      const activeWeight = (activeSetMeta && setActive && activeSetMeta.weightKg !== undefined) ? activeSetMeta.weightKg : weightKg;
+      const dateStr = document.getElementById('workoutDate').value || todayISO();
+
+      const uiState = getLiftUiState();
+      const tabLift = document.getElementById('tabLift');
+      if (tabLift) tabLift.dataset.state = uiState;
 
       document.body.classList.toggle('free-mode', isFreeMode());
       document.getElementById('modeGuidedBtn').classList.toggle('active', !isFreeMode());
       document.getElementById('modeFreeBtn').classList.toggle('active', isFreeMode());
 
-      const badge = document.getElementById('setNumberBadge');
-      const nextNum = getCompletedSetsForCurrentDate().length + 1;
-      if (currentSetSaved && count > 0) {
-        badge.textContent = `✓ Sarja #${displaySetNum} tallennettu (Seuraava: #${nextNum})`;
-        badge.className = 'set-badge saved';
-      } else {
-        badge.textContent = setActive ? `● Sarja #${displaySetNum} käynnissä` : `Sarja #${displaySetNum}`;
-        badge.className = 'set-badge';
-      }
+      const clearBtn = document.getElementById('clearRepsBtn');
+      if (clearBtn) clearBtn.classList.toggle('hidden', count === 0);
 
-      const readinessEl = document.getElementById('readinessBanner');
-      if (readinessEl) {
-        if (!dataChar) {
-          readinessEl.className = 'readiness-banner';
-          readinessEl.textContent = '⚪ Yhdistä Pin yläkulmasta aloittaaksesi';
-        } else if (zeroing) {
-          readinessEl.className = 'readiness-banner calibrating';
-          readinessEl.textContent = `⏳ Kalibroidaan anturia (${zeroCountdownSec} s) – pidä painopakka paikallaan...`;
-        } else if (setActive) {
-          readinessEl.className = 'readiness-banner active-set';
-          readinessEl.textContent = `🟢 SARJA #${displaySetNum} KÄYNNISSÄ – TEE TOISTOJA NYT!`;
-        } else if (currentSetSaved && count > 0) {
-          readinessEl.className = 'readiness-banner ready-to-start';
-          readinessEl.textContent = `✅ Sarja #${displaySetNum} valmis! Paina "▶ Aloita sarja #${nextNum}" kun aloitat seuraavan`;
-        } else {
-          readinessEl.className = 'readiness-banner ready-to-start';
-          readinessEl.textContent = `✅ PIN VALMIS – Paina "▶ Aloita sarja #${nextNum}" ja aloita nostaminen!`;
-        }
-      }
+      // Analyze active/current set for hero view
+      const prof = (!isFreeMode() && getLiftCfg(currentExercise)) ? recentProfile(currentExercise, dateStr) : null;
+      const liveA = count > 0 ? analyzeSet(currentReps, currentExercise, activeWeight, { profile: prof }) : null;
+      const lastP = (liveA && liveA.valid.length) ? liveA.valid[liveA.valid.length - 1] : null;
 
-      const metricsRow = document.getElementById('liveMetricsRow');
-      if (metricsRow) {
-        if (last) {
-          metricsRow.classList.remove('hidden');
-          const lastVelEl = document.getElementById('liveLastVel');
-          if (lastVelEl) lastVelEl.textContent = `${last.meanVelocity.toFixed(2)} m/s`;
-          const lastWattsEl = document.getElementById('liveLastWatts');
-          if (lastWattsEl) lastWattsEl.textContent = `${last.power.toFixed(0)} W`;
-          const lastRomEl = document.getElementById('liveLastRom');
-          if (lastRomEl) lastRomEl.textContent = `${last.rangeOfMotionCm.toFixed(0)} cm`;
-          const lastLowEl = document.getElementById('liveLastLowering');
-          if (lastLowEl) {
-            lastLowEl.textContent = last.loweringVelocity !== null ? `${last.loweringVelocity.toFixed(2)} m/s` : '-- m/s';
-            lastLowEl.className = isControlled(last.loweringVelocity) ? 'green' : (last.loweringVelocity !== null ? 'red' : '');
-          }
-        } else {
-          metricsRow.classList.add('hidden');
-        }
-      }
-
-      const bannerEl = document.getElementById('velDropBanner');
-      const liveA = renderVbtLiveCard();
-      const dropPct = liveA ? liveA.vlFinal : null;
-      if (bannerEl && count >= 2 && dropPct !== null && liveA) {
-        const bestV = fmtV(liveA.vBest);
-        const lastV = fmtV(liveA.valid[liveA.valid.length - 1].v);
-        const cls = dropPct > liveA.redVl ? 'red' : (dropPct > liveA.cutoffPct ? 'amber' : 'green');
-        bannerEl.classList.remove('hidden');
-        bannerEl.innerHTML = `
-          <span>Paras → viimeinen (${bestV} → ${lastV} m/s, ${metricLabel()})</span>
-          <span class="${cls}">VL <strong>${dropPct.toFixed(1)} %</strong> / raja ${liveA.cutoffPct} %</span>
-        `;
-      } else if (bannerEl) {
-        bannerEl.classList.add('hidden');
-        bannerEl.innerHTML = '';
-      }
-
-      const chartEl = document.getElementById('velBarChart');
-      if (chartEl) {
-        chartEl.innerHTML = buildVelocityChartHTML(currentReps, currentExercise);
-      }
-
-      document.getElementById('repProgressLabel').textContent = isFreeMode() ? `Toistot: ${count}` : `Toistot: ${count} / ${target}`;
+      // Active hero view updates
+      const alertEl = document.getElementById('vbtLiveAlert');
+      const heroValEl = document.getElementById('heroVelVal');
+      const heroSubEl = document.getElementById('heroSubLine');
+      const liveCardEl = document.getElementById('liveSetCard');
+      const kpiVlEl = document.getElementById('liveKpiVl');
+      const kpiVlSubEl = document.getElementById('liveKpiVlSub');
+      const kpiRirEl = document.getElementById('liveKpiRir');
+      const kpiRirSubEl = document.getElementById('liveKpiRirSub');
+      const miniBarsEl = document.getElementById('liveMiniBars');
+      const repProgLbl = document.getElementById('repProgressLabel');
       const fill = document.getElementById('repProgressFill');
-      const pct = Math.min(100, (count / Math.max(1, target)) * 100);
-      fill.style.width = `${pct}%`;
-      fill.className = 'progress-fill' + (count >= target ? ' done' : '');
+      const traceWarnEl = document.getElementById('liveTraceWarn');
 
-      const listEl = document.getElementById('repList');
-      listEl.innerHTML = '';
-      const maxVel = Math.max(0.01, ...currentReps.map((r) => r.meanVelocity));
+      let heroColor = '';
+      let alertHtml = '';
+      let alertClass = 'vbt-alert hidden';
+      if (!isFreeMode() && liveA && !liveA.isWarmup && lastP) {
+        if (liveA.mvt !== null && lastP.rir === 0) {
+          heroColor = 'red';
+          alertClass = 'vbt-alert red';
+          alertHtml = `⛔ LOPETA – RIR ~0 (${fmtV(lastP.v)} m/s vs. MVT ${fmtV(liveA.mvt)})`;
+        } else if (lastP.vl !== null && lastP.vl > liveA.cutoffPct) {
+          heroColor = 'red';
+          alertClass = 'vbt-alert amber';
+          alertHtml = `🛑 LOPETA – VL ${lastP.vl.toFixed(0)} % > raja ${liveA.cutoffPct} %`;
+        } else if ((lastP.vl !== null && lastP.vl >= liveA.cutoffPct * 0.5) || (lastP.rir !== null && lastP.rir <= 1)) {
+          heroColor = 'amber';
+        } else {
+          heroColor = 'green';
+        }
+      } else if (last) {
+        heroColor = 'green';
+      }
 
-      currentReps.forEach((r, idx) => {
-        const div = document.createElement('div');
-        div.className = 'rep-item';
-        const lowHtml = r.loweringVelocity !== null
-          ? `<span class="${isControlled(r.loweringVelocity) ? 'green' : 'red'}">↓ ${r.loweringVelocity.toFixed(2)} m/s</span>`
-          : `<span style="color:var(--muted)">↓ …</span>`;
-        const pr = liveA ? liveA.perRep[idx] : null;
-        const widthPct = Math.max(6, Math.round((r.meanVelocity / maxVel) * 100));
-        const qDot = pr ? `<span class="q-dot" style="border-color:${Q_COLORS[pr.quality]}"></span>` : '';
-        const vsFirstHtml = isFreeMode() ? '' : (pr && pr.suspect)
-          ? `<span style="color:#64748b; font-size:12px;">epäilyttävä</span>`
-          : (!pr || pr.vl === null || idx === liveA.vBestIdx)
-            ? `<span style="color:var(--muted); font-size:12px;">paras</span>`
-            : `<span class="${pr.vl > liveA.redVl ? 'red' : (pr.vl > liveA.cutoffPct ? 'amber' : 'green')}" style="font-size:12px; font-weight:600;">VL ${pr.vl.toFixed(0)} %</span>`
-              + (pr.rir !== null ? ` <span style="color:var(--muted); font-size:12px;">RIR ~${pr.rir >= 10 ? '10+' : pr.rir}</span>` : '')
-              + (pr.rqi !== null && pr.rqi !== undefined ? ` <span style="color:var(--muted); font-size:12px;">RQI ${Math.round(pr.rqi)}</span>` : '');
-        const repVbt = getVbtZoneForVelocity(currentExercise, r.meanVelocity);
-        const repVbtHtml = repVbt
-          ? `<span style="font-size:11px; color:var(--muted); font-weight:600;">${repVbt.icon || ''} ${repVbt.label}</span>`
-          : '';
-        const repZoneClass = '';
+      if (alertEl) {
+        alertEl.className = alertClass;
+        alertEl.textContent = alertHtml;
+      }
+      if (liveCardEl) {
+        liveCardEl.classList.toggle('active-glow', uiState === 'active' && heroColor !== 'red');
+      }
 
-        div.innerHTML = `
-          <div class="rep-item-top" style="flex-wrap: wrap;">
-            <span class="rep-num">${qDot}#${idx + 1}</span>
-            <span><strong>${r.meanVelocity.toFixed(2)} m/s</strong> (${r.power.toFixed(1)} W)</span>
-            ${vsFirstHtml}
-            ${lowHtml}
-            <span style="color:var(--muted)">${r.rangeOfMotionCm.toFixed(0)} cm</span>
-            <button type="button" data-del-live-rep="${idx}" title="Poista toisto" style="padding: 2px 6px; font-size: 11px; border-radius: 6px; background: transparent; border: 1px solid var(--border); color: var(--muted);">✕</button>
-          </div>
-          <div class="rep-bar-track">
-            <div class="rep-bar-fill ${repZoneClass}" style="width: ${widthPct}%;"></div>
-          </div>
-        `;
-        div.querySelector('[data-del-live-rep]').addEventListener('click', () => {
-          currentReps.splice(idx, 1);
-          if (lastSavedSetRef && Array.isArray(lastSavedSetRef.reps)) {
-            lastSavedSetRef.reps.splice(idx, 1);
-            saveJSON(KEY_WORKOUTS, workouts);
-            renderCalendar();
-            renderHistoryList();
+      if (heroValEl) {
+        if (zeroing && autoStartAfterZero) {
+          heroValEl.textContent = `${zeroCountdownSec}`;
+          heroValEl.className = 'hero-vel amber';
+        } else if (last) {
+          heroValEl.textContent = repV(last).toFixed(2);
+          heroValEl.className = 'hero-vel' + (heroColor ? ' ' + heroColor : '');
+        } else {
+          heroValEl.textContent = '--';
+          heroValEl.className = 'hero-vel';
+        }
+      }
+
+      if (heroSubEl) {
+        if (zeroing && autoStartAfterZero) {
+          heroSubEl.innerHTML = '<span>Kalibroidaan anturia – pidä tanko paikallaan</span>';
+        } else if (last) {
+          const parts = [];
+          if (liveA && liveA.vBest) parts.push(`V<sub>best</sub> ${fmtV(liveA.vBest)} m/s`);
+          parts.push(`${Math.round(last.power || 0)} W`);
+          parts.push(`${Math.round(last.rangeOfMotionCm || 0)} cm`);
+          if (last.loweringVelocity !== null) {
+            const lCls = isControlled(last.loweringVelocity) ? 'green' : 'red';
+            parts.push(`<span class="${lCls}">↓ ${last.loweringVelocity.toFixed(2)} m/s</span>`);
           }
-          renderLiveSet();
-        });
-        listEl.appendChild(div);
-      });
+          heroSubEl.innerHTML = parts.map((p) => `<span>${p}</span>`).join('');
+        } else {
+          heroSubEl.innerHTML = `<span>${currentExercise} · ${activeWeight} kg</span>`;
+        }
+      }
 
-      renderSetupVbtForecast();
+      if (kpiVlEl && kpiVlSubEl) {
+        const vlNow = lastP ? lastP.vl : null;
+        const vlCls = (vlNow === null || (liveA && liveA.isWarmup)) ? '' : (vlNow > liveA.redVl ? 'red' : (vlNow > liveA.cutoffPct ? 'amber' : 'green'));
+        kpiVlEl.textContent = vlNow === null ? '--' : `${vlNow.toFixed(0)} %`;
+        kpiVlEl.className = 'live-kpi-val' + (vlCls ? ' ' + vlCls : '');
+        const cutPct = liveA ? liveA.cutoffPct : getCutoffPct(currentExercise);
+        const cutV = (liveA && liveA.vCutoff) ? ` · stop ${fmtV(liveA.vCutoff)}` : '';
+        kpiVlSubEl.textContent = `raja ${cutPct} %${cutV}`;
+      }
+
+      if (kpiRirEl && kpiRirSubEl) {
+        const rirEnd = liveA ? liveA.rirEnd : null;
+        const rirCls = (rirEnd === null || (liveA && liveA.isWarmup)) ? '' : (rirEnd <= 0 ? 'red' : (rirEnd <= 1 ? 'amber' : 'green'));
+        kpiRirEl.textContent = rirEnd === null ? '--' : (rirEnd >= 10 ? '10+' : `~${rirEnd}`);
+        kpiRirEl.className = 'live-kpi-val' + (rirCls ? ' ' + rirCls : '');
+        if (liveA && liveA.isWarmup) {
+          kpiRirSubEl.textContent = 'lämmittely';
+        } else if (liveA && liveA.repsToCutoff !== null && liveA.stopAfterRep === null) {
+          kpiRirSubEl.textContent = `~${liveA.repsToCutoff} toistoa rajaan`;
+        } else if (liveA && liveA.stopAfterRep !== null) {
+          kpiRirSubEl.textContent = 'VL-raja ylitetty';
+        } else {
+          const mvtInfo = getEffectiveMvt(currentExercise);
+          kpiRirSubEl.textContent = mvtInfo ? `MVT ${fmtV(mvtInfo.value)} m/s` : 'ei MVT-rajaa';
+        }
+      }
+
+      if (miniBarsEl) {
+        miniBarsEl.innerHTML = buildMiniBarsHTML(currentReps, liveA, target, isFreeMode());
+      }
+
+      if (repProgLbl) {
+        repProgLbl.textContent = isFreeMode() ? `${count} t` : `${count} / ${target}`;
+      }
+      if (fill) {
+        const pct = Math.min(100, (count / Math.max(1, target)) * 100);
+        fill.style.width = `${pct}%`;
+        fill.className = 'progress-fill' + (count >= target ? ' done' : '');
+      }
+      if (traceWarnEl) {
+        const showWarn = lastTraceFailed && lastTraceStatus;
+        traceWarnEl.classList.toggle('hidden', !showWarn);
+        traceWarnEl.textContent = showWarn ? lastTraceStatus : '';
+      }
+
+      renderContextAndSteppers();
       renderDailyPlanCard();
+      renderRestSummaryCard();
+      renderDoneSummaryCard();
       renderTodaySetsOnLiftTab();
       updateSetButton();
+      updateHeaderStatus();
     }
 
     async function finishWorkout() {
+      if (!confirm('Lopetetaanko treeni? Nykyinen sarja tallennetaan ja Pin-yhteys katkaistaan.')) {
+        return;
+      }
       // 1. Stop active set and save any unsaved reps
       if (setActive || zeroing) {
         await stopSetOnPin(true);
       } else if (currentReps.length > 0 && !currentSetSaved) {
         commitCurrentSetToWorkouts();
       }
+      stopRestTimer();
 
       // 2. End Pin session cleanly (send 0x04 + 0x05 and disconnect) if connected
       if (dataChar || (bleDevice && bleDevice.gatt && bleDevice.gatt.connected)) {
@@ -5067,21 +6061,24 @@
         releaseScreenWakeLock();
       }
 
-      // 3. Reset live set view and open the Calendar & CSV workout summary tab
+      // 3. Reset live set view, mark done state, and open Analyysi › Sessio
       const dateStr = document.getElementById('workoutDate').value || todayISO();
+      const curEx = getCurrentSelectedExerciseName();
       currentReps = [];
       currentSetSaved = false;
       lastSavedSetRef = null;
-      openTodaySetIndices.clear();
+      workoutDoneState = true;
       selectedHistoryDate = dateStr;
       document.getElementById('filterDateChk').checked = true;
       renderLiveSet();
       renderCalendar();
       renderHistoryList();
 
+      const wToday = workouts.find((w) => w.date === dateStr);
+      const todayExercises = wToday && wToday.sets ? wToday.sets.map((s) => s.exercise) : [];
       anaDate = dateStr;
-      anaExercise = null;
-      showTab('analysis');
+      anaExercise = todayExercises.includes(curEx) ? curEx : (todayExercises[0] || null);
+      showTab('analysis', 'sessio');
     }
 
     // --- Exercises Management ---
@@ -5387,7 +6384,7 @@
     // --- Event Listeners ---
     document.getElementById('workoutDate').value = todayISO();
     document.getElementById('workoutDate').addEventListener('change', () => {
-      openTodaySetIndices.clear();
+      workoutDoneState = false;
       renderLiveSet();
     });
 
@@ -5397,18 +6394,85 @@
     renderHistoryList();
 
     document.getElementById('connectBtn').addEventListener('click', connectPin);
-    document.getElementById('startSetBtn').addEventListener('click', startSetOnPin);
-    document.getElementById('stopSetBtn').addEventListener('click', () => stopSetOnPin(true));
+    document.getElementById('mainSetActionBtn').addEventListener('click', () => {
+      if (!dataChar) {
+        connectPin();
+      } else if (setActive || (zeroing && autoStartAfterZero)) {
+        stopSetOnPin(true);
+      } else {
+        startSetOnPin();
+      }
+    });
     document.getElementById('finishWorkoutBtn').addEventListener('click', finishWorkout);
+
+    // More (⋯) bottom sheet
+    function closeMoreMenuSheet() { document.getElementById('moreMenuSheet').classList.add('hidden'); }
+    document.getElementById('moreMenuBtn').addEventListener('click', () => {
+      document.getElementById('clearRepsBtn').classList.toggle('hidden', currentReps.length === 0);
+      document.getElementById('moreMenuSheet').classList.remove('hidden');
+    });
+    document.getElementById('closeMoreMenuBtn').addEventListener('click', closeMoreMenuSheet);
+    document.getElementById('moreMenuSheet').addEventListener('click', (e) => {
+      if (e.target.id === 'moreMenuSheet') closeMoreMenuSheet();
+    });
+    document.getElementById('menuOpenSettingsBtn').addEventListener('click', () => {
+      closeMoreMenuSheet();
+      document.getElementById('liftSettingsSheet').classList.remove('hidden');
+    });
     document.getElementById('reloadAppBtn').addEventListener('click', () => {
+      if ((setActive || (currentReps.length > 0 && !currentSetSaved)) && !confirm('Sarja on kesken. Päivitetäänkö sovellus silti?')) {
+        return;
+      }
       location.replace(location.pathname + '?v=' + Date.now());
     });
     document.getElementById('clearRepsBtn').addEventListener('click', () => {
+      if (!confirm('Tyhjennetäänkö nykyisen sarjan toistot?')) return;
+      closeMoreMenuSheet();
       currentReps = [];
       currentSetSaved = false;
       lastSavedSetRef = null;
+      stopRestTimer();
       renderLiveSet();
     });
+
+    // Lift settings bottom sheet
+    function closeLiftSettingsSheet() { document.getElementById('liftSettingsSheet').classList.add('hidden'); }
+    document.getElementById('openLiftSettingsBtn').addEventListener('click', () => {
+      document.getElementById('liftSettingsSheet').classList.remove('hidden');
+    });
+    document.getElementById('closeLiftSettingsBtn').addEventListener('click', closeLiftSettingsSheet);
+    document.getElementById('liftSettingsSheet').addEventListener('click', (e) => {
+      if (e.target.id === 'liftSettingsSheet') closeLiftSettingsSheet();
+    });
+    document.getElementById('gotoVbtSettingsBtn').addEventListener('click', () => {
+      closeLiftSettingsSheet();
+      showTab('analysis', 'asetukset');
+    });
+
+    // Rest summary actions & set analysis bottom sheet
+    document.getElementById('saveUnsavedSetBtn').addEventListener('click', () => {
+      if (currentReps.length > 0 && !currentSetSaved) {
+        commitCurrentSetToWorkouts(activeSetMeta);
+        renderLiveSet();
+      }
+    });
+    document.getElementById('restAnalyzeBtn').addEventListener('click', () => {
+      const coords = lastSavedSetRef ? findSetCoordinates(lastSavedSetRef) : null;
+      if (coords) openSetAnalysisSheet(coords.date, coords.sIdx);
+    });
+    document.getElementById('closeSetAnalysisSheetBtn').addEventListener('click', closeSetAnalysisSheet);
+    document.getElementById('setAnalysisSheet').addEventListener('click', (e) => {
+      if (e.target.id === 'setAnalysisSheet') closeSetAnalysisSheet();
+    });
+    document.getElementById('setAnalysisOpenInTabBtn').addEventListener('click', () => {
+      if (!activeSheetSetRef) return;
+      const { dateStr, setIdx } = activeSheetSetRef;
+      closeSetAnalysisSheet();
+      openSetInAnalysis(dateStr, setIdx);
+    });
+
+    // Undo toast
+    document.getElementById('undoToastBtn').addEventListener('click', performUndo);
 
     document.getElementById('soundBtn').addEventListener('click', () => {
       soundEnabled = !soundEnabled;
@@ -5420,6 +6484,7 @@
     });
 
     function handleWeightChanged() {
+      workoutDoneState = false;
       const newWeight = parseFloat(document.getElementById('weightInput').value) || 0;
       if (!currentSetSaved && currentReps.length > 0) {
         if (lastRepAt > 0 && (Date.now() - lastRepAt) > 10000) {
@@ -5448,6 +6513,7 @@
     document.getElementById('weightInput').addEventListener('change', handleWeightChanged);
 
     function handleTargetRepsChanged() {
+      workoutDoneState = false;
       const newTarget = parseInt(document.getElementById('targetRepsInput').value, 10) || 5;
       if (!currentSetSaved && currentReps.length === 0 && activeSetMeta) {
         activeSetMeta.targetReps = newTarget;
@@ -5470,6 +6536,7 @@
 
     // Exercise selection & adding (both modal and inline on iOS)
     document.getElementById('exerciseSelect').addEventListener('change', (e) => {
+      workoutDoneState = false;
       if (e.target.value === ADD_NEW_EX_VALUE) {
         const inlineForm = document.getElementById('inlineExerciseForm');
         inlineForm.classList.remove('hidden');
@@ -5503,6 +6570,7 @@
     });
 
     document.getElementById('editExercisesBtn').addEventListener('click', () => {
+      closeLiftSettingsSheet();
       document.getElementById('exerciseFeedback').classList.add('hidden');
       renderExerciseModal();
       document.getElementById('exerciseModal').classList.remove('hidden');
@@ -5548,7 +6616,8 @@
     document.getElementById('filterDateChk').addEventListener('change', renderHistoryList);
     document.getElementById('exportCsvBtn').addEventListener('click', exportCSV);
 
-    function showTab(name) {
+    function showTab(name, subTab) {
+      if (subTab) anaSubTab = subTab;
       const map = { lift: ['tabLift', 'navLiftBtn'], analysis: ['tabAnalysis', 'navAnalysisBtn'], history: ['tabHistory', 'navHistoryBtn'] };
       Object.entries(map).forEach(([k, [tabId, btnId]]) => {
         document.getElementById(tabId).classList.toggle('hidden', k !== name);
@@ -5562,8 +6631,13 @@
     document.getElementById('navLiftBtn').addEventListener('click', () => showTab('lift'));
     document.getElementById('navHistoryBtn').addEventListener('click', () => showTab('history'));
     document.getElementById('navAnalysisBtn').addEventListener('click', () => showTab('analysis'));
-    document.getElementById('anaExerciseSelect').addEventListener('change', (e) => { anaExercise = e.target.value; anaDate = null; renderAnalysisTab(); });
-    document.getElementById('anaDateSelect').addEventListener('change', (e) => { anaDate = e.target.value; renderAnalysisTab(); });
+    document.getElementById('anaExerciseSelect').addEventListener('change', (e) => { anaExercise = e.target.value; anaDate = null; anaSelectedSetIdx = 0; renderAnalysisTab(); });
+    document.getElementById('anaDateSelect').addEventListener('change', (e) => { anaDate = e.target.value; anaSelectedSetIdx = 0; renderAnalysisTab(); });
+    document.getElementById('anaSubTabs').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-ana-sub]');
+      if (!btn) return;
+      setAnaSubTab(btn.getAttribute('data-ana-sub'));
+    });
     document.getElementById('dailyPlanCard').addEventListener('click', (e) => {
       const b = e.target.closest('[data-plan-apply]');
       if (!b) return;
@@ -5580,12 +6654,6 @@
     }
     document.getElementById('modeGuidedBtn').addEventListener('click', () => setTrainingMode('guided'));
     document.getElementById('modeFreeBtn').addEventListener('click', () => setTrainingMode('free'));
-    document.getElementById('goalSelect').value = vbtSettings.goal;
-    document.getElementById('goalSelect').addEventListener('change', (e) => {
-      vbtSettings.goal = e.target.value;
-      saveVbtSettings();
-      onVbtSettingsChanged();
-    });
   </script>
 </body>
 </html>
