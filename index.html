@@ -1093,6 +1093,8 @@
       <div class="progress-bar guided-only">
         <div id="repProgressFill" class="progress-fill"></div>
       </div>
+      <div id="liveExtraRepHint" class="hidden guided-only" style="font-size: 12px; color: #86efac; margin-top: 6px; padding: 5px 8px; border-radius: 8px; background: rgba(34,197,94,0.10); border: 1px solid rgba(34,197,94,0.35);"></div>
+      <div id="liveMergedWarn" class="hidden" style="font-size: 12px; color: var(--amber); margin-top: 4px;"></div>
       <div id="liveTraceWarn" class="hidden" style="font-size: 12px; color: var(--amber); margin-top: 4px;"></div>
     </div>
 
@@ -1389,14 +1391,47 @@
     }
 
     // --- Pure Web Audio API Engine (Bluetooth Music Safe + Zero-Clip Cue Synthesis) ---
-    // Uses ONLY Web Audio API (no <audio> or <video> elements) and sets
-    // navigator.audioSession.type = 'ambient' so iOS/Android Bluetooth music
-    // (Spotify, Apple Music) keeps playing without interruption.
+    // Uses Web Audio API + navigator.audioSession.type = 'ambient' so iOS/Android Bluetooth
+    // music (Spotify, Apple Music) keeps playing for normal beeps, and temporarily switches to
+    // 'transient-solo' (fallback 'transient') only for the "+1 toisto ok" voice prompt.
+    const EXTRA_REP_VOICE_DATA_URI = 'data:audio/mpeg;base64,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pEiRw5FiWmo5300iUAgq5KIkc2cOJbVkSLVv/yiVUcSqf57f84kls/mkUjiWkUWOqc/at71Xc0jgMAiOVszSVnEtmc9UaRRarBQCE/nEku1f+ccijzarTSKOPLkUfVEiW1B0qAlAVQoQD2BcCNk0NdAlxJ8bJ+KNYWmVXMS5XDGyO2V8wsLc3vHN1GewoTa1QyCatmWdrzf/5p2dr3KmnZ2Z2f//84TE/y78OhQAywww//3Kk4sot4tSRE4SBCgMwmgkicaaUegtE404ULIJjQoFFAYGYTGDgCDCQICFiCYYKIgwkSKAxBNBaNUaUXFxef//ZbPMpZKRkyy2VHI1aWVDL///1ZWUEDR3Q1ZQQMECFhIHn+sVFRVMQU1FMy4xMDFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/84TE9irDrVCseYc8VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/84TETAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/84TETAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/84TETAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/84TETAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=';
+    let extraVoiceAudio = null;
+    let extraVoicePlaying = false;
+    let extraVoiceSafetyTimer = null;
+
     function configureAmbientAudioSession() {
       try {
         if ('audioSession' in navigator && navigator.audioSession) {
           navigator.audioSession.type = 'ambient';
         }
+      } catch {}
+    }
+
+    function setSoloAudioSession() {
+      try {
+        if ('audioSession' in navigator && navigator.audioSession) {
+          try {
+            navigator.audioSession.type = 'transient-solo';
+            if (navigator.audioSession.type === 'transient-solo') return 'transient-solo';
+          } catch {}
+          try {
+            navigator.audioSession.type = 'transient';
+            return navigator.audioSession.type || 'transient';
+          } catch {}
+        }
+      } catch {}
+      return null;
+    }
+
+    function prepareExtraRepVoiceAudio() {
+      if (extraVoiceAudio || typeof Audio === 'undefined' || !EXTRA_REP_VOICE_DATA_URI || EXTRA_REP_VOICE_DATA_URI.includes('__EXTRA_REP_VOICE_B64__')) return;
+      try {
+        const el = new Audio();
+        el.preload = 'auto';
+        el.playsInline = true;
+        el.src = EXTRA_REP_VOICE_DATA_URI;
+        el.load();
+        extraVoiceAudio = el;
       } catch {}
     }
 
@@ -1459,12 +1494,13 @@
       keepWarmGain = null;
     }
 
-    // Unlock AudioContext on user gesture only when needed (never interrupts Bluetooth music)
+    // Unlock AudioContext & pre-load extra-rep audio clip on user gesture without interrupting music
     ['touchstart', 'pointerdown', 'click'].forEach((evtName) => {
       document.addEventListener(evtName, () => {
         if (!audioUnlocked || (audioCtx && audioCtx.state !== 'running')) {
           ensureAudio();
         }
+        prepareExtraRepVoiceAudio();
       }, { passive: true });
     });
 
@@ -1552,7 +1588,7 @@
       ]);
     }
     function speakRepVelocity(vel) {
-      if (!soundEnabled || !vbtSettings || !vbtSettings.voiceVelocity) return;
+      if (!soundEnabled || extraVoicePlaying || !vbtSettings || !vbtSettings.voiceVelocity) return;
       if (typeof window === 'undefined' || !('speechSynthesis' in window) || !Number.isFinite(vel)) return;
       try {
         const digits = ['nolla', 'yksi', 'kaksi', 'kolme', 'neljä', 'viisi', 'kuusi', 'seitsemän', 'kahdeksan', 'yhdeksän'];
@@ -1563,6 +1599,92 @@
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(u);
       } catch {}
+    }
+
+    function fallbackSpeakExtraRep(done) {
+      if (typeof window === 'undefined' || !('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
+        done();
+        return;
+      }
+      try {
+        const u = new SpeechSynthesisUtterance('Kevyttä, vielä yksi toisto!');
+        u.lang = 'fi-FI';
+        u.pitch = 0.85;
+        u.rate = 1.15;
+        u.onend = () => done();
+        u.onerror = () => done();
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(u);
+      } catch {
+        done();
+      }
+    }
+
+    function playExtraRepVoiceCue() {
+      if (!soundEnabled) return;
+      try {
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+        }
+      } catch {}
+      if (extraVoiceSafetyTimer) {
+        clearTimeout(extraVoiceSafetyTimer);
+        extraVoiceSafetyTimer = null;
+      }
+      extraVoicePlaying = true;
+      if (keepWarmOsc) stopAudioKeepWarm();
+      setSoloAudioSession();
+
+      let finished = false;
+      const finishCue = () => {
+        if (finished) return;
+        finished = true;
+        if (extraVoiceSafetyTimer) {
+          clearTimeout(extraVoiceSafetyTimer);
+          extraVoiceSafetyTimer = null;
+        }
+        if (extraVoiceAudio) {
+          try {
+            extraVoiceAudio.onended = null;
+            extraVoiceAudio.onerror = null;
+            extraVoiceAudio.pause();
+            extraVoiceAudio.currentTime = 0;
+          } catch {}
+        }
+        extraVoicePlaying = false;
+        configureAmbientAudioSession();
+        if (setActive || (zeroing && autoStartAfterZero)) {
+          startAudioKeepWarm();
+        }
+      };
+
+      extraVoiceSafetyTimer = setTimeout(finishCue, 4500);
+
+      prepareExtraRepVoiceAudio();
+      if (!extraVoiceAudio) {
+        fallbackSpeakExtraRep(finishCue);
+        return;
+      }
+      try {
+        extraVoiceAudio.onended = null;
+        extraVoiceAudio.onerror = null;
+        extraVoiceAudio.pause();
+        extraVoiceAudio.currentTime = 0;
+        let fallbackTriggered = false;
+        const onFail = () => {
+          if (finished || fallbackTriggered) return;
+          fallbackTriggered = true;
+          fallbackSpeakExtraRep(finishCue);
+        };
+        extraVoiceAudio.onended = finishCue;
+        extraVoiceAudio.onerror = onFail;
+        const p = extraVoiceAudio.play();
+        if (p && typeof p.catch === 'function') {
+          p.catch(onFail);
+        }
+      } catch {
+        fallbackSpeakExtraRep(finishCue);
+      }
     }
 
     function formatMMSS(sec) {
@@ -2078,6 +2200,7 @@
     async function startSetOnPin() {
       if (!dataChar) return;
       ensureAudio();
+      prepareExtraRepVoiceAudio();
       startAudioKeepWarm();
       requestScreenWakeLock();
       stopRestTimer();
@@ -2361,15 +2484,22 @@
           pauseMs: pauseMs
         });
         lastRepAt = Date.now();
-        setTimeout(() => speakRepVelocity(meanVel), 220);
         if (!isFreeMode() && vbtOnNewRep()) return; // set auto-stopped at the velocity-loss cutoff
 
         const targetReps = parseInt(document.getElementById('targetRepsInput').value, 10) || 5;
-        if (!isFreeMode() && currentReps.length >= targetReps) {
+        const extraOk = (!isFreeMode() && currentReps.length >= targetReps) ? liveExtraRepHint(targetReps) : null;
+        if (extraOk) {
+          // "+1 toisto ok": älä lopeta sarjaa automaattisesti, keskeytä taustamusiikki puhekehotteen ajaksi ja jatka sitten
+          playExtraRepVoiceCue();
+          renderLiveSet();
+          updateSetButton();
+        } else if (!isFreeMode() && currentReps.length >= targetReps) {
           // Target reps reached: play fanfare and automatically complete & save this set!
+          setTimeout(() => speakRepVelocity(meanVel), 220);
           soundTargetReached();
           stopSetOnPin(true);
         } else {
+          setTimeout(() => speakRepVelocity(meanVel), 220);
           soundRep();
           renderLiveSet();
           updateSetButton();
@@ -2587,9 +2717,9 @@
     }
 
     // Velocity loss (VL%) = (V_best - V_last) / V_best, suspect reps excluded (see analyzeSet)
-    function calcVelocityDropPct(reps, exercise) {
+    function calcVelocityDropPct(reps, exercise, dateStr) {
       if (!reps || reps.length < 2) return null;
-      const a = analyzeSet(reps, exercise || '', 0);
+      const a = analyzeSet(reps, exercise || '', 0, dateStr ? { dateStr } : {});
       return a.vlFinal;
     }
     // Legacy metric kept for CSV compatibility: 1st rep -> last rep
@@ -3279,8 +3409,10 @@
       workouts.forEach((w) => {
         (w.sets || []).forEach((s) => {
           if (getLiftKey(s.exercise) !== cfg.id || !(s.weightKg >= minHeavyKg) || !s.reps || !s.reps.length) return;
-          const flagged = flagSuspectReps(s.reps, cfg);
-          const validCount = flagged.filter((x) => !x.suspect).length;
+          const flagged = flagSuspectReps(s.reps, cfg, null, w.date);
+          const validCount = Number(s.repCountOverride) > 0
+            ? Math.round(Number(s.repCountOverride))
+            : flagged.filter((x) => !x).length;
           if (validCount >= 1 && validCount <= 8) {
             const est = calcRef1RM(s.weightKg, validCount);
             if (est && est > bestProven) bestProven = est;
@@ -3383,13 +3515,134 @@
     }
 
     // --- Suspect rep detection (unrack / positioning / partial ROM / bar-rack) ---
-    function flagSuspectReps(reps, cfg) {
+    // --- Yhdistyneet toistot: useita toistoja tallentunut yhdeksi (ROM >> tavallinen) ---
+    const MERGED_ROM_FACTOR = 1.6;
+    let _romHistCache = { sig: '', map: {} };
+    // Liikkeen toistojen mediaani-ROM viimeiseltä 90 pv:ltä (vähintään 6 toistoa) päivään dateStr asti – käytetään kun sarjassa on < 3 toistoa tai liian vähän verrokkeja
+    function historyMedianRom(liftKey, dateStr) {
+      const sig = workoutsSignature();
+      if (_romHistCache.sig !== sig) _romHistCache = { sig, map: {} };
+      const endDate = dateStr || todayISO();
+      const cacheKey = `${liftKey}|${endDate}`;
+      if (_romHistCache.map[cacheKey] !== undefined) return _romHistCache.map[cacheKey];
+      const from = addDaysIso(endDate, -90);
+      const roms = [];
+      workouts.forEach((w) => {
+        if (w.date < from || w.date > endDate) return;
+        (w.sets || []).forEach((s) => {
+          if (getLiftKey(s.exercise) !== liftKey) return;
+          (s.reps || []).forEach((r) => { const x = Number(r.rangeOfMotionCm); if (x > 0) roms.push(x); });
+        });
+      });
+      const res = roms.length >= 6 ? vbtMedian(roms) : null;
+      _romHistCache.map[cacheKey] = res;
+      return res;
+    }
+    // Jakaa yhden (yhdistyneen) 40 Hz nopeuskäyrän [[ROM cm, mm/s], ...] paikallisten nopeusminimien kohdalta.
+    // Minimi lasketaan jakokohdaksi, jos se on <= 0,05 m/s tai < 25 % matalammasta vierekkäisestä huipusta.
+    // Jokaisen osan huippu >= 0,08 m/s ja siirtymä >= 8 cm (sama kuin analyzeTrace-segmentoinnin kynnykset).
+    function splitCurveReps(curve) {
+      if (!Array.isArray(curve) || curve.length < 8) return null;
+      const dt = 1 / 40;
+      const n = curve.length;
+      const v = curve.map((c) => Math.max(0, (Number(c[1]) || 0) / 1000));
+      const sm = v.map((x, i) => (v[Math.max(0, i - 1)] + x + v[Math.min(n - 1, i + 1)]) / 3);
+      const peaks = [];
+      for (let i = 1; i < n - 1; i++) if (sm[i] >= 0.08 && sm[i] >= sm[i - 1] && sm[i] > sm[i + 1]) peaks.push(i);
+      if (!peaks.length) return { count: 0, dips: [] };
+      const groups = [peaks[0]];
+      const dips = [];
+      for (let k = 1; k < peaks.length; k++) {
+        const a = groups[groups.length - 1], b = peaks[k];
+        let m = a;
+        for (let j = a; j <= b; j++) if (sm[j] < sm[m]) m = j;
+        const low = Math.min(sm[a], sm[b]);
+        if (sm[m] <= 0.05 || sm[m] < 0.25 * low) { groups.push(b); dips.push(m); }
+        else if (sm[b] > sm[a]) groups[groups.length - 1] = b;
+      }
+      const bounds = [0, ...dips, n - 1];
+      let count = 0;
+      for (let i = 0; i < bounds.length - 1; i++) {
+        let disp = 0, pk = 0;
+        for (let j = bounds[i]; j <= bounds[i + 1]; j++) { disp += v[j] * dt; if (v[j] > pk) pk = v[j]; }
+        if (disp >= 0.08 && pk >= 0.08) count++;
+      }
+      return { count, dips };
+    }
+    // Palauttaa taulukon (null | {idx, romCm, medRom, refSrc, est, lo, hi, estSrc}) – ei-null = toisto näyttää yhdistyneeltä.
+    // Vertailu: sarjan muiden toistojen mediaani-ROM (>= 3 toistoa, vähintään 2 muuta), muuten liikkeen 90 pv historia,
+    // muuten (n === 2) sarjan toinen toisto jos >= minRomCm; n === 1 ilman historiaa vain nopeuskäyrän (splitCurveReps) perusteella.
+    function detectMergedReps(reps, cfg, dateStr) {
+      const n = (reps || []).length;
+      const out = new Array(n).fill(null);
+      if (!n) return out;
+      const roms = reps.map((r) => Number(r && r.rangeOfMotionCm) || 0);
+      const minValid = cfg ? cfg.minRomCm : 15;
+      let histMed = null, histLoaded = false;
+      const getHistMed = () => {
+        if (!histLoaded) {
+          histLoaded = true;
+          histMed = cfg ? historyMedianRom(cfg.id, dateStr) : null;
+        }
+        return histMed;
+      };
+      reps.forEach((r, i) => {
+        const rom = roms[i];
+        const sp = (r && r.trace && r.trace.curve) ? splitCurveReps(r.trace.curve) : null;
+        const traceSplit = !!(sp && sp.count >= 2);
+        if (!(rom > 0)) return;
+        let med = null, src = null;
+        if (n >= 3) {
+          let others = roms.filter((x, j) => j !== i && x > 0);
+          if (others.length >= 2) {
+            // 2. kierros: jätä referenssistä pois ensimmäisen kierroksen kynnyksen ylittävät (useita yhdistyneitä samassa sarjassa)
+            const thr1 = MERGED_ROM_FACTOR * vbtMedian(others);
+            const trimmed = others.filter((x) => x <= thr1);
+            if (trimmed.length >= 2) others = trimmed;
+            med = vbtMedian(others); src = 'set';
+          }
+        }
+        if (!med) {
+          const hm = getHistMed();
+          if (hm) { med = hm; src = 'history'; }
+        }
+        if (!med && n === 2) {
+          const otherRom = roms[1 - i];
+          if (otherRom >= minValid && rom > MERGED_ROM_FACTOR * otherRom) {
+            med = otherRom;
+            src = 'set';
+          }
+        }
+        const romMerged = !!(med && rom > MERGED_ROM_FACTOR * med);
+        if (!romMerged && !traceSplit) return;
+        const useMed = med || (traceSplit ? rom / sp.count : rom);
+        const ratio = rom / useMed;
+        let lo = Math.max(2, Math.floor(ratio)), hi = Math.max(lo, Math.ceil(ratio));
+        let est = Math.max(2, Math.round(ratio)), estSrc = 'rom';
+        if (traceSplit) { est = lo = hi = sp.count; estSrc = 'trace'; }
+        out[i] = { idx: i, romCm: rom, medRom: useMed, refSrc: src || 'trace', est, lo, hi, estSrc };
+      });
+      return out;
+    }
+    function mergedWarnText(m) {
+      const rng = m.lo === m.hi ? `${m.lo}` : `${m.lo}–${m.hi}`;
+      return `⚠ Toisto #${m.idx + 1} näyttää yhdistetyltä (ROM ${Math.round(m.romCm)} cm ≈ ${rng} toistoa${m.estSrc === 'trace' ? ', nopeuskäyrästä' : ''}) – jätetty pois VL- ja e1RM-laskuista.`;
+    }
+    function setRepCount(s) {
+      const o = Number(s && s.repCountOverride);
+      return o > 0 ? Math.round(o) : ((s && s.reps) ? s.reps.length : 0);
+    }
+
+    function flagSuspectReps(reps, cfg, mergedInfo, dateStr) {
       const n = reps.length;
       const flags = new Array(n).fill(false);
+      mergedInfo = mergedInfo || detectMergedReps(reps, cfg, dateStr);
+      mergedInfo.forEach((m, i) => { if (m) flags[i] = true; });
       if (n < 2) return flags;
       const vs = reps.map(repV);
       const roms = reps.map((r) => Number(r.rangeOfMotionCm) || 0);
-      const medRom = vbtMedian(roms);
+      const mInfo = mergedInfo || [];
+      const medRom = vbtMedian(roms.filter((x, i) => x > 0 && !flags[i] && !mInfo[i]));
       const minRom = cfg ? cfg.minRomCm : 15;
       reps.forEach((r, i) => {
         // 1. Unrack / positioning movement recorded as 1st rep (much slower than the rest)
@@ -3413,7 +3666,9 @@
       let n = 0;
       workouts.forEach((w) => (w.sets || []).forEach((s) => { n += (s.reps || []).length; }));
       const refSig = JSON.stringify(vbtSettings.refMax || {});
-      return `${workouts.length}:${n}:${vbtSettings.velocityMetric}:${refSig}`;
+      const mvtSig = JSON.stringify(vbtSettings.mvtOverride || {});
+      const cycSig = JSON.stringify(vbtSettings.cycle || null);
+      return `${workouts.length}:${n}:${vbtSettings.velocityMetric}:${vbtSettings.goal}:${refSig}:${mvtSig}:${cycSig}`;
     }
     function learnedMvt(liftKey) {
       const sig = workoutsSignature();
@@ -3431,7 +3686,7 @@
         if (getLiftKey(s.exercise) !== liftKey) return;
         if ((Number(s.weightKg) || 0) < minHeavyKg) return;
         const reps = s.reps || [];
-        const sus = flagSuspectReps(reps, cfg);
+        const sus = flagSuspectReps(reps, cfg, null, w.date);
         reps.forEach((r, i) => {
           if (sus[i]) return;
           const v = repV(r);
@@ -3462,9 +3717,15 @@
       const mvtInfo = getEffectiveMvt(exercise);
       const mvt = mvtInfo ? mvtInfo.value : null;
       const anchor1RM = getAnchor1RM(exercise);
+      let effDate = opts.dateStr;
+      if (!effDate && reps[0] && Number(reps[0].t) > 0) {
+        const d0 = new Date(Number(reps[0].t));
+        effDate = `${d0.getFullYear()}-${String(d0.getMonth() + 1).padStart(2, '0')}-${String(d0.getDate()).padStart(2, '0')}`;
+      }
       const n = reps.length;
       const vs = reps.map(repV);
-      const suspect = flagSuspectReps(reps, cfg);
+      const mergedInfo = detectMergedReps(reps, cfg, effDate);
+      const suspect = flagSuspectReps(reps, cfg, mergedInfo, effDate);
 
       // Touch-and-go detection (deadlift): pause between reps < 0.8 s
       const pauses = reps.slice(1).map((r) => r.pauseMs).filter((p) => Number.isFinite(p));
@@ -3479,7 +3740,7 @@
         if (!excludedFromRef && v > bestSoFar) bestSoFar = v;
         if (!suspect[i] && !(tng && i === 0 && n > 1) && (vBest === null || v > vBest)) { vBest = v; vBestIdx = i; }
         const vl = (!suspect[i] && bestSoFar > 0 && !(tng && i === 0 && n > 1)) ? Math.max(0, (bestSoFar - v) / bestSoFar * 100) : null;
-        return { idx: i, v, vl, bestSoFar: bestSoFar || null, suspect: suspect[i], rir: null, quality: 'good' };
+        return { idx: i, v, vl, bestSoFar: bestSoFar || null, suspect: suspect[i], merged: !!mergedInfo[i], mergedInfo: mergedInfo[i], rir: null, quality: 'good' };
       });
       if (vBest === null && n > 0) { vBest = Math.max(...vs); vBestIdx = vs.indexOf(vBest); }
 
@@ -3534,6 +3795,13 @@
         }
       }
 
+      // Sarjassa liian vähän toistoja oman kulmakertoimen laskemiseen → käytä omien sarjojen yhteistä nopeuskustannusta (jos ≥ 2 havaintoa)
+      let ownCostInfo = null;
+      if (cfg && tail.length < 2 && !opts.noOwnCost) {
+        ownCostInfo = ownVelocityCost(exercise, effDate, pctVel, 2);
+        if (ownCostInfo) { cost = Math.min(0.12, Math.max(0.015, ownCostInfo.cost)); costSource = 'own'; }
+      }
+
       // --- Gpath Pin raw-trace metrics: sticking point, bar path vs best rep, tilt ---
       const rules = cfg ? TRACE_LIFT_RULES[cfg.id] : null;
       const hasTrace = reps.some((r) => r && r.trace);
@@ -3545,6 +3813,7 @@
       perRep.forEach((p) => {
         p.flags = [];
         p.pathDev = null;
+        if (p.merged) p.flags.push('merged');
         if (p.suspect) { p.quality = 'suspect'; return; }
         validDone++;
         const tr = reps[p.idx].trace;
@@ -3718,6 +3987,7 @@
 
       return {
         n, cfg, perRep, valid, suspectCount: perRep.filter((p) => p.suspect).length,
+        mergedReps: mergedInfo.filter(Boolean), mergedCount: mergedInfo.filter(Boolean).length,
         vBest, vBestIdx, vlFinal, vlMax, cutoffPct, redVl, vCutoff, mvt, mvtInfo, cost, costSource,
         rirEnd, qualityReps, stopAfterRep, junkReps, effectiveReps, repsToCutoff, tng,
         pct1RM, pctSource, e1RM, epleyRir, isWarmup, romCv,
@@ -3737,6 +4007,46 @@
         });
       });
       return out;
+    }
+
+    // --- Oma nopeuskustannus (m/s / toisto) omista sarjoista ---
+    // Havainto = yhden työsarjan nopeuden lineaarinen kulmakerroin V_best-toistosta eteenpäin (vain kelvolliset toistot,
+    // ei lämmittelyjä, ei yhdistyneitä/epäilyttäviä toistoja). Yhdistetään mediaanilla: ensin tämän päivän aiemmat sarjat,
+    // sitten 28 pv sarjat samalla kuormatasolla (±7,5 % 1RM).
+    const OWN_COST_MIN_TAIL = 2; // vähintään näin monta kelvollista toistoa V_best (mukaan lukien) jälkeen
+    let _ownCostCache = { sig: '', map: new Map() };
+    function setCostObservation(set, exercise, dateStr) {
+      const a = analyzeSet(set.reps, exercise, set.weightKg, { noOwnCost: true, dateStr });
+      if (a.isWarmup || a.pct1RM === null || a.vBestIdx < 0) return null;
+      const tail = a.valid.filter((p) => p.idx >= a.vBestIdx);
+      if (tail.length < OWN_COST_MIN_TAIL) return null;
+      const reg = vbtLinReg(tail.map((p) => p.idx), tail.map((p) => p.v));
+      if (!reg) return null;
+      return { cost: Math.max(0, -reg.slope), pct: a.pct1RM, nTail: tail.length };
+    }
+    // Palauttaa { cost, n, scope: 'today'|'28d' } tai null (jos havaintoja < minN)
+    function ownVelocityCost(exercise, dateStr, pct, minN) {
+      if (!exercise || !getLiftCfg(exercise)) return null;
+      dateStr = dateStr || todayISO();
+      minN = minN || 2;
+      const wsig = workoutsSignature();
+      if (_ownCostCache.sig !== wsig) _ownCostCache = { sig: wsig, map: new Map() };
+      const key = exercise + '|' + dateStr;
+      let obs = _ownCostCache.map.get(key);
+      if (!obs) {
+        obs = [];
+        const from = addDaysIso(dateStr, -28);
+        setsForExercise(exercise, (d) => d <= dateStr && d >= from).forEach(({ date, set }) => {
+          const o = setCostObservation(set, exercise, date);
+          if (o) obs.push({ date, weightKg: set.weightKg, ...o });
+        });
+        _ownCostCache.map.set(key, obs);
+      }
+      const todayObs = obs.filter((o) => o.date === dateStr && (!(pct > 0) || Math.abs(o.pct - pct) <= 7.5));
+      if (todayObs.length >= minN) return { cost: vbtMedian(todayObs.map((o) => o.cost)), n: todayObs.length, scope: 'today' };
+      const near = pct > 0 ? obs.filter((o) => Math.abs(o.pct - pct) <= 7.5) : obs;
+      if (near.length >= minN) return { cost: vbtMedian(near.map((o) => o.cost)), n: near.length, scope: '28d' };
+      return null;
     }
 
     // --- Load–velocity profile (best rep of each load) & VBT e1RM at MVT ---
@@ -3789,7 +4099,7 @@
     function sessionProfile(exercise, dateStr) {
       const sets = setsForExercise(exercise, (d) => d === dateStr);
       const pts = sets.map(({ date, set }) => {
-        const a = analyzeSet(set.reps, set.exercise, set.weightKg);
+        const a = analyzeSet(set.reps, set.exercise, set.weightKg, { dateStr });
         return { load: set.weightKg, v: a.vBest, date };
       }).filter((p) => p.v > 0);
       return buildLVProfile(pts, exercise);
@@ -3805,7 +4115,7 @@
       const from = new Date(onOrBeforeDate); from.setDate(from.getDate() - 28);
       const fromIso = from.toISOString().slice(0, 10);
       const sets = setsForExercise(exercise, (d) => d <= onOrBeforeDate && d >= fromIso);
-      const pts = sets.map(({ date, set }) => ({ load: set.weightKg, v: analyzeSet(set.reps, set.exercise, set.weightKg).vBest, date })).filter((p) => p.v > 0);
+      const pts = sets.map(({ date, set }) => ({ load: set.weightKg, v: analyzeSet(set.reps, set.exercise, set.weightKg, { dateStr: date }).vBest, date })).filter((p) => p.v > 0);
       const p = buildLVProfile(pts, exercise);
       if (p.valid && p.r2 >= 0.75 && p.points.length >= 3) { p.date = dates[0]; p.method = 'pooled28'; return p; }
       return null;
@@ -3817,7 +4127,7 @@
       return dates.map((d) => {
         const workE1s = [];
         setsForExercise(exercise, (x) => x === d).forEach(({ set }) => {
-          const a = analyzeSet(set.reps, set.exercise, set.weightKg);
+          const a = analyzeSet(set.reps, set.exercise, set.weightKg, { dateStr: d });
           if (a.e1RM && !a.isWarmup) workE1s.push(a.e1RM);
         });
         if (workE1s.length) return { date: d, e1RM: vbtMedian(workE1s), method: workE1s.length >= 2 ? 'työsarjat' : 'yksittäinen sarja' };
@@ -3836,9 +4146,9 @@
       const prev = setsForExercise(exercise, (d) => d < dateStr && d >= fromIso);
       let best = null;
       today.forEach(({ set }) => {
-        const vT = analyzeSet(set.reps, set.exercise, set.weightKg).vBest;
+        const vT = analyzeSet(set.reps, set.exercise, set.weightKg, { dateStr }).vBest;
         const same = prev.filter((p) => Math.abs(p.set.weightKg - set.weightKg) < 0.6)
-          .map((p) => analyzeSet(p.set.reps, p.set.exercise, p.set.weightKg).vBest).filter((v) => v > 0);
+          .map((p) => analyzeSet(p.set.reps, p.set.exercise, p.set.weightKg, { dateStr: p.date }).vBest).filter((v) => v > 0);
         if (!same.length || !vT) return;
         const base = same.reduce((a, b) => a + b, 0) / same.length;
         const cand = { weight: set.weightKg, today: vT, baseline: base, deltaPct: (vT - base) / base * 100, nPrev: same.length };
@@ -3852,13 +4162,14 @@
       if (!a || a.n === 0) return '';
       const g = getGoal();
       const parts = [];
-      if (a.suspectCount) parts.push(`${a.suspectCount} epäilyttävä(ä) liike(ttä) (telineestä otto / vajaa liikerata) jätettiin laskennan ulkopuolelle.`);
+      if (a.mergedReps && a.mergedReps.length) a.mergedReps.forEach((m) => parts.push(mergedWarnText(m)));
+      if (a.suspectCount - (a.mergedCount || 0) > 0) parts.push(`${a.suspectCount - (a.mergedCount || 0)} epäilyttävä(ä) liike(ttä) (telineestä otto / vajaa liikerata) jätettiin laskennan ulkopuolelle.`);
       if (a.tng) parts.push('Touch-and-go tunnistettu (tauko < 0,8 s): 1. toistoa ei verrata muihin.');
       if (a.isWarmup) {
         parts.push(`Arvioitu kuorma ~${Math.round(a.pct1RM)} % 1RM → lämmittely-/tekniikkasarja, ei laatuluokitusta maksimivoimalle.`);
         return parts.join(' ');
       }
-      if (a.n >= 2 && a.vlFinal !== null) {
+      if (a.valid.length >= 2 && a.vlFinal !== null) {
         if (a.stopAfterRep !== null) {
           const keep = a.stopAfterRep; // reps within cutoff = idx of first over
           parts.push(`${g.short}: VL-raja ${a.cutoffPct} % ylittyi toistolla ${a.stopAfterRep + 1} → sarja olisi kannattanut katkaista toiston ${keep} jälkeen. ${a.junkReps} toisto(a) kerrytti lähinnä väsymystä.`);
@@ -3981,8 +4292,9 @@
 
     // Full VBT block used in saved-set analysis
     function buildVbtSetBlockHTML(s, dateStr) {
-      const prof = getLiftCfg(s.exercise) ? recentProfile(s.exercise, dateStr || todayISO()) : null;
-      const a = analyzeSet(s.reps, s.exercise, s.weightKg, { profile: prof });
+      const useDate = dateStr || todayISO();
+      const prof = getLiftCfg(s.exercise) ? recentProfile(s.exercise, useDate) : null;
+      const a = analyzeSet(s.reps, s.exercise, s.weightKg, { profile: prof, dateStr: useDate });
       if (!a.n) return '';
       const e1 = a.e1RM ? `${a.e1RM.toFixed(1)} kg <span style="color:var(--muted); font-weight:500; font-size:11px;">(${a.pctSource === 'profile' ? 'oma profiili' : 'nopeustaulukko'})</span>` : '--';
       return `
@@ -4021,7 +4333,7 @@
         if (!matches.length) continue;
         let bestV = 0;
         matches.forEach((s) => {
-          const a = analyzeSet(s.reps, s.exercise, s.weightKg);
+          const a = analyzeSet(s.reps, s.exercise, s.weightKg, { dateStr: w.date });
           if (a.vBest && a.vBest > bestV) bestV = a.vBest;
         });
         if (bestV > 0) {
@@ -4068,6 +4380,9 @@
     // --- Single most important rest finding (max 1 line) ---
     function buildShortRestFinding(a, exercise) {
       if (!a || !a.n) return null;
+      if (a.mergedReps && a.mergedReps.length) {
+        return { text: a.mergedReps.map(mergedWarnText).join(' '), cls: 'amber' };
+      }
       if (a.mvt !== null && a.rirEnd === 0) {
         return { text: '⛔ Lähellä failurea (RIR ~0) – kevennä kuormaa tai pidennä lepoa', cls: 'red' };
       }
@@ -4092,11 +4407,44 @@
       return null;
     }
 
+    // "+1 toisto ok" -vihje (ohjattu tila): tavoitetoistot täynnä (kelvollisia toistoja), VL < 0,5 × raja, viimeisen toiston RIR ≥ 3 (piikkaus ≥ 2),
+    // toistoja < Prilepinin max/sarja ja kyseessä ei ole päivän ensimmäinen kartoittava viitesarja. Palauttaa null tai { vl, cutoff, rir, max, text }.
+    function isReferenceSetContext(exercise, dateStr, setObj) {
+      if (!exercise || !getLiftCfg(exercise)) return false;
+      const plan = computeDailyPlan(exercise, dateStr);
+      if (!plan) return false;
+      if (plan.stage === 'needRef') return true;
+      if (setObj && plan.ref && plan.ref.set === setObj) return true;
+      return false;
+    }
+    function extraRepHint(a, count, targetReps, opts = {}) {
+      if (isFreeMode() || (opts && opts.isRef) || !a || !a.cfg || a.isWarmup) return null;
+      const validCount = a.valid ? a.valid.length : 0;
+      if (!(validCount >= 1) || !(validCount >= targetReps)) return null;
+      const last = a.valid[a.valid.length - 1];
+      if (!last || last.idx !== a.n - 1 || a.pct1RM === null || a.mvt === null || last.rir === null) return null;
+      const vl = last.vl === null ? 0 : last.vl;
+      const max = prilepinRow(a.pct1RM).repsMax;
+      const rirMin = getGoal().key === 'peaking' ? 2 : 3;
+      if (!(vl < 0.5 * a.cutoffPct) || last.rir < rirMin || validCount >= max) return null;
+      const rirTxt = last.rir >= 10 ? '10+' : last.rir;
+      return { vl, cutoff: a.cutoffPct, rir: last.rir, max, text: `✅ +1 toisto ok (VL ${vl.toFixed(0)} % / raja ${a.cutoffPct} %, RIR ~${rirTxt}, max ${max}/sarja)` };
+    }
+    function liveExtraRepHint(targetReps) {
+      const exercise = (activeSetMeta && activeSetMeta.exercise) || getCurrentSelectedExerciseName();
+      const weightKg = (activeSetMeta && activeSetMeta.weightKg) || 0;
+      const dateStr = document.getElementById('workoutDate').value || todayISO();
+      const prof = getLiftCfg(exercise) ? recentProfile(exercise, dateStr) : null;
+      const isRef = isReferenceSetContext(exercise, dateStr);
+      return extraRepHint(analyzeSet(currentReps, exercise, weightKg, { profile: prof, dateStr }), currentReps.length, targetReps, { isRef });
+    }
+
     // Called right after a new rep was pushed during an active set. Returns true if the set was auto-stopped.
     function vbtOnNewRep() {
       const exercise = (activeSetMeta && activeSetMeta.exercise) || getCurrentSelectedExerciseName();
       const weightKg = (activeSetMeta && activeSetMeta.weightKg) || 0;
-      const a = analyzeSet(currentReps, exercise, weightKg);
+      const dateStr = document.getElementById('workoutDate').value || todayISO();
+      const a = analyzeSet(currentReps, exercise, weightKg, { dateStr });
       const lastP = a.valid[a.valid.length - 1];
       if (!lastP || a.isWarmup) return false;
       const overCutoff = lastP.vl !== null && lastP.vl > a.cutoffPct;
@@ -4390,14 +4738,14 @@
       const cfg = getLiftCfg(anaExercise);
       const prof = cfg ? recentProfile(anaExercise, anaDate) : null;
       const sets = setsForExercise(anaExercise, (d) => d === anaDate);
-      const analyses = sets.map(({ set }) => ({ set, a: analyzeSet(set.reps, set.exercise, set.weightKg, { profile: prof }) }));
+      const analyses = sets.map(({ set }) => ({ set, a: analyzeSet(set.reps, set.exercise, set.weightKg, { profile: prof, dateStr: anaDate }) }));
       const work = analyses.filter((x) => !x.a.isWarmup);
-      const totalReps = analyses.reduce((s, x) => s + x.a.valid.length, 0);
+      const totalReps = analyses.reduce((s, x) => s + planRepsOf(x), 0);
       const goodReps = work.reduce((s, x) => s + x.a.qualityReps, 0);
       const junk = work.reduce((s, x) => s + x.a.junkReps, 0);
       const avgScore = work.length ? Math.round(work.reduce((s, x) => s + x.a.score, 0) / work.length) : null;
       const effReps = work.reduce((s, x) => s + (x.a.mvt !== null ? x.a.effectiveReps : 0), 0);
-      const tonnage = analyses.reduce((s, x) => s + x.set.weightKg * x.a.valid.length, 0);
+      const tonnage = analyses.reduce((s, x) => s + x.set.weightKg * planRepsOf(x), 0);
       const ready = readinessForDate(anaExercise, anaDate);
 
       const rows = analyses.map(({ set, a }, i) => {
@@ -4661,6 +5009,12 @@
       return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
     }
 
+    // Sarjan toistomäärä päivän suunnitelmassa: käsin korjattu määrä, muuten kelvolliset toistot
+    function planRepsOf(x) {
+      const o = Number(x.set.repCountOverride);
+      return o > 0 ? Math.round(o) : x.a.valid.length;
+    }
+
     function computeDailyPlan(exercise, dateStr) {
       const cfg = getLiftCfg(exercise);
       if (!cfg || !exercise) return null;
@@ -4679,18 +5033,18 @@
       let last = null;
       for (const d of prevDates.slice(0, 8)) {
         const work = setsForExercise(exercise, (x) => x === d)
-          .map(({ set }) => ({ set, a: analyzeSet(set.reps, exercise, set.weightKg, { profile: recentProfile(exercise, d) }) }))
+          .map(({ set }) => ({ set, a: analyzeSet(set.reps, exercise, set.weightKg, { profile: recentProfile(exercise, d), dateStr: d }) }))
           .filter((x) => !x.a.isWarmup && x.a.valid.length > 0 && x.a.pct1RM !== null && x.a.pct1RM >= pLo - 7.5);
         if (work.length) { last = { date: d, work }; break; }
       }
       // tyypillinen nopeuskustannus / toisto omista sarjoista (42 pv)
       const costsObs = setsForExercise(exercise, (d) => d <= dateStr && d >= addDaysIso(dateStr, -42))
-        .map(({ set }) => analyzeSet(set.reps, exercise, set.weightKg))
+        .map(({ set, date }) => analyzeSet(set.reps, exercise, set.weightKg, { dateStr: date }))
         .filter((a) => a.costSource === 'set' && !a.isWarmup).map((a) => a.cost);
 
       // --- tämän päivän sarjat & viitesarja ---
       const today = setsForExercise(exercise, (d) => d === dateStr)
-        .map(({ set }) => ({ set, a: analyzeSet(set.reps, exercise, set.weightKg, { profile: histProf }) }))
+        .map(({ set }) => ({ set, a: analyzeSet(set.reps, exercise, set.weightKg, { profile: histProf, dateStr }) }))
         .filter((x) => x.a.vBest);
       // viitesarjat = nousevan lämmittelyn viimeiset 62–79 % sarjat ennen varsinaisia työsarjoja;
       // toistuvat työsarjapainot tai raskaat (>79 %) työsarjat eivät muuta päivän viitesarjaa
@@ -4768,34 +5122,72 @@
         notes.push('Ei aiempaa e1RM-tasoa vertailuun – suositus perustuu viitesarjaan.');
       }
 
+      // --- toistokapasiteetti kuormalle L: Prilepin ∩ VL-raja ∩ RIR-varmuus ---
+      const rirMin = g.key === 'peaking' ? 1 : 2;
+      // Laskee toistokapasiteetin kuormalle L. Nopeuskustannus: omat sarjat (paino 0,75) + malli (0,25), rajattu 0,015–0,12 m/s/toisto;
+      // jos omia havaintoja < 2, aiempi malli + (42 pv) omien sarjojen yhdistelmä.
+      const calcRepsFor = (L) => {
+        const pctL = L / e1RM * 100;
+        const rowL = prilepinRow(pctL);
+        const v0L = predV(L);
+        const maxRepsL = Math.max(1, 30 * (100 / pctL - 1));
+        const costEpley = Math.max(0.025, (v0L - mvt) / maxRepsL);
+        const costBase = Math.max(costEpley, cfg.repCost * 0.58);
+        const own = ownVelocityCost(exercise, dateStr, pctL, 2);
+        let costL, costSrcL;
+        if (own) {
+          costL = Math.min(0.12, Math.max(0.015, 0.75 * own.cost + 0.25 * costBase));
+          costSrcL = `omat sarjat ${own.cost.toFixed(3)} × 0,75 + malli ${costBase.toFixed(3)} × 0,25 (n=${own.n} ${own.scope === 'today' ? 'tämän päivän sarjaa' : 'sarjaa, 28 pv, ±7,5 % 1RM'})`;
+        } else {
+          const costObs = costsObs.length >= 2 ? vbtMedian(costsObs) : null;
+          costL = costObs !== null ? Math.max(costBase, 0.50 * costBase + 0.50 * Math.min(cfg.repCost * 0.90, costObs)) : costBase;
+          costSrcL = costObs !== null ? `malli ${costBase.toFixed(3)} + omat sarjat ${costObs.toFixed(3)} (n=${costsObs.length})` : `malli ${costBase.toFixed(3)} m/s/toisto`;
+        }
+        const vCutL = v0L * (1 - cutoff / 100);
+        const repsVLL = Math.max(1, Math.floor((v0L - vCutL) / costL + 1e-9) + 1);
+        const repsRIRL = Math.max(1, Math.floor((v0L - mvt) / costL + 1e-9) + 1 - rirMin);
+        return { pct: pctL, row: rowL, v0: v0L, vCut: vCutL, cost: costL, costSrc: costSrcL, ownCost: own, repsVL: repsVLL, repsRIR: repsRIRL, cap: Math.max(1, Math.min(rowL.repsMax, repsVLL, repsRIRL)) };
+      };
+
       // --- kuorma: progressio edellisestä treenistä, rajattuna päivän tavoitealueeseen ---
       const loLoad = plateRound(e1RM * pLo / 100);
       const hiLoad = plateRound(e1RM * hiPct / 100);
       const autoLoad = plateRound(e1RM * targetPct / 100);
       let load = autoLoad;
       let lastInfo = null;
+      let progression = null;
       if (last) {
         const byLoad = new Map();
-        last.work.forEach(({ set, a }) => byLoad.set(set.weightKg, (byLoad.get(set.weightKg) || 0) + a.valid.length));
+        last.work.forEach(({ set, a }) => byLoad.set(set.weightKg, (byLoad.get(set.weightKg) || 0) + planRepsOf({ set, a })));
         const lastLoad = [...byLoad.entries()].sort((x, y) => y[1] - x[1] || y[0] - x[0])[0][0];
-        const lastReps = last.work.reduce((s, x) => s + x.a.valid.length, 0);
+        const lastReps = last.work.reduce((s, x) => s + planRepsOf(x), 0);
+        const lastLoadSets = last.work.filter((x) => Math.abs(x.set.weightKg - lastLoad) < 0.6);
+        const prevPerSet = lastLoadSets.length ? lastLoadSets.reduce((s, x) => s + planRepsOf(x), 0) / lastLoadSets.length : lastReps / last.work.length;
         const scores = last.work.map((x) => x.a.score);
         const meanScore = scores.reduce((s, x) => s + x, 0) / scores.length;
         const overVl = last.work.filter((x) => x.a.vlFinal !== null && x.a.vlFinal > x.a.cutoffPct + 2).length;
         const tooFatigued = last.work.some((x) => x.a.vlFinal !== null && x.a.vlFinal > x.a.redVl) || meanScore < 50;
         const ok = overVl === 0 && meanScore >= 65;
         const inc = liftIncrement(cfg);
-        const progLoad = ok ? lastLoad + inc : (tooFatigued ? lastLoad - inc : lastLoad);
         // Salli hallittu progressio enintään 85 % e1RM:ään asti, jos edellinen treeni tehtiin jo >= tavoitealueen ylärajalla puhtaasti
         const maxProgLoad = (lastLoad >= hiLoad - 2.5 && ok) ? Math.max(hiLoad, plateRound(e1RM * Math.min(85, hiPct + 5) / 100)) : hiLoad;
-        load = Math.min(maxProgLoad, Math.max(loLoad, progLoad));
-        lastInfo = { date: last.date, load: lastLoad, reps: lastReps, sets: last.work.length, meanScore, ok, tooFatigued, progLoad };
-        const why = ok ? `kaikki työsarjat VL-rajan sisällä ja RQI ka. ${meanScore.toFixed(0)} → +${inc} kg`
+        const progLoad = ok ? lastLoad + inc : (tooFatigued ? lastLoad - inc : lastLoad);
+        // Kaksinkertainen progressio (perusvoima / kerääminen): sama kuorma +1 toisto/sarja, kuormaa nostetaan vasta kun Prilepinin toistoraja on täynnä tai VL/RIR ei salli lisätoistoa
+        const clampProg = (L) => Math.min(maxProgLoad, Math.max(loLoad, L));
+        let repMode = g.key === 'baseStrength' && ok && !tooFatigued && prevPerSet < prilepinRow(lastLoad / e1RM * 100).repsMax - 1e-9;
+        if (repMode && clampProg(lastLoad) !== lastLoad) repMode = false;
+        if (repMode && calcRepsFor(lastLoad).cap <= Math.round(prevPerSet)) repMode = false;
+        progression = { mode: repMode ? 'reps' : 'load', lastLoad, prevPerSet, loadAlt: clampProg(progLoad), ok, tooFatigued };
+        // Salli hallittu progressio enintään 85 % e1RM:ään asti, jos edellinen treeni tehtiin jo >= tavoitealueen ylärajalla puhtaasti
+        load = clampProg(repMode ? lastLoad : progLoad);
+        lastInfo = { date: last.date, load: lastLoad, reps: lastReps, sets: last.work.length, meanScore, ok, tooFatigued, progLoad, repsPerSet: prevPerSet };
+        const why = repMode ? `työsarjat VL-rajan sisällä ja RQI ka. ${meanScore.toFixed(0)}, toistoja ${prevPerSet.toFixed(1)}/sarja < Prilepin ${prilepinRow(lastLoad / e1RM * 100).repsMax} → toistoprogressio: sama kuorma, +1 toisto`
+          : ok ? `kaikki työsarjat VL-rajan sisällä ja RQI ka. ${meanScore.toFixed(0)} → +${inc} kg`
           : tooFatigued ? `sarjat menivät liian väsyneiksi (RQI ka. ${meanScore.toFixed(0)}) → −${inc} kg`
             : `${overVl} sarjaa ylitti VL-rajan → sama kuorma`;
-        let txt = `Edellinen treeni ${fmtDateFi(last.date)}: ${lastInfo.sets} työsarjaa @ ${lastLoad} kg (${lastReps} toistoa): ${why} = ${progLoad} kg.`;
-        if (progLoad > maxProgLoad) txt += ` Rajattu päivän ylärajaan ${maxProgLoad} kg (${Math.round(maxProgLoad / e1RM * 100)} % päivän e1RM:stä).`;
-        else if (progLoad < loLoad) txt += ` Nostettu päivän tavoitealueen alarajaan ${loLoad} kg (${pLo} %).`;
+        let txt = `Edellinen treeni ${fmtDateFi(last.date)}: ${lastInfo.sets} työsarjaa @ ${lastLoad} kg (${lastReps} toistoa): ${why} = ${repMode ? lastLoad : progLoad} kg.`;
+        if ((repMode ? lastLoad : progLoad) > maxProgLoad) txt += ` Rajattu päivän ylärajaan ${maxProgLoad} kg (${Math.round(maxProgLoad / e1RM * 100)} % päivän e1RM:stä).`;
+        else if ((repMode ? lastLoad : progLoad) < loLoad) txt += ` Nostettu päivän tavoitealueen alarajaan ${loLoad} kg (${pLo} %).`;
         notes.push(txt);
       } else {
         notes.push(`Ei aiempaa työsarjadataa → kuorma = ${Math.round(targetPct)} % päivän e1RM:stä (${loLoad}–${hiLoad} kg).`);
@@ -4811,6 +5203,7 @@
         const activeLoad = [...wCounts.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0][0];
         if (Math.abs(activeLoad - load) >= 2.5 && activeLoad >= loLoad - 2.5 && activeLoad <= e1RM * 0.90) {
           load = activeLoad;
+          progression = null;
         }
       }
 
@@ -4825,20 +5218,16 @@
       if (readiness !== null && readiness <= -5) volume = Math.min(volume, row.rangeLo);
       else if (readiness !== null && readiness < -2) volume = Math.min(volume, Math.round((row.rangeLo + row.opt) / 2));
 
-      // --- toistot / sarja: Prilepin ∩ VL-raja ∩ RIR-varmuus ---
-      const v0 = predV(load);
-      // nopeuskustannus/toisto: huomioidaan lajikohtainen peruskustannus (cfg.repCost) ja omat työsarjat
-      const maxReps = Math.max(1, 30 * (100 / pct - 1));
-      const costEpley = Math.max(0.025, (v0 - mvt) / maxReps);
-      const costBase = Math.max(costEpley, cfg.repCost * 0.58);
-      const costObs = costsObs.length >= 2 ? vbtMedian(costsObs) : null;
-      const cost = costObs !== null ? Math.max(costBase, 0.50 * costBase + 0.50 * Math.min(cfg.repCost * 0.90, costObs)) : costBase;
-      const costSrc = costObs !== null ? `malli ${costBase.toFixed(3)} + omat sarjat ${costObs.toFixed(3)} (n=${costsObs.length})` : `malli ${costBase.toFixed(3)} m/s/toisto`;
-      const vCut = v0 * (1 - cutoff / 100);
-      const repsVL = Math.max(1, Math.floor((v0 - vCut) / cost + 1e-9) + 1);
-      const rirMin = g.key === 'peaking' ? 1 : 2;
-      const repsRIR = Math.max(1, Math.floor((v0 - mvt) / cost + 1e-9) + 1 - rirMin);
-      let reps = Math.min(row.repsMax, repsVL, repsRIR);
+      // --- toistot / sarja ---
+      const rc = calcRepsFor(load);
+      const { v0, vCut, cost, costSrc, repsVL, repsRIR } = rc;
+      let reps = rc.cap;
+      if (progression && progression.mode === 'reps') {
+        reps = Math.max(1, Math.min(Math.round(progression.prevPerSet) + 1, rc.cap));
+        notes.push(reps > Math.round(progression.prevPerSet)
+          ? `Toistoprogressio: sama kuorma ${load} kg, ${Math.round(progression.prevPerSet)} → ${reps} toistoa/sarja (raja min(Prilepin ${rc.row.repsMax}, VL ${repsVL}, RIR ${repsRIR}) = ${rc.cap}).`
+          : `Toistoprogressio: sama kuorma ${load} kg, mutta VL-/RIR-ennuste ei salli lisätoistoa (min(Prilepin ${rc.row.repsMax}, VL ${repsVL}, RIR ${repsRIR}) = ${rc.cap}) → ${reps} toistoa/sarja.`);
+      }
       reps = Math.max(1, reps);
       if (reps < row.repsMin) notes.push(`VBT rajoittaa: ennuste ${repsVL} toistoa ennen VL ${cutoff} % -rajaa → ${reps} toistoa/sarja (Prilepin ${row.repsMin}–${row.repsMax}).`);
       let sets = Math.max(2, Math.min(8, Math.round(volume / reps)));
@@ -4854,17 +5243,38 @@
 
       // --- tehty tänään ja sarjojen välinen väsymys / autoregulaatio (painon tai toistojen pudotus) ---
       const work = today.filter((x, i) => i > refIdx && !x.a.isWarmup);
-      const doneReps = work.reduce((s, x) => s + x.a.valid.length, 0);
+      const doneReps = work.reduce((s, x) => s + planRepsOf(x), 0);
       const doneSets = work.length;
       // Jos nostaja tekee sarjoissa säännöllisesti eri toistomäärää kuin alkuperäinen suositus (esim. 5 toiston sarjoja 4×5×140),
       // huomioidaan nostajan käyttämä tavoitetoistomäärä ja -volyymi
       if (work.length > 0) {
-        const firstWorkReps = work[0].a.valid.length;
-        if (firstWorkReps > reps && firstWorkReps <= 8) {
-          reps = firstWorkReps;
+        const firstWorkReps = planRepsOf(work[0]);
+        const cappedFirst = Math.min(firstWorkReps, row.repsMax);
+        if (cappedFirst > reps && firstWorkReps <= 8) {
+          reps = cappedFirst; // tapaoverride saa nostaa toistot vain Prilepin-rajaan asti
           volume = sets * reps;
+        } else {
+          // Estä toistotavoitteen nousu kesken treenin yli nostajan jo tekemien puhtaiden työsarjojen
+          const cleanWorkReps = work
+            .filter((x) => !(x.a.vlFinal !== null && x.a.vlFinal > cutoff)
+              && (x.a.rirEnd === null || x.a.rirEnd >= 2)
+              && (!(Number(x.set.targetReps) > 0) || planRepsOf(x) >= Number(x.set.targetReps)))
+            .map(planRepsOf)
+            .filter((r) => r >= 1 && r <= 8);
+          if (cleanWorkReps.length > 0) {
+            const maxClean = Math.max(...cleanWorkReps);
+            if (maxClean < reps) {
+              reps = maxClean;
+              sets = Math.max(2, Math.min(8, Math.round(volume / reps)));
+              if ((reps <= 3 && pct >= 70 && sets > 4) || (pct >= 80 && sets > 4)) {
+                sets = 4;
+                volume = sets * reps;
+              }
+            }
+          }
         }
       }
+      reps = Math.max(1, Math.min(reps, row.repsMax));
       let adjust = null;
       if (work.length) {
         const lastW = work[work.length - 1];
@@ -4881,10 +5291,13 @@
         const lastOverRed = lastW.a.vlFinal !== null && lastW.a.vlFinal >= lastW.a.redVl;
         const lastOverCut = lastW.a.vlFinal !== null && lastW.a.vlFinal > cutoff;
         const lastNearFail = lastW.a.rirEnd === 0 || (lastOverCut && lastVmin !== null && lastVmin <= stickFail + 0.05);
-        const missedReps = lastW.a.valid.length < reps;
+        const lastTargetMet = Number(lastW.set.targetReps) > 0 && planRepsOf(lastW) >= Number(lastW.set.targetReps);
+        const lastClean = !lastOverCut && (lastW.a.rirEnd === null || lastW.a.rirEnd >= 2);
+        const missedReps = planRepsOf(lastW) < reps && !(lastTargetMet && lastClean);
         const vDropBetween = (work.length >= 2 && (work[0].a.vBest - lastW.a.vBest) >= 0.055) || (lastW.a.vBest < vExp - 0.06);
-        const remSetsRaw = Math.max(0, sets - doneSets);
         const remRepsRaw = Math.max(0, volume - doneReps);
+        // jäljellä olevat sarjat = ceil((tavoitevolyymi − tehdyt toistot) / toistoa per sarja) – huomioi ylimääräiset toistot
+        const remSetsRaw = remRepsRaw > 0 ? Math.ceil(remRepsRaw / Math.max(1, reps)) : 0;
 
         if (remSetsRaw === 0 || remRepsRaw === 0) {
           // Päivän suunniteltu sarja-/toistotavoite on jo täynnä
@@ -4943,14 +5356,55 @@
           };
         }
       }
-      const remainingSets = Math.max(0, sets - doneSets);
       const remainingReps = Math.max(0, volume - doneReps);
+      const remainingSets = remainingReps > 0 ? Math.ceil(remainingReps / Math.max(1, reps)) : 0;
+
+      // --- vaihtoehtoinen progressio (toisto- vs. kuormaprogressio) ---
+      let alt = null;
+      if (progression) {
+        const volFor = (rowX) => {
+          let v = waveVolume(rowX, wave);
+          if (readiness !== null && readiness <= -5) v = Math.min(v, rowX.rangeLo);
+          else if (readiness !== null && readiness < -2) v = Math.min(v, Math.round((rowX.rangeLo + rowX.opt) / 2));
+          return v;
+        };
+        const setsFor = (rowX, pctX, repsX) => {
+          let n = Math.max(2, Math.min(8, Math.round(volFor(rowX) / repsX)));
+          if ((repsX <= 3 && pctX >= 70 && n > 4) || (pctX >= 80 && n > 4)) n = 4;
+          return n;
+        };
+        if (progression.mode === 'reps' && progression.loadAlt !== load) {
+          const rA = calcRepsFor(progression.loadAlt);
+          alt = { kind: 'load', load: progression.loadAlt, reps: rA.cap, sets: setsFor(rA.row, rA.pct, rA.cap) };
+        } else if (progression.mode === 'load' && !progression.tooFatigued && progression.lastLoad === load) {
+          // kuormaprogressio valittu mutta sama kuorma ei noussut → ei erillistä vaihtoehtoa
+        } else if (progression.mode === 'load' && !progression.tooFatigued) {
+          const rA = calcRepsFor(progression.lastLoad);
+          if (g.key === 'baseStrength' && progression.prevPerSet < rA.row.repsMax - 1e-9) {
+            const rr = Math.max(1, Math.min(Math.round(progression.prevPerSet) + 1, rA.cap));
+            if (rr > Math.round(progression.prevPerSet)) {
+              alt = { kind: 'reps', load: progression.lastLoad, reps: rr, sets: setsFor(rA.row, rA.pct, rr) };
+            }
+          }
+        }
+        if (alt && alt.load === load && alt.reps === reps) alt = null;
+      }
 
       return {
         stage: 'plan', exercise, cfg, goal: g, e1RM, e1Src, baseline, readiness, ref, load, pct, row, volume,
         reps, sets, v0, vCut, cutoff, mvt, cost, costSrc, repsVL, repsRIR, notes, lastInfo,
-        doneReps, doneSets, remainingSets, remainingReps, adjust, loLoad, hiLoad
+        doneReps, doneSets, remainingSets, remainingReps, adjust, loLoad, hiLoad, progression, alt, ownCost: rc.ownCost
       };
+    }
+
+    function planAltHTML(plan, opts = {}) {
+      if (!plan || !plan.alt) return '';
+      const a = plan.alt;
+      const lbl = a.kind === 'load' ? 'kuormaprogressio' : 'toistoprogressio';
+      const btn = opts.withButtons
+        ? `<button type="button" data-plan-apply="${a.load}|${a.reps}" style="padding:3px 9px; font-size:11px; margin-left:6px; border-radius:6px;">Käytä</button>`
+        : '';
+      return `<div class="plan-alt-line" style="font-size:12px; color:var(--muted); margin:4px 0; display:flex; align-items:center; flex-wrap:wrap; gap:4px;"><span>Vaihtoehto (${lbl}): <strong style="color:var(--text);">${a.sets} × ${a.reps} @ ${a.load} kg</strong></span>${btn}</div>`;
     }
 
     function buildDailyPlanHTML(plan, opts = {}) {
@@ -4978,6 +5432,7 @@
             <div class="vbt-kpi" style="grid-column: span 2;"><span class="vbt-kpi-l">Työsarjat</span><span class="vbt-kpi-v" style="color:#60a5fa;">${plan.sets} × ${plan.reps} @ ${plan.load} kg</span><span class="vbt-kpi-s">${Math.round(plan.pct)} % päivän e1RM${loadRangeTxt} · ${plan.sets * plan.reps} toistoa</span></div>
             <div class="vbt-kpi"><span class="vbt-kpi-l">Nopeusohje</span><span class="vbt-kpi-v" style="font-size:16px;">${fmtV(plan.v0)}</span><span class="vbt-kpi-s">±0.03 · stop ${fmtV(plan.vCut)} (VL ${plan.cutoff} %)</span></div>
           </div>
+          ${planAltHTML(plan)}
           <div style="font-size:11px; color:var(--muted); margin:4px 0;">Prilepin ${plan.row.label}: ${plan.row.repsMin}–${plan.row.repsMax} toistoa/sarja, optimi ${plan.row.opt} (${plan.row.rangeLo}–${plan.row.rangeHi}) → tavoite <strong style="color:var(--text);">${plan.volume}</strong> toistoa</div>
           <div class="progress-bar" style="margin:4px 0;"><div class="progress-fill ${doneFrac >= 1 ? 'done' : ''}" style="width:${Math.round(doneFrac * 100)}%"></div></div>
           <div style="font-size:12px; margin-bottom:4px;">Tehty: <strong>${plan.doneSets}</strong> sarjaa / <strong>${plan.doneReps}</strong> toistoa${plan.remainingSets > 0 && plan.remainingReps > 0 ? ` · jäljellä ~${plan.remainingSets} × ${plan.reps}` : ' · <span class="green">volyymi täynnä ✓</span>'}</div>
@@ -5023,6 +5478,7 @@
       return `
         ${actionHtml}
         <div class="plan-summary-line">Tänään ${plan.sets} × ${plan.reps} @ ${plan.load} kg · stop &lt; ${fmtV(plan.vCut)} m/s${rdTxt}</div>
+        ${planAltHTML(plan, opts)}
         <div class="progress-bar" style="margin:8px 0 6px;"><div class="progress-fill ${doneFrac >= 1 ? 'done' : ''}" style="width:${Math.round(doneFrac * 100)}%"></div></div>
         <div style="font-size:12px; color:var(--muted);">Tehty <strong style="color:var(--text);">${plan.doneSets}/${plan.sets}</strong> sarjaa (${plan.doneReps}/${plan.volume} toistoa)${plan.remainingSets > 0 && plan.remainingReps > 0 ? ` · jäljellä ~${plan.remainingSets} × ${plan.reps}` : ' · <span class="green">volyymi täynnä ✓</span>'}</div>
         <details class="details-toggle plan-why" ${opts.whyOpen ? 'open' : ''}>
@@ -5161,9 +5617,10 @@
         (w.sets || []).forEach((s) => {
           if (exercise && s.exercise !== exercise) return;
           if (!s.reps || !s.reps.length) return;
-          const a = analyzeSet(s.reps, s.exercise, s.weightKg);
+          const a = analyzeSet(s.reps, s.exercise, s.weightKg, { dateStr: w.date });
           if (a.isWarmup) return;
-          reps += a.valid.length; tonnage += a.valid.length * (s.weightKg || 0); sets++;
+          const rc = Number(s.repCountOverride) > 0 ? setRepCount(s) : a.valid.length;
+          reps += rc; tonnage += rc * (s.weightKg || 0); sets++;
           sessions.add(w.date);
         });
       });
@@ -5493,6 +5950,28 @@
       refreshOpenSetAnalysisSheet();
     }
 
+    // Käsin korjattu toistomäärä (esim. yhdistyneet toistot): set.repCountOverride; null/tyhjä/sama kuin tallennettu = poista korjaus
+    function setRepCountOverride(dateStr, setIdx, value) {
+      const w = workouts.find((x) => x.date === dateStr);
+      if (!w || !w.sets || !w.sets[setIdx]) return false;
+      const s = w.sets[setIdx];
+      const n = (value === null || value === '' || value === undefined) ? null : Math.round(Number(value));
+      if (n !== null && !(n >= 1 && n <= 99)) return false;
+      const snap = captureUndoSnapshot('Toistomäärä korjattu');
+      const cfg = getLiftCfg(s.exercise);
+      const hasSuspect = flagSuspectReps(s.reps || [], cfg, null, dateStr).some(Boolean);
+      if (n === null || (n === (s.reps || []).length && !hasSuspect)) delete s.repCountOverride;
+      else s.repCountOverride = n;
+      saveJSON(KEY_WORKOUTS, workouts);
+      showUndoToast(n === null ? 'Toistomäärän korjaus poistettu' : `Toistomäärä korjattu: ${n}`, snap);
+      renderLiveSet();
+      renderCalendar();
+      renderHistoryList();
+      if (!document.getElementById('tabAnalysis').classList.contains('hidden')) renderAnalysisTab();
+      refreshOpenSetAnalysisSheet();
+      return true;
+    }
+
     function deleteLiveRep(idx) {
       if (idx < 0 || idx >= currentReps.length) return;
       const snap = captureUndoSnapshot('Toisto poistettu');
@@ -5528,11 +6007,15 @@
       if (count === 0) {
         return `<div style="color:var(--muted); font-size:12px; padding:6px 0;">Sarjassa ei ole toistoja.</div>`;
       }
-      const bestVel = Math.max(0, ...reps.map((r) => r.meanVelocity || 0));
-      const avgVel = count ? reps.reduce((a, r) => a + (r.meanVelocity || 0), 0) / count : 0;
-      const bestWatt = Math.max(0, ...reps.map((r) => r.power || 0));
-      const avgRom = count ? reps.reduce((a, r) => a + (r.rangeOfMotionCm || 0), 0) / count : 0;
-      const setA = analyzeSet(reps, s.exercise, s.weightKg);
+      const useDate = opts.dateStr || s._date || todayISO();
+      const prof = getLiftCfg(s.exercise) ? recentProfile(s.exercise, useDate) : null;
+      const setA = analyzeSet(reps, s.exercise, s.weightKg, { profile: prof, dateStr: useDate });
+      const statReps = (setA.valid && setA.valid.length >= 1) ? setA.valid.map((p) => reps[p.idx]) : reps;
+      const statCount = statReps.length;
+      const bestVel = Math.max(0, ...statReps.map((r) => r.meanVelocity || 0));
+      const avgVel = statCount ? statReps.reduce((a, r) => a + (r.meanVelocity || 0), 0) / statCount : 0;
+      const bestWatt = Math.max(0, ...statReps.map((r) => r.power || 0));
+      const avgRom = statCount ? statReps.reduce((a, r) => a + (r.rangeOfMotionCm || 0), 0) / statCount : 0;
 
       const repListRows = reps.map((r, rIdx) => {
         const pr = setA.perRep[rIdx];
@@ -5540,7 +6023,7 @@
         const qDot = pr ? `<span class="q-dot" style="border-color:${Q_COLORS[pr.quality]}" title="${pr.quality}"></span>` : '';
         const rirHtml = pr && pr.rir !== null ? `<span style="color:var(--muted); font-size:11px;">RIR ~${pr.rir >= 10 ? '10+' : pr.rir}</span>` : '';
         const dropHtml = pr && pr.suspect
-          ? '<span style="color:#64748b; font-size:11px;">epäilyttävä</span>'
+          ? `<span style="color:#64748b; font-size:11px;">${pr.merged ? 'yhdistetty' : 'epäilyttävä'}</span>`
           : (repDrop === null || (pr && pr.v >= pr.bestSoFar && rIdx === setA.vBestIdx))
             ? '<span style="color:var(--muted); font-size:11px;">paras</span>'
             : `<span class="${repDrop > setA.cutoffPct ? (repDrop > setA.redVl ? 'red' : 'amber') : 'green'}" style="font-size:11px; font-weight:600;">VL ${repDrop.toFixed(0)} %</span> ${rirHtml}`;
@@ -5569,6 +6052,17 @@
           }</div>`
         : '';
 
+      const fixDefault = Number(s.repCountOverride) > 0 ? Math.round(s.repCountOverride)
+        : (setA.mergedCount ? setA.valid.length + setA.mergedReps.reduce((acc, m) => acc + m.est, 0) : count);
+      const fixCountHtml = opts.allowRepDelete
+        ? `<div class="row" style="gap:6px; flex-wrap:wrap; align-items:center;">
+            <span style="font-size:12px; font-weight:700;">Korjaa toistomäärä</span>
+            <input type="number" data-fix-repcount-input min="1" max="99" step="1" inputmode="numeric" value="${fixDefault}" style="width:64px;" />
+            <button type="button" data-fix-repcount="1" style="padding:6px 10px; font-size:12px;">Tallenna</button>
+            ${Number(s.repCountOverride) > 0 ? `<button type="button" data-fix-repcount-clear="1" style="padding:6px 10px; font-size:12px;">Nollaa</button>` : ''}
+            <span style="font-size:11px; color:var(--muted); flex-basis:100%;">${Number(s.repCountOverride) > 0 ? `Käsin korjattu: ${Math.round(s.repCountOverride)} toistoa (tallennettu ${count}). ` : ''}Käytetään volyymiin ja toistosummiin; nopeustilastot lasketaan vain kelvollisista toistoista.</span>
+          </div>`
+        : '';
       const delSetHtml = opts.allowSetDelete
         ? `<button type="button" class="danger" data-del-this-set="1" style="width:100%; min-height:44px; margin-top:4px;">🗑 Poista tämä sarja</button>`
         : '';
@@ -5593,19 +6087,20 @@
             </div>
             <div class="stat-pill">
               <span class="stat-pill-label">Tonnimäärä</span>
-              <span class="stat-pill-val">${Math.round((s.weightKg || 0) * count)} kg</span>
+              <span class="stat-pill-val">${Math.round((s.weightKg || 0) * setRepCount(s))} kg</span>
             </div>
           </div>
 
           <div>
             <div class="row" style="margin-bottom:4px;">
               <span style="font-size:12px; font-weight:700; color:var(--text);">Toistoerittely</span>
-              <span style="font-size:11px; color:var(--muted);">${count} toistoa</span>
+              <span style="font-size:11px; color:var(--muted);">${count} toistoa${Number(s.repCountOverride) > 0 ? ` (korjattu ${Math.round(s.repCountOverride)})` : ''}</span>
             </div>
             <div style="display:flex; flex-direction:column; gap:4px;">
               ${repListRows}
             </div>
           </div>
+          ${fixCountHtml}
           ${delSetHtml}
         </div>
       `;
@@ -5620,6 +6115,18 @@
           deleteRepFromSavedSet(dateStr, workoutSetIdx, rIdx);
         });
       });
+      const fixBtn = containerEl.querySelector('[data-fix-repcount]');
+      if (fixBtn) {
+        fixBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const inp = containerEl.querySelector('[data-fix-repcount-input]');
+          setRepCountOverride(dateStr, workoutSetIdx, inp ? inp.value : '');
+        });
+      }
+      const fixClr = containerEl.querySelector('[data-fix-repcount-clear]');
+      if (fixClr) {
+        fixClr.addEventListener('click', (e) => { e.stopPropagation(); setRepCountOverride(dateStr, workoutSetIdx, null); });
+      }
       const delSetBtn = containerEl.querySelector('[data-del-this-set]');
       if (delSetBtn) {
         delSetBtn.addEventListener('click', (e) => {
@@ -5703,10 +6210,13 @@
       const ex = meta.exercise || getCurrentSelectedExerciseName();
       const wKg = Number(meta.weightKg) || 0;
       const prof = (!isFreeMode() && getLiftCfg(ex)) ? recentProfile(ex, dateStr) : null;
-      const a = analyzeSet(currentReps, ex, wKg, { profile: prof });
+      const a = analyzeSet(currentReps, ex, wKg, { profile: prof, dateStr });
       const bestV = a.vBest || Math.max(0, ...currentReps.map((r) => r.meanVelocity || 0));
+      const displayRepCount = (lastSavedSetRef && Number(lastSavedSetRef.repCountOverride) > 0)
+        ? setRepCount(lastSavedSetRef)
+        : currentReps.length;
 
-      const metricsParts = [`${wKg} kg × ${currentReps.length}`, `paras ${fmtV(bestV)} m/s`];
+      const metricsParts = [`${wKg} kg × ${displayRepCount}`, `paras ${fmtV(bestV)} m/s`];
       if (!isFreeMode()) {
         if (a.vlFinal !== null) metricsParts.push(`VL ${a.vlFinal.toFixed(0)} %`);
         if (a.rirEnd !== null) metricsParts.push(`RIR ~${a.rirEnd >= 10 ? '10+' : a.rirEnd}`);
@@ -5759,7 +6269,7 @@
           const widthPct = Math.max(6, Math.round((r.meanVelocity / maxVel) * 100));
           const qDot = pr ? `<span class="q-dot" style="border-color:${Q_COLORS[pr.quality]}"></span>` : '';
           const vsFirstHtml = isFreeMode() ? '' : (pr && pr.suspect)
-            ? `<span style="color:#64748b; font-size:12px;">epäilyttävä</span>`
+            ? `<span style="color:#64748b; font-size:12px;">${pr.merged ? 'yhdistetty' : 'epäilyttävä'}</span>`
             : (!pr || pr.vl === null || idx === a.vBestIdx)
               ? `<span style="color:var(--muted); font-size:12px;">paras</span>`
               : `<span class="${pr.vl > a.redVl ? 'red' : (pr.vl > a.cutoffPct ? 'amber' : 'green')}" style="font-size:12px; font-weight:600;">VL ${pr.vl.toFixed(0)} %</span>`
@@ -5789,12 +6299,12 @@
       if (!card || getLiftUiState() !== 'done') return;
       const dateStr = document.getElementById('workoutDate').value || todayISO();
       const sets = getCompletedSetsForCurrentDate();
-      const totalReps = sets.reduce((sum, s) => sum + ((s.reps && s.reps.length) || 0), 0);
-      const tonnage = sets.reduce((sum, s) => sum + ((s.weightKg || 0) * ((s.reps && s.reps.length) || 0)), 0);
+      const totalReps = sets.reduce((sum, s) => sum + setRepCount(s), 0);
+      const tonnage = sets.reduce((sum, s) => sum + ((s.weightKg || 0) * setRepCount(s)), 0);
       let overVlCount = 0;
       let bestE1 = null;
       sets.forEach((s) => {
-        const a = analyzeSet(s.reps, s.exercise, s.weightKg);
+        const a = analyzeSet(s.reps, s.exercise, s.weightKg, { dateStr });
         if (!a.isWarmup && a.vlFinal !== null && a.vlFinal > a.cutoffPct) overVlCount++;
         if (a.e1RM && (!bestE1 || a.e1RM > bestE1.e1RM)) bestE1 = { ex: s.exercise, e1RM: a.e1RM };
       });
@@ -5840,10 +6350,10 @@
       card.classList.remove('hidden');
       countEl.textContent = `${sets.length} sarjaa`;
       listEl.innerHTML = sets.map((s, idx) => {
-        const count = s.reps ? s.reps.length : 0;
-        const bestVel = count ? Math.max(0, ...s.reps.map((r) => r.meanVelocity || 0)) : 0;
-        const dropPct = calcVelocityDropPct(s.reps, s.exercise);
-        const qa = analyzeSet(s.reps, s.exercise, s.weightKg);
+        const count = setRepCount(s);
+        const bestVel = (s.reps && s.reps.length) ? Math.max(0, ...s.reps.map((r) => r.meanVelocity || 0)) : 0;
+        const dropPct = calcVelocityDropPct(s.reps, s.exercise, dateStr);
+        const qa = analyzeSet(s.reps, s.exercise, s.weightKg, { dateStr });
         const parts = [
           `<strong>#${idx + 1}</strong> ${s.exercise}`,
           `${s.weightKg} × ${count}`
@@ -5910,7 +6420,7 @@
 
       // Analyze active/current set for hero view
       const prof = (!isFreeMode() && getLiftCfg(currentExercise)) ? recentProfile(currentExercise, dateStr) : null;
-      const liveA = count > 0 ? analyzeSet(currentReps, currentExercise, activeWeight, { profile: prof }) : null;
+      const liveA = count > 0 ? analyzeSet(currentReps, currentExercise, activeWeight, { profile: prof, dateStr }) : null;
       const lastP = (liveA && liveA.valid.length) ? liveA.valid[liveA.valid.length - 1] : null;
 
       // Active hero view updates
@@ -5926,6 +6436,8 @@
       const repProgLbl = document.getElementById('repProgressLabel');
       const fill = document.getElementById('repProgressFill');
       const traceWarnEl = document.getElementById('liveTraceWarn');
+      const extraHintEl = document.getElementById('liveExtraRepHint');
+      const mergedWarnEl = document.getElementById('liveMergedWarn');
 
       let heroColor = '';
       let alertHtml = '';
@@ -6025,6 +6537,17 @@
         const pct = Math.min(100, (count / Math.max(1, target)) * 100);
         fill.style.width = `${pct}%`;
         fill.className = 'progress-fill' + (count >= target ? ' done' : '');
+      }
+      if (extraHintEl) {
+        const isRef = isReferenceSetContext(currentExercise, dateStr);
+        const hint = (liveA && uiState === 'active' && setActive) ? extraRepHint(liveA, count, target, { isRef }) : null;
+        extraHintEl.classList.toggle('hidden', !hint);
+        extraHintEl.textContent = hint ? hint.text : '';
+      }
+      if (mergedWarnEl) {
+        const mw = (!isFreeMode() && liveA && liveA.mergedReps.length) ? liveA.mergedReps.map(mergedWarnText) : [];
+        mergedWarnEl.classList.toggle('hidden', !mw.length);
+        mergedWarnEl.innerHTML = mw.map((t) => `<div>${t}</div>`).join('');
       }
       if (traceWarnEl) {
         const showWarn = lastTraceFailed && lastTraceStatus;
@@ -6207,8 +6730,8 @@
           const avgVel = s.reps.length ? s.reps.reduce((a, r) => a + r.meanVelocity, 0) / s.reps.length : 0;
           const bestWatt = Math.max(0, ...s.reps.map((r) => r.power));
           const avgRom = s.reps.length ? s.reps.reduce((a, r) => a + r.rangeOfMotionCm, 0) / s.reps.length : 0;
-          const dropPct = calcVelocityDropPct(s.reps, s.exercise);
-          const ha = analyzeSet(s.reps, s.exercise, s.weightKg);
+          const dropPct = calcVelocityDropPct(s.reps, s.exercise, w.date);
+          const ha = analyzeSet(s.reps, s.exercise, s.weightKg, { dateStr: w.date });
           const dropHtml = (dropPct !== null
             ? ` • VL paras→viim.: <strong class="${dropPct > ha.redVl ? 'red' : dropPct > ha.cutoffPct ? 'amber' : 'green'}">${dropPct.toFixed(1)} %</strong>`
             : '')
@@ -6227,7 +6750,7 @@
               <div class="row" style="gap: 8px;">
                 <strong>#${sIdx + 1} ${s.exercise}</strong>
                 <div style="display:flex; align-items:center; gap:8px;">
-                  <span style="color:var(--muted); font-size:13px;">${s.weightKg} kg • ${s.reps.length}/${s.targetReps} toistoa</span>
+                  <span style="color:var(--muted); font-size:13px;">${s.weightKg} kg • ${setRepCount(s)}/${s.targetReps} toistoa</span>
                   <button type="button" class="danger" data-del-date="${w.date}" data-del-idx="${sIdx}" style="padding: 4px 8px; font-size: 11px; border-radius: 6px;">🗑 Poista</button>
                 </div>
               </div>
@@ -6264,10 +6787,10 @@
         w.sets.forEach((s, sIdx) => {
           const ex = `"${String(s.exercise).replace(/"/g, '""')}"`;
           const setDrop = calcFirstToLastDropPct(s.reps);
-          const ca = analyzeSet(s.reps, s.exercise, s.weightKg, { profile: getLiftCfg(s.exercise) ? recentProfile(s.exercise, w.date) : null });
+          const ca = analyzeSet(s.reps, s.exercise, s.weightKg, { profile: getLiftCfg(s.exercise) ? recentProfile(s.exercise, w.date) : null, dateStr: w.date });
           const f = (x, d) => (x === null || x === undefined || !Number.isFinite(x)) ? '' : x.toFixed(d);
           const setDropStr = setDrop !== null ? setDrop.toFixed(1) : '';
-          const set1RM = calcEpley1RM(s.weightKg, s.reps.length);
+          const set1RM = calcEpley1RM(s.weightKg, setRepCount(s));
           const set1RMStr = set1RM !== null ? set1RM.toFixed(1) : '';
           s.reps.forEach((r, rIdx) => {
             const low = r.loweringVelocity !== null && r.loweringVelocity !== undefined ? r.loweringVelocity.toFixed(3) : '';
