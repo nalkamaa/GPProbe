@@ -1062,6 +1062,10 @@
           <button type="button" id="repPlusBtn">+</button>
         </div>
       </div>
+      <label id="tngToggleRow" class="row hidden" style="justify-content: flex-start; gap: 8px; font-size: 13px; cursor: pointer; padding-top: 2px;">
+        <input type="checkbox" id="tngToggle" />
+        <span>Touch-and-go (maastaveto)</span>
+      </label>
     </div>
 
     <!-- B. SARJAN AIKANA (HERO-NÄKYMÄ) -->
@@ -1099,8 +1103,10 @@
     </div>
 
     <!-- Yksi iso koko leveyden päätoimintopainike -->
-    <div id="mainSetActionWrap" class="hide-done">
+    <div id="mainSetActionWrap" class="hide-done" style="display: flex; flex-direction: column; gap: 6px;">
       <button type="button" id="mainSetActionBtn" class="primary main-action-btn">🔌 Yhdistä Pin aloittaaksesi</button>
+      <button type="button" id="rezeroBtn" class="hidden" style="width: 100%; padding: 8px 12px; font-size: 13px; color: var(--muted); background: var(--card);">🧭 Nollaa anturi (kalibroi)</button>
+      <div id="rezeroStatusText" class="hidden" style="font-size: 12px; color: #93c5fd; text-align: center;"></div>
     </div>
 
     <!-- Today's completed sets on the live training tab -->
@@ -1211,6 +1217,10 @@
       <button type="button" id="menuOpenSettingsBtn" class="sheet-item-btn">
         <span>⚙️ Treeniasetukset</span>
         <span style="color: var(--muted);">›</span>
+      </button>
+      <button type="button" id="menuRezeroBtn" class="sheet-item-btn hidden">
+        <span>🧭 Nollaa anturi</span>
+        <span style="color: var(--muted);">↻</span>
       </button>
       <button type="button" id="clearRepsBtn" class="sheet-item-btn danger hidden">
         <span>🧹 Tyhjennä nykyinen sarja</span>
@@ -1325,6 +1335,31 @@
     let activeSetMeta = null;
     let keepWarmOsc = null;
     let keepWarmGain = null;
+    let resumeSetAfterReconnect = false;
+    let resumeSetDisconnectedAt = 0;
+    let rezeroNoticeTimer = null;
+    const BLE_DIAG_MAX = 50;
+    const bleDiagLog = [];
+    function logBleDiag(kind, msg) {
+      bleDiagLog.push({ ts: new Date().toTimeString().slice(0, 8), kind: String(kind || 'info'), msg: String(msg || '') });
+      if (bleDiagLog.length > BLE_DIAG_MAX) bleDiagLog.shift();
+      if (typeof refreshBleDiagUI === 'function') refreshBleDiagUI();
+    }
+    function showRezeroStatus(msg, autoHideMs = 3500) {
+      const el = document.getElementById('rezeroStatusText');
+      if (!el) return;
+      if (rezeroNoticeTimer) { clearTimeout(rezeroNoticeTimer); rezeroNoticeTimer = null; }
+      if (!msg) { el.classList.add('hidden'); el.textContent = ''; return; }
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      if (autoHideMs > 0) {
+        rezeroNoticeTimer = setTimeout(() => {
+          el.classList.add('hidden');
+          el.textContent = '';
+          rezeroNoticeTimer = null;
+        }, autoHideMs);
+      }
+    }
 
     const memoryStore = {};
     let exercises = loadJSON(KEY_EXERCISES, [...DEFAULT_EXERCISES]);
@@ -1920,10 +1955,12 @@
       const exercise = (selVal && selVal !== ADD_NEW_EX_VALUE) ? selVal : (exercises[0] || DEFAULT_EXERCISES[0]);
       const weightKg = parseFloat(document.getElementById('weightInput').value) || 0;
       const targetReps = parseInt(document.getElementById('targetRepsInput').value, 10) || 5;
+      const tngToggleEl = document.getElementById('tngToggle');
       return {
         exercise,
         weightKg,
         targetReps,
+        touchAndGo: !!(getLiftKey(exercise) === 'deadlift' && tngToggleEl && tngToggleEl.checked),
         time: new Date().toTimeString().slice(0, 8)
       };
     }
@@ -1940,12 +1977,18 @@
         autoStartAfterZero = false;
         setActive = true;
         setStartedAt = Date.now();
-        activeSetMeta = snapshotCurrentSetMeta();
+        if (!activeSetMeta || currentReps.length === 0) {
+          activeSetMeta = snapshotCurrentSetMeta();
+        }
         startAudioKeepWarm();
         stopRestTimer();
         soundReady();
       } else {
         soundReady();
+        const rzEl = document.getElementById('rezeroStatusText');
+        if (rzEl && !rzEl.classList.contains('hidden')) {
+          showRezeroStatus('✓ Anturi nollattu ja valmis', 2500);
+        }
       }
       updateHeaderStatus();
       renderLiveSet();
@@ -1955,6 +1998,8 @@
     async function disconnectPin() {
       manualDisconnect = true;
       bleConnecting = false;
+      resumeSetAfterReconnect = false;
+      resumeSetDisconnectedAt = 0;
       activeSetToken++;
       clearZeroTimer();
       stopBleKeepAlive();
@@ -2085,6 +2130,11 @@
         finishBtn.disabled = false;
         finishBtn.textContent = '🏁 Lopeta treeni';
       }
+
+      const rezeroBtn = document.getElementById('rezeroBtn');
+      if (rezeroBtn) {
+        rezeroBtn.classList.toggle('hidden', !(dataChar && !setActive && !zeroing && !bleConnecting));
+      }
     }
 
     function beginZeroCountdown(token, autoStart) {
@@ -2136,10 +2186,29 @@
       pinStarted = false;
       setActive = false;
       workoutDoneState = false;
+      const shouldResume = resumeSetAfterReconnect && (Date.now() - resumeSetDisconnectedAt) < 90000;
+      resumeSetAfterReconnect = false;
+      resumeSetDisconnectedAt = 0;
+      if (shouldResume) {
+        logBleDiag('reconnect-resumed', `Sarja jatkettu automaattisesti uudelleenyhdistämisen jälkeen (${currentReps.length} toistoa)`);
+      }
       const token = ++activeSetToken;
       document.getElementById('connectBtn').textContent = 'Katkaise';
-      beginZeroCountdown(token, false);
+      beginZeroCountdown(token, shouldResume);
       await sleep(50);
+      await writeByte(CMD_START);
+    }
+
+    async function rezeroPin() {
+      if (!dataChar || setActive || zeroing || bleConnecting) return;
+      pinStarted = false;
+      logBleDiag('rezero', 'Anturin manuaalinen nollaus käynnistetty (0x04 -> 0x03)');
+      showRezeroStatus('Nollataan anturia (pidä paikallaan ~3 s)…', 0);
+      const token = ++activeSetToken;
+      beginZeroCountdown(token, false);
+      await writeByte(CMD_STOP);
+      await sleep(60);
+      if (token !== activeSetToken || !dataChar) return;
       await writeByte(CMD_START);
     }
 
@@ -2159,11 +2228,13 @@
       const currentExercise = (selVal && selVal !== ADD_NEW_EX_VALUE) ? selVal : (exercises[0] || DEFAULT_EXERCISES[0]);
       const currentWeightKg = parseFloat(document.getElementById('weightInput').value) || 0;
       const currentTargetReps = parseInt(document.getElementById('targetRepsInput').value, 10) || 5;
+      const tngToggleEl = document.getElementById('tngToggle');
 
       const meta = metaOverride || activeSetMeta || {
         exercise: currentExercise,
         weightKg: currentWeightKg,
         targetReps: currentTargetReps,
+        touchAndGo: !!(getLiftKey(currentExercise) === 'deadlift' && tngToggleEl && tngToggleEl.checked),
         time: new Date().toTimeString().slice(0, 8)
       };
 
@@ -2183,6 +2254,7 @@
         reps: currentReps.map((r) => ({ ...r })),
         goal: getGoal().key
       };
+      if (meta.touchAndGo && getLiftKey(meta.exercise) === 'deadlift') setCopy.touchAndGo = true;
       if (isFreeMode()) setCopy.free = true;
       { const cst = getCycleState(dateStr); if (cst && !cst.finished && !cst.notStarted) setCopy.cycle = { phase: cst.phase.key, week: cst.weekIdx + 1, wave: cst.wave }; }
       if (pendingTraceMeta) { setCopy.traceMeta = pendingTraceMeta; pendingTraceMeta = null; }
@@ -2217,6 +2289,10 @@
       }
 
       pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: 0 };
+      lastBottomAt = 0;
+      lastEccEndAt = 0;
+      resumeSetAfterReconnect = false;
+      resumeSetDisconnectedAt = 0;
       activeSetMeta = snapshotCurrentSetMeta();
       vbtCutoffAlerted = false;
       vbtFailureAlerted = false;
@@ -2262,6 +2338,8 @@
       clearZeroTimer();
       stopAudioKeepWarm();
       autoStartAfterZero = false;
+      resumeSetAfterReconnect = false;
+      resumeSetDisconnectedAt = 0;
       setActive = false;
       zeroing = false;
       lastSetStoppedAt = Date.now();
@@ -2292,6 +2370,17 @@
     }
 
     function onDisconnected() {
+      const wasActiveOrStarting = setActive || (zeroing && autoStartAfterZero);
+      if (wasActiveOrStarting && !manualDisconnect) {
+        resumeSetAfterReconnect = true;
+        resumeSetDisconnectedAt = Date.now();
+        logBleDiag('disconnect', `BLE-yhteys katkesi kesken sarjan (${currentReps.length} toistoa)`);
+      } else if (!manualDisconnect) {
+        logBleDiag('disconnect', 'BLE-yhteys katkesi');
+      } else {
+        resumeSetAfterReconnect = false;
+        resumeSetDisconnectedAt = 0;
+      }
       activeSetToken++;
       bleConnecting = false;
       clearZeroTimer();
@@ -2370,7 +2459,10 @@
           // Fresh upward movement started: clear any leftover partial packets from prior movements
           pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: Date.now() };
         } else if (phase === 0x03) {
-          lastBottomAt = Date.now(); // bottom / rest reached (used for touch-and-go detection)
+          const prevT = currentReps.length > 0 ? (currentReps[currentReps.length - 1].t || 0) : 0;
+          if (lastEccEndAt > prevT && lastBottomAt <= lastEccEndAt) {
+            lastBottomAt = Date.now(); // bottom / rest reached once per rep (ignore floor jitter)
+          }
         }
         return;
       }
@@ -2409,22 +2501,33 @@
         pendingRep.propAcc = val / 1000.0;
       } else if (type === 0x02) {
         const meanVel = val / 1000.0;
-        const hasFullBurst = pendingRep.propVel !== null && pendingRep.romCm !== null && pendingRep.propAcc !== null;
-        const propVel = pendingRep.propVel ?? meanVel;
-        const propAcc = pendingRep.propAcc ?? 0;
-        const romCm   = pendingRep.romCm ?? 0;
+        const rawPropVel = pendingRep.propVel;
+        const rawPropAcc = pendingRep.propAcc;
+        const rawRomCm = pendingRep.romCm;
+        const hasFullBurst = rawPropVel !== null && rawRomCm !== null && rawPropAcc !== null;
+        const propVel = rawPropVel ?? meanVel;
+        const propAcc = rawPropAcc ?? 0;
+        const romCm   = rawRomCm ?? 0;
         const liftStartAt = pendingRep.phaseStartedAt || 0;
         pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: 0 };
 
-        // 1. Ignore incomplete packet bursts (e.g. movement started before "Aloita sarja" was tapped)
-        if (!hasFullBurst) {
+        // 1. Enforce strict full-burst only on Rep 1 during the initial 1500 ms after set start
+        const isInitialWindow = currentReps.length === 0 && (Date.now() - setStartedAt) < 1500;
+        if (!hasFullBurst && isInitialWindow) {
           console.debug('Ignored incomplete rep burst on 0x02:', { meanVel, propVel, propAcc, romCm });
+          logBleDiag('ghost-filtered', `Puuttuva pakettiryhmä sarjan alussa (mv=${Number.isFinite(meanVel) ? meanVel.toFixed(2) : '?'} m/s)`);
           return;
         }
 
-        // 2. Reject non-lift ghost movements (cable slack pull, pin adjustment, <0.12 m/s or <12 cm ROM)
-        if (meanVel < MIN_VALID_VEL_M_S || romCm < MIN_VALID_ROM_CM || propAcc < 0 || !Number.isFinite(meanVel)) {
-          console.debug('Filtered ghost movement:', { meanVel, romCm, propAcc });
+        // 2. Reject non-lift ghost movements (cable slack pull, pin adjustment, <0.12 m/s or <12 cm ROM when present)
+        if (
+          !Number.isFinite(meanVel) ||
+          meanVel < MIN_VALID_VEL_M_S ||
+          (rawRomCm !== null && rawRomCm < MIN_VALID_ROM_CM) ||
+          (rawPropAcc !== null && rawPropAcc < 0)
+        ) {
+          console.debug('Filtered ghost movement:', { meanVel, romCm: rawRomCm, propAcc: rawPropAcc });
+          logBleDiag('ghost-filtered', `Haamuliike suodatettu (mv=${Number.isFinite(meanVel) ? meanVel.toFixed(2) : '?'} m/s, rom=${rawRomCm !== null ? rawRomCm.toFixed(1) : 'null'} cm)`);
           return;
         }
 
@@ -2434,8 +2537,13 @@
           const prevRep = currentReps[currentReps.length - 1];
           if (meanVel < 0.21 && prevRep.meanVelocity > 0.45 && meanVel < prevRep.meanVelocity * 0.40) {
             console.debug('Filtered bar-racking movement at end of set:', { meanVel, prevVel: prevRep.meanVelocity });
+            logBleDiag('ghost-filtered', `Telineeseen lasku suodatettu (mv=${meanVel.toFixed(2)} vs ${prevRep.meanVelocity.toFixed(2)} m/s)`);
             return;
           }
+        }
+
+        if (!hasFullBurst) {
+          logBleDiag('partial-accepted', `Osittainen toisto hyväksytty #${currentReps.length + 1} (mv=${meanVel.toFixed(2)} m/s, rom=${rawRomCm !== null ? rawRomCm.toFixed(1) : 'null'})`);
         }
 
         // 4. Auto-replace bogus 1st "unrack / positioning" movement if rep #1 was slow (<0.22 m/s, no lowering)
@@ -2450,6 +2558,7 @@
             unrackVel: currentReps[0].meanVelocity,
             realFirstVel: meanVel
           });
+          logBleDiag('ghost-filtered', `Alun telineestä otto korvattu (mv=${currentReps[0].meanVelocity.toFixed(2)} -> ${meanVel.toFixed(2)} m/s)`);
           currentReps.pop();
         }
 
@@ -2462,12 +2571,12 @@
         // Verified power formula: P = m * (g + 0.58 * a_prop) * v
         const power = weightKg * (9.80665 + 0.58 * propAcc) * meanVel;
 
-        // Pause at the bottom before this rep (touch-and-go detection). Requires the previous rep's
-        // eccentric end (0x06) or bottom phase (0x01 0x03) after that rep, and this rep's lift start.
+        // Pause at the bottom before this rep. Anchor bottom to lastEccEndAt when available after prevT
+        // so rest-state 0x01 0x03 oscillations never reset the pause clock.
         let pauseMs = null;
         if (currentReps.length > 0 && liftStartAt > 0) {
           const prevT = currentReps[currentReps.length - 1].t || 0;
-          const bottom = Math.max(lastBottomAt, lastEccEndAt);
+          const bottom = lastEccEndAt > prevT ? lastEccEndAt : lastBottomAt;
           if (bottom > prevT && liftStartAt >= bottom) pauseMs = liftStartAt - bottom;
           else if (bottom <= prevT && liftStartAt > prevT) pauseMs = 0; // no rest phase seen between reps
         }
@@ -2717,9 +2826,12 @@
     }
 
     // Velocity loss (VL%) = (V_best - V_last) / V_best, suspect reps excluded (see analyzeSet)
-    function calcVelocityDropPct(reps, exercise, dateStr) {
+    function calcVelocityDropPct(reps, exercise, dateStr, opts = {}) {
       if (!reps || reps.length < 2) return null;
-      const a = analyzeSet(reps, exercise || '', 0, dateStr ? { dateStr } : {});
+      const anaOpts = {};
+      if (dateStr) anaOpts.dateStr = dateStr;
+      if (opts && opts.touchAndGo) anaOpts.touchAndGo = true;
+      const a = analyzeSet(reps, exercise || '', 0, anaOpts);
       return a.vlFinal;
     }
     // Legacy metric kept for CSV compatibility: 1st rep -> last rep
@@ -2787,7 +2899,7 @@
       // dxMax = suurin sallittu vaakasiirtymä lähtölinjasta (cm), null = vain vertailu parhaaseen toistoon
       squat:    { dxMax: 6.0, templMax: 3.0, label: 'kyykyssä tanko kippaa eteen (good morning)' },
       bench:    { dxMax: null, templMax: 3.0, label: 'penkissä J-käyrä hajoaa' },
-      deadlift: { dxMax: 3.5, templMax: 3.0, label: 'maastavedossa tanko karkaa irti kehosta' }
+      deadlift: { dxMax: null, templMax: 3.0, label: 'maastavedossa tanko karkaa irti kehosta' }
     };
     const TILT_WARN_DEG = 4.0;
     const STICK_MIN_DROP = 0.03; // m/s
@@ -3165,18 +3277,33 @@
             tilt: tr.tiltMax !== null ? +tr.tiltMax.toFixed(1) : null,
             path: tr.path, curve: tr.curve, pauseMs: tr.pauseMs
           };
-          if (Number.isFinite(tr.pauseMs) && (r.pauseMs === null || r.pauseMs === undefined)) r.pauseMs = tr.pauseMs;
+          if (Number.isFinite(tr.pauseMs)) r.pauseMs = tr.pauseMs;
           if (reps === targets[0]) matched++;
         });
       });
-      const meta = { samples: ta.samples, coverage: +raw.coverage.toFixed(3), barAxis: ta.barAxis ? 'xyz'[ta.barAxis.indexOf(1)] : null, barAxisConf: +ta.barAxisConf.toFixed(2), segments: ta.reps.length, matched };
+      const extraReps = Math.max(0, ta.reps.length - targets[0].length);
+      const meta = {
+        samples: ta.samples,
+        coverage: +raw.coverage.toFixed(3),
+        barAxis: ta.barAxis ? 'xyz'[ta.barAxis.indexOf(1)] : null,
+        barAxisConf: +ta.barAxisConf.toFixed(2),
+        segments: ta.reps.length,
+        matched,
+        extraReps
+      };
       if (currentSetSaved && lastSavedSetRef && targets.includes(lastSavedSetRef.reps)) lastSavedSetRef.traceMeta = meta;
       else if (!targets.includes(currentReps)) {
         workouts.forEach((w) => (w.sets || []).forEach((s) => { if (targets.includes(s.reps)) s.traceMeta = meta; }));
       } else pendingTraceMeta = meta;
       saveJSON(KEY_WORKOUTS, workouts);
-      lastTraceFailed = false;
-      lastTraceStatus = `📡 Raakadata analysoitu: ${matched}/${targets[0].length} toistoa (${ta.samples} näytettä${meta.barAxis ? ', tangon akseli ' + meta.barAxis.toUpperCase() : ', tangon akseli ei tunnistettu'})`;
+      if (extraReps > 0) {
+        logBleDiag('trace-mismatch', `80 Hz raakadata havaitsi ${ta.reps.length} nostoa, sovellus tallensi ${targets[0].length} (+${extraReps} puuttuvaa)`);
+        lastTraceFailed = true;
+        lastTraceStatus = `⚠️ Pin 80 Hz havaitsi ${ta.reps.length} nostoa, mutta sovellukseen tallentui ${targets[0].length} toistoa (+${extraReps} puuttuvaa) – korjaa toistomäärä Analyysissä.`;
+      } else {
+        lastTraceFailed = false;
+        lastTraceStatus = `📡 Raakadata analysoitu: ${matched}/${targets[0].length} toistoa (${ta.samples} näytettä${meta.barAxis ? ', tangon akseli ' + meta.barAxis.toUpperCase() : ', tangon akseli ei tunnistettu'})`;
+      }
       renderCalendar();
       renderHistoryList();
     }
@@ -3275,7 +3402,7 @@
       const rules = a.cfg ? TRACE_LIFT_RULES[a.cfg.id] : null;
       const meta = s.traceMeta || {};
       const hasPath = reps.some((r) => r.trace && r.trace.path);
-      const flagTxt = { stick: 'kuolokohta < 0.10 m/s', tech: 'tankoreitti hajosi', dx: 'vaakasiirtymä', tilt: 'kallistus' };
+      const flagTxt = { stick: 'kuolokohta < 0.10 m/s', tech: 'tankoreitti hajosi', dx: 'vaakasiirtymä', tilt: 'kallistus', drift: 'IMU-ajautuma', merged: 'yhdistetty' };
       const rows = reps.map((r, i) => {
         const p = a.perRep[i]; const t = r.trace;
         if (!t) return `<tr><td>${i + 1}</td><td colspan="6" style="color:var(--muted)">ei raakadataa</td><td>${p && p.rqi !== null ? Math.round(p.rqi) : '--'}</td></tr>`;
@@ -3321,12 +3448,12 @@
       },
       maxStrength: {
         key: 'maxStrength', label: 'Kehittävä maksimivoima (78–86 % 1RM)', short: 'Maksimivoima',
-        pctRange: [78, 86], vl: { squat: 15, bench: 18, deadlift: 10, generic: 15 },
+        pctRange: [78, 86], vl: { squat: 15, bench: 18, deadlift: 15, generic: 15 },
         why: 'Paras suhde voimankehityksen ja palautumisen välillä.'
       },
       baseStrength: {
         key: 'baseStrength', label: 'Perusvoima / voima-hypertrofia (70–80 % 1RM)', short: 'Perusvoima',
-        pctRange: [70, 80], vl: { squat: 20, bench: 20, deadlift: 15, generic: 20 },
+        pctRange: [70, 80], vl: { squat: 20, bench: 20, deadlift: 20, generic: 20 },
         why: 'Riittävä mekaaninen kuormitus ja volyymi ilman ylikuormitusta.'
       }
     };
@@ -3342,15 +3469,15 @@
         lv: [[50, 0.680], [60, 0.580], [70, 0.500], [75, 0.470], [80, 0.430], [85, 0.380], [90, 0.310], [95, 0.250], [100, 0.200]]
       },
       deadlift: {
-        id: 'deadlift', name: 'Maastaveto', mvt: 0.155, mvtFloor: 0.08, repCost: 0.050, minRomCm: 25, redVl: 15, stickFail: 0.14, stickStep: 0.060,
+        id: 'deadlift', name: 'Maastaveto', mvt: 0.155, mvtFloor: 0.08, repCost: 0.050, minRomCm: 25, redVl: 25, stickFail: 0.14, stickStep: 0.060,
         lv: [[60, 0.660], [70, 0.535], [75, 0.465], [80, 0.405], [85, 0.335], [90, 0.275], [95, 0.220], [100, 0.155]]
       }
     };
     const GENERIC_RED_VL = 30;
-    const TNG_PAUSE_MS = 800;
     const DEFAULT_REF_MAX = {
       squat: { weight: 140, reps: 5 },
-      bench: { weight: 105, reps: 5 }
+      bench: { weight: 105, reps: 5 },
+      deadlift: { weight: 170, reps: 1 }
     };
 
     let vbtSettings = Object.assign(
@@ -3409,10 +3536,11 @@
       workouts.forEach((w) => {
         (w.sets || []).forEach((s) => {
           if (getLiftKey(s.exercise) !== cfg.id || !(s.weightKg >= minHeavyKg) || !s.reps || !s.reps.length) return;
-          const flagged = flagSuspectReps(s.reps, cfg, null, w.date);
+          const mInfo = detectMergedReps(s.reps, cfg, w.date);
+          const flagged = flagSuspectReps(s.reps, cfg, mInfo, w.date);
           const validCount = Number(s.repCountOverride) > 0
             ? Math.round(Number(s.repCountOverride))
-            : flagged.filter((x) => !x).length;
+            : flagged.filter((x, idx) => !x || (mInfo[idx] && mInfo[idx].drift)).length;
           if (validCount >= 1 && validCount <= 8) {
             const est = calcRef1RM(s.weightKg, validCount);
             if (est && est > bestProven) bestProven = est;
@@ -3534,7 +3662,12 @@
           (s.reps || []).forEach((r) => { const x = Number(r.rangeOfMotionCm); if (x > 0) roms.push(x); });
         });
       });
-      const res = roms.length >= 6 ? vbtMedian(roms) : null;
+      let res = null;
+      if (roms.length >= 6) {
+        const med1 = vbtMedian(roms);
+        const trimmed = roms.filter((x) => x <= MERGED_ROM_FACTOR * med1);
+        res = vbtMedian(trimmed.length ? trimmed : roms);
+      }
       _romHistCache.map[cacheKey] = res;
       return res;
     }
@@ -3616,17 +3749,25 @@
         const romMerged = !!(med && rom > MERGED_ROM_FACTOR * med);
         if (!romMerged && !traceSplit) return;
         const useMed = med || (traceSplit ? rom / sp.count : rom);
+        const isDeadliftDrift = !!(cfg && cfg.id === 'deadlift' && romMerged && !traceSplit);
+        if (isDeadliftDrift) {
+          out[i] = { idx: i, romCm: rom, medRom: useMed, refSrc: src || 'set', est: 1, lo: 1, hi: 1, estSrc: 'drift', drift: true };
+          return;
+        }
         const ratio = rom / useMed;
         let lo = Math.max(2, Math.floor(ratio)), hi = Math.max(lo, Math.ceil(ratio));
         let est = Math.max(2, Math.round(ratio)), estSrc = 'rom';
         if (traceSplit) { est = lo = hi = sp.count; estSrc = 'trace'; }
-        out[i] = { idx: i, romCm: rom, medRom: useMed, refSrc: src || 'trace', est, lo, hi, estSrc };
+        out[i] = { idx: i, romCm: rom, medRom: useMed, refSrc: src || 'trace', est, lo, hi, estSrc, drift: false };
       });
       return out;
     }
     function mergedWarnText(m) {
       const rng = m.lo === m.hi ? `${m.lo}` : `${m.lo}–${m.hi}`;
       return `⚠ Toisto #${m.idx + 1} näyttää yhdistetyltä (ROM ${Math.round(m.romCm)} cm ≈ ${rng} toistoa${m.estSrc === 'trace' ? ', nopeuskäyrästä' : ''}) – jätetty pois VL- ja e1RM-laskuista.`;
+    }
+    function driftWarnText(d) {
+      return `⚠ Toisto #${d.idx + 1}: anturin IMU-ajautuma (ROM ${Math.round(d.romCm)} cm) – toisto lasketaan mukaan, nopeus jätetty pois VL- ja e1RM-laskuista.`;
     }
     function setRepCount(s) {
       const o = Number(s && s.repCountOverride);
@@ -3654,8 +3795,8 @@
         if (i === n - 1 && n >= 3 && vs[i] < 0.22 && vs[i - 1] > 0.45 && vs[i] < vs[i - 1] * 0.40) {
           flags[i] = true;
         }
-        // 3. Partial movement: ROM clearly below set median AND below lift-specific minimum
-        if (medRom && roms[i] < medRom * 0.5 && roms[i] < minRom) flags[i] = true;
+        // 3. Partial movement: ROM clearly below set median AND below lift-specific minimum (skip missing/0 ROM)
+        if (medRom && roms[i] > 0 && roms[i] < medRom * 0.5 && roms[i] < minRom) flags[i] = true;
       });
       return flags;
     }
@@ -3663,12 +3804,15 @@
     // --- Personal MVT: manual override > learned from heavy completed reps > population default ---
     let _mvtCache = { sig: '', map: {} };
     function workoutsSignature() {
-      let n = 0;
-      workouts.forEach((w) => (w.sets || []).forEach((s) => { n += (s.reps || []).length; }));
+      let n = 0, tngN = 0;
+      workouts.forEach((w) => (w.sets || []).forEach((s) => {
+        n += (s.reps || []).length;
+        if (s.touchAndGo) tngN++;
+      }));
       const refSig = JSON.stringify(vbtSettings.refMax || {});
       const mvtSig = JSON.stringify(vbtSettings.mvtOverride || {});
       const cycSig = JSON.stringify(vbtSettings.cycle || null);
-      return `${workouts.length}:${n}:${vbtSettings.velocityMetric}:${vbtSettings.goal}:${refSig}:${mvtSig}:${cycSig}`;
+      return `${workouts.length}:${n}:${tngN}:${vbtSettings.velocityMetric}:${vbtSettings.goal}:${refSig}:${mvtSig}:${cycSig}`;
     }
     function learnedMvt(liftKey) {
       const sig = workoutsSignature();
@@ -3708,6 +3852,13 @@
       return { value: cfg.mvt, source: 'default', label: 'kalibroitu oletus' };
     }
 
+    function isLiveTouchAndGo(exercise) {
+      if (getLiftKey(exercise) !== 'deadlift') return false;
+      if (activeSetMeta && getLiftKey(activeSetMeta.exercise) === 'deadlift') return !!activeSetMeta.touchAndGo;
+      const el = document.getElementById('tngToggle');
+      return !!(el && el.checked);
+    }
+
     // --- Core: analyse one set ---
     function analyzeSet(reps, exercise, weightKg, opts = {}) {
       reps = reps || [];
@@ -3727,9 +3878,10 @@
       const mergedInfo = detectMergedReps(reps, cfg, effDate);
       const suspect = flagSuspectReps(reps, cfg, mergedInfo, effDate);
 
-      // Touch-and-go detection (deadlift): pause between reps < 0.8 s
-      const pauses = reps.slice(1).map((r) => r.pauseMs).filter((p) => Number.isFinite(p));
-      const tng = !!(cfg && cfg.id === 'deadlift' && pauses.length >= 1 && vbtMedian(pauses) < TNG_PAUSE_MS);
+      // Manual-only Touch-and-Go (deadlift): ignore auto pause heuristic
+      const tng = !!(cfg && cfg.id === 'deadlift' && opts && opts.touchAndGo === true);
+      const isDriftRep = (i) => !!(mergedInfo[i] && mergedInfo[i].drift);
+      const isTrueMerged = (i) => !!(mergedInfo[i] && !mergedInfo[i].drift);
 
       // Velocity loss vs. best-so-far rep (NOT vs. 1st rep: PAP, unrack & dead-start would distort it)
       let bestSoFar = 0;
@@ -3740,9 +3892,30 @@
         if (!excludedFromRef && v > bestSoFar) bestSoFar = v;
         if (!suspect[i] && !(tng && i === 0 && n > 1) && (vBest === null || v > vBest)) { vBest = v; vBestIdx = i; }
         const vl = (!suspect[i] && bestSoFar > 0 && !(tng && i === 0 && n > 1)) ? Math.max(0, (bestSoFar - v) / bestSoFar * 100) : null;
-        return { idx: i, v, vl, bestSoFar: bestSoFar || null, suspect: suspect[i], merged: !!mergedInfo[i], mergedInfo: mergedInfo[i], rir: null, quality: 'good' };
+        return {
+          idx: i, v, vl, bestSoFar: bestSoFar || null,
+          suspect: suspect[i],
+          drift: isDriftRep(i),
+          merged: isTrueMerged(i),
+          mergedInfo: isTrueMerged(i) ? mergedInfo[i] : null,
+          driftInfo: isDriftRep(i) ? mergedInfo[i] : null,
+          rir: null, quality: 'good'
+        };
       });
-      if (vBest === null && n > 0) { vBest = Math.max(...vs); vBestIdx = vs.indexOf(vBest); }
+      if (vBest === null && n > 0) {
+        const nonSus = perRep.filter((p) => !p.suspect);
+        if (nonSus.length > 0) {
+          let bestP = nonSus[0];
+          for (let k = 1; k < nonSus.length; k++) {
+            if (nonSus[k].v > bestP.v) bestP = nonSus[k];
+          }
+          vBest = bestP.v;
+          vBestIdx = bestP.idx;
+        } else {
+          vBest = Math.max(...vs);
+          vBestIdx = vs.indexOf(vBest);
+        }
+      }
 
       // Initial relative intensity (%1RM) from personal profile or velocity table, regularized by anchor1RM
       let pctVel = null, pctSource = null;
@@ -3814,7 +3987,12 @@
         p.flags = [];
         p.pathDev = null;
         if (p.merged) p.flags.push('merged');
-        if (p.suspect) { p.quality = 'suspect'; return; }
+        if (p.drift) p.flags.push('drift');
+        if (p.suspect) {
+          if (p.drift) validDone++;
+          p.quality = 'suspect';
+          return;
+        }
         validDone++;
         const tr = reps[p.idx].trace;
 
@@ -3839,13 +4017,12 @@
           if (p.rir === null || rirTr < p.rir) p.rir = rirTr;
         }
 
-        // 3. Velocity loss % RIR ceiling on work sets
+        // 3. Velocity loss % RIR ceiling on work sets (anchored on redVl proximity to failure)
         if (p.rir !== null && p.vl !== null && (pctVel === null || pctVel >= 65)) {
-          const vlFail = cfg ? cfg.redVl * 1.55 : 44;
+          const vlFail = redVl * 1.55;
           if (p.vl >= vlFail) p.rir = 0;
           else if (p.vl >= redVl) p.rir = Math.min(p.rir, 1);
-          else if (p.vl >= cutoffPct) p.rir = Math.min(p.rir, 2);
-          else if (p.vl >= cutoffPct * 0.70) p.rir = Math.min(p.rir, 3);
+          else if (p.vl >= redVl * 0.85) p.rir = Math.min(p.rir, 2);
         }
 
         // 4. Relative intensity (%1RM / anchor) max-reps ceiling on work sets
@@ -3876,6 +4053,10 @@
       });
 
       const valid = perRep.filter((p) => !p.suspect);
+      const mergedReps = mergedInfo.filter((m) => m && !m.drift);
+      const driftReps = mergedInfo.filter((m) => m && m.drift);
+      const driftCount = driftReps.length;
+      const completedCount = valid.length + driftCount;
       const lastValid = valid[valid.length - 1] || null;
       const vlFinal = lastValid && lastValid.vl !== null ? lastValid.vl : null;
       const vlMax = valid.reduce((m, p) => (p.vl !== null && p.vl > m ? p.vl : m), 0);
@@ -3895,8 +4076,8 @@
       }
 
       // Epley+Brzycki corrected with reps-in-reserve (reps to failure = reps done + RIR)
-      const epleyRir = (weightKg > 0 && valid.length > 0)
-        ? calcRef1RM(weightKg, valid.length + (rirEnd || 0)) : null;
+      const epleyRir = (weightKg > 0 && valid.length > 0 && completedCount > 0)
+        ? calcRef1RM(weightKg, completedCount + (rirEnd || 0)) : null;
 
       // Finalize pct1RM & e1RM: blend velocity estimate with realized fatigue (epleyRir) on work sets
       let pct1RM = pctVel, e1RM = null;
@@ -3905,7 +4086,7 @@
         if (pctVel >= 65 && valid.length >= 2 && epleyRir && ((vlFinal !== null && vlFinal >= 12) || (rirEnd !== null && rirEnd <= 3))) {
           const wRir = (rirEnd !== null && rirEnd <= 1) || (vlFinal !== null && vlFinal >= redVl)
             ? 0.65
-            : ((rirEnd !== null && rirEnd <= 2) || (vlFinal !== null && vlFinal >= cutoffPct - 3) ? 0.50 : 0.30);
+            : ((rirEnd !== null && rirEnd <= 2) || ((rirEnd === null || rirEnd <= 3) && vlFinal !== null && vlFinal >= cutoffPct - 3) ? 0.50 : 0.30);
           e1RM = (1 - wRir) * e1RMVel + wRir * epleyRir;
           pct1RM = Math.max(30, Math.min(105, (weightKg / e1RM) * 100));
         } else {
@@ -3987,7 +4168,8 @@
 
       return {
         n, cfg, perRep, valid, suspectCount: perRep.filter((p) => p.suspect).length,
-        mergedReps: mergedInfo.filter(Boolean), mergedCount: mergedInfo.filter(Boolean).length,
+        mergedReps, mergedCount: mergedReps.length,
+        driftReps, driftCount, completedCount,
         vBest, vBestIdx, vlFinal, vlMax, cutoffPct, redVl, vCutoff, mvt, mvtInfo, cost, costSource,
         rirEnd, qualityReps, stopAfterRep, junkReps, effectiveReps, repsToCutoff, tng,
         pct1RM, pctSource, e1RM, epleyRir, isWarmup, romCv,
@@ -4016,7 +4198,7 @@
     const OWN_COST_MIN_TAIL = 2; // vähintään näin monta kelvollista toistoa V_best (mukaan lukien) jälkeen
     let _ownCostCache = { sig: '', map: new Map() };
     function setCostObservation(set, exercise, dateStr) {
-      const a = analyzeSet(set.reps, exercise, set.weightKg, { noOwnCost: true, dateStr });
+      const a = analyzeSet(set.reps, exercise, set.weightKg, { noOwnCost: true, dateStr, touchAndGo: !!(set && set.touchAndGo) });
       if (a.isWarmup || a.pct1RM === null || a.vBestIdx < 0) return null;
       const tail = a.valid.filter((p) => p.idx >= a.vBestIdx);
       if (tail.length < OWN_COST_MIN_TAIL) return null;
@@ -4099,7 +4281,7 @@
     function sessionProfile(exercise, dateStr) {
       const sets = setsForExercise(exercise, (d) => d === dateStr);
       const pts = sets.map(({ date, set }) => {
-        const a = analyzeSet(set.reps, set.exercise, set.weightKg, { dateStr });
+        const a = analyzeSet(set.reps, set.exercise, set.weightKg, { dateStr, touchAndGo: !!set.touchAndGo });
         return { load: set.weightKg, v: a.vBest, date };
       }).filter((p) => p.v > 0);
       return buildLVProfile(pts, exercise);
@@ -4115,7 +4297,7 @@
       const from = new Date(onOrBeforeDate); from.setDate(from.getDate() - 28);
       const fromIso = from.toISOString().slice(0, 10);
       const sets = setsForExercise(exercise, (d) => d <= onOrBeforeDate && d >= fromIso);
-      const pts = sets.map(({ date, set }) => ({ load: set.weightKg, v: analyzeSet(set.reps, set.exercise, set.weightKg, { dateStr: date }).vBest, date })).filter((p) => p.v > 0);
+      const pts = sets.map(({ date, set }) => ({ load: set.weightKg, v: analyzeSet(set.reps, set.exercise, set.weightKg, { dateStr: date, touchAndGo: !!set.touchAndGo }).vBest, date })).filter((p) => p.v > 0);
       const p = buildLVProfile(pts, exercise);
       if (p.valid && p.r2 >= 0.75 && p.points.length >= 3) { p.date = dates[0]; p.method = 'pooled28'; return p; }
       return null;
@@ -4127,7 +4309,7 @@
       return dates.map((d) => {
         const workE1s = [];
         setsForExercise(exercise, (x) => x === d).forEach(({ set }) => {
-          const a = analyzeSet(set.reps, set.exercise, set.weightKg, { dateStr: d });
+          const a = analyzeSet(set.reps, set.exercise, set.weightKg, { dateStr: d, touchAndGo: !!set.touchAndGo });
           if (a.e1RM && !a.isWarmup) workE1s.push(a.e1RM);
         });
         if (workE1s.length) return { date: d, e1RM: vbtMedian(workE1s), method: workE1s.length >= 2 ? 'työsarjat' : 'yksittäinen sarja' };
@@ -4137,18 +4319,41 @@
       }).filter(Boolean);
     }
 
-    // --- Day readiness: same absolute load vs. previous sessions (90 d) ---
+    // --- Day readiness: same absolute load vs. previous sessions (90 d), ascending/fresh sets only ---
     function readinessForDate(exercise, dateStr) {
-      const today = setsForExercise(exercise, (d) => d === dateStr);
+      const freshAscendingSets = (list) => {
+        const out = [];
+        const seenW = [];
+        let maxW = 0;
+        for (const item of list) {
+          const w = Number(item.set.weightKg) || 0;
+          if (!(w > 0)) continue;
+          if (w < maxW - 0.5) break;
+          if (!seenW.some((sw) => Math.abs(sw - w) < 0.6)) {
+            out.push(item);
+            seenW.push(w);
+            if (w > maxW) maxW = w;
+          }
+        }
+        return out;
+      };
+      const today = freshAscendingSets(setsForExercise(exercise, (d) => d === dateStr));
       if (!today.length) return null;
       const from = new Date(dateStr); from.setDate(from.getDate() - 90);
       const fromIso = from.toISOString().slice(0, 10);
-      const prev = setsForExercise(exercise, (d) => d < dateStr && d >= fromIso);
+      const prevRaw = setsForExercise(exercise, (d) => d < dateStr && d >= fromIso);
+      const prevByDate = new Map();
+      prevRaw.forEach((p) => {
+        if (!prevByDate.has(p.date)) prevByDate.set(p.date, []);
+        prevByDate.get(p.date).push(p);
+      });
+      const prev = [];
+      prevByDate.forEach((list) => { prev.push(...freshAscendingSets(list)); });
       let best = null;
       today.forEach(({ set }) => {
-        const vT = analyzeSet(set.reps, set.exercise, set.weightKg, { dateStr }).vBest;
+        const vT = analyzeSet(set.reps, set.exercise, set.weightKg, { dateStr, touchAndGo: !!set.touchAndGo }).vBest;
         const same = prev.filter((p) => Math.abs(p.set.weightKg - set.weightKg) < 0.6)
-          .map((p) => analyzeSet(p.set.reps, p.set.exercise, p.set.weightKg, { dateStr: p.date }).vBest).filter((v) => v > 0);
+          .map((p) => analyzeSet(p.set.reps, p.set.exercise, p.set.weightKg, { dateStr: p.date, touchAndGo: !!p.set.touchAndGo }).vBest).filter((v) => v > 0);
         if (!same.length || !vT) return;
         const base = same.reduce((a, b) => a + b, 0) / same.length;
         const cand = { weight: set.weightKg, today: vT, baseline: base, deltaPct: (vT - base) / base * 100, nPrev: same.length };
@@ -4158,13 +4363,21 @@
     }
 
     // --- Verdict text ---
-    function buildVerdict(a, exercise) {
+    function buildVerdict(a, exercise, opts = {}) {
       if (!a || a.n === 0) return '';
       const g = getGoal();
       const parts = [];
+      const tm = opts.traceMeta || null;
+      const cnt = opts.count ?? a.n;
+      const traceExtra = tm ? (tm.extraReps > 0 ? tm.extraReps : (tm.segments > cnt ? tm.segments - cnt : 0)) : 0;
+      if (traceExtra > 0) {
+        parts.push(`⚠️ Pin 80 Hz -raakadata havaitsi ${tm.segments} nostoa, mutta sovellukseen tallentui ${cnt} toistoa (+${traceExtra} puuttuvaa) – voit korjata toistomäärän alta.`);
+      }
       if (a.mergedReps && a.mergedReps.length) a.mergedReps.forEach((m) => parts.push(mergedWarnText(m)));
-      if (a.suspectCount - (a.mergedCount || 0) > 0) parts.push(`${a.suspectCount - (a.mergedCount || 0)} epäilyttävä(ä) liike(ttä) (telineestä otto / vajaa liikerata) jätettiin laskennan ulkopuolelle.`);
-      if (a.tng) parts.push('Touch-and-go tunnistettu (tauko < 0,8 s): 1. toistoa ei verrata muihin.');
+      if (a.driftReps && a.driftReps.length) a.driftReps.forEach((d) => parts.push(driftWarnText(d)));
+      const otherSuspect = a.suspectCount - (a.mergedCount || 0) - (a.driftCount || 0);
+      if (otherSuspect > 0) parts.push(`${otherSuspect} epäilyttävä(ä) liike(ttä) (telineestä otto / vajaa liikerata) jätettiin laskennan ulkopuolelle.`);
+      if (a.tng) parts.push('Touch-and-go (maastaveto): 1. toistoa ei verrata muihin.');
       if (a.isWarmup) {
         parts.push(`Arvioitu kuorma ~${Math.round(a.pct1RM)} % 1RM → lämmittely-/tekniikkasarja, ei laatuluokitusta maksimivoimalle.`);
         return parts.join(' ');
@@ -4294,7 +4507,7 @@
     function buildVbtSetBlockHTML(s, dateStr) {
       const useDate = dateStr || todayISO();
       const prof = getLiftCfg(s.exercise) ? recentProfile(s.exercise, useDate) : null;
-      const a = analyzeSet(s.reps, s.exercise, s.weightKg, { profile: prof, dateStr: useDate });
+      const a = analyzeSet(s.reps, s.exercise, s.weightKg, { profile: prof, dateStr: useDate, touchAndGo: !!(s && s.touchAndGo) });
       if (!a.n) return '';
       const e1 = a.e1RM ? `${a.e1RM.toFixed(1)} kg <span style="color:var(--muted); font-weight:500; font-size:11px;">(${a.pctSource === 'profile' ? 'oma profiili' : 'nopeustaulukko'})</span>` : '--';
       return `
@@ -4306,7 +4519,7 @@
           ${buildVbtKpiHTML(a, false)}
           ${buildRepCurveSVG(a)}
           ${buildVbtLegendHTML()}
-          <p class="vbt-verdict">${buildVerdict(a, s.exercise)}</p>
+          <p class="vbt-verdict">${buildVerdict(a, s.exercise, { traceMeta: s.traceMeta, count: (s.reps || []).length })}</p>
           ${buildScoreBreakdownHTML(a)}
           ${buildTraceSectionHTML(s, a)}
           <div class="stat-pill-grid" style="margin-top:8px;">
@@ -4333,7 +4546,7 @@
         if (!matches.length) continue;
         let bestV = 0;
         matches.forEach((s) => {
-          const a = analyzeSet(s.reps, s.exercise, s.weightKg, { dateStr: w.date });
+          const a = analyzeSet(s.reps, s.exercise, s.weightKg, { dateStr: w.date, touchAndGo: !!s.touchAndGo });
           if (a.vBest && a.vBest > bestV) bestV = a.vBest;
         });
         if (bestV > 0) {
@@ -4378,13 +4591,22 @@
     }
 
     // --- Single most important rest finding (max 1 line) ---
-    function buildShortRestFinding(a, exercise) {
+    function buildShortRestFinding(a, exercise, opts = {}) {
       if (!a || !a.n) return null;
+      const tm = opts.traceMeta || null;
+      const cnt = opts.count ?? a.n;
+      const traceExtra = tm ? (tm.extraReps > 0 ? tm.extraReps : (tm.segments > cnt ? tm.segments - cnt : 0)) : 0;
+      if (traceExtra > 0) {
+        return { text: `⚠️ Pin 80 Hz havaitsi ${tm.segments} nostoa, mutta sovellus tallensi ${cnt} (+${traceExtra} puuttuvaa)`, cls: 'amber' };
+      }
       if (a.mergedReps && a.mergedReps.length) {
         return { text: a.mergedReps.map(mergedWarnText).join(' '), cls: 'amber' };
       }
       if (a.mvt !== null && a.rirEnd === 0) {
         return { text: '⛔ Lähellä failurea (RIR ~0) – kevennä kuormaa tai pidennä lepoa', cls: 'red' };
+      }
+      if (a.driftReps && a.driftReps.length) {
+        return { text: a.driftReps.map(driftWarnText).join(' '), cls: 'amber' };
       }
       if (a.techFirst) {
         return { text: `⚠ Tankoreitti poikkesi toistolla ${a.techFirst.idx + 1}${a.techFirst.pathDev !== null ? ' (' + a.techFirst.pathDev.toFixed(1) + ' cm)' : ''}`, cls: 'amber' };
@@ -4420,13 +4642,14 @@
     function extraRepHint(a, count, targetReps, opts = {}) {
       if (isFreeMode() || (opts && opts.isRef) || !a || !a.cfg || a.isWarmup) return null;
       const validCount = a.valid ? a.valid.length : 0;
-      if (!(validCount >= 1) || !(validCount >= targetReps)) return null;
+      const completedCount = a.completedCount ?? validCount;
+      if (!(validCount >= 1) || !(completedCount >= targetReps)) return null;
       const last = a.valid[a.valid.length - 1];
       if (!last || last.idx !== a.n - 1 || a.pct1RM === null || a.mvt === null || last.rir === null) return null;
       const vl = last.vl === null ? 0 : last.vl;
       const max = prilepinRow(a.pct1RM).repsMax;
       const rirMin = getGoal().key === 'peaking' ? 2 : 3;
-      if (!(vl < 0.5 * a.cutoffPct) || last.rir < rirMin || validCount >= max) return null;
+      if (!(vl < 0.5 * a.cutoffPct) || last.rir < rirMin || completedCount >= max) return null;
       const rirTxt = last.rir >= 10 ? '10+' : last.rir;
       return { vl, cutoff: a.cutoffPct, rir: last.rir, max, text: `✅ +1 toisto ok (VL ${vl.toFixed(0)} % / raja ${a.cutoffPct} %, RIR ~${rirTxt}, max ${max}/sarja)` };
     }
@@ -4436,7 +4659,7 @@
       const dateStr = document.getElementById('workoutDate').value || todayISO();
       const prof = getLiftCfg(exercise) ? recentProfile(exercise, dateStr) : null;
       const isRef = isReferenceSetContext(exercise, dateStr);
-      return extraRepHint(analyzeSet(currentReps, exercise, weightKg, { profile: prof, dateStr }), currentReps.length, targetReps, { isRef });
+      return extraRepHint(analyzeSet(currentReps, exercise, weightKg, { profile: prof, dateStr, touchAndGo: isLiveTouchAndGo(exercise) }), currentReps.length, targetReps, { isRef });
     }
 
     // Called right after a new rep was pushed during an active set. Returns true if the set was auto-stopped.
@@ -4444,7 +4667,7 @@
       const exercise = (activeSetMeta && activeSetMeta.exercise) || getCurrentSelectedExerciseName();
       const weightKg = (activeSetMeta && activeSetMeta.weightKg) || 0;
       const dateStr = document.getElementById('workoutDate').value || todayISO();
-      const a = analyzeSet(currentReps, exercise, weightKg, { dateStr });
+      const a = analyzeSet(currentReps, exercise, weightKg, { dateStr, touchAndGo: isLiveTouchAndGo(exercise) });
       const lastP = a.valid[a.valid.length - 1];
       if (!lastP || a.isWarmup) return false;
       const overCutoff = lastP.vl !== null && lastP.vl > a.cutoffPct;
@@ -4539,6 +4762,13 @@
       if (sumBtn) {
         sumBtn.classList.toggle('date-warn', !isToday);
       }
+
+      // Deadlift-only manual Touch-and-go toggle
+      const tngRow = document.getElementById('tngToggleRow');
+      const tngEl = document.getElementById('tngToggle');
+      const isDeadlift = getLiftKey(exercise) === 'deadlift';
+      if (tngRow) tngRow.classList.toggle('hidden', !isDeadlift);
+      if (tngEl && !isDeadlift) tngEl.checked = false;
 
       // Weight hint (expected velocity + same load history)
       const hintEl = document.getElementById('weightContextHint');
@@ -4738,7 +4968,7 @@
       const cfg = getLiftCfg(anaExercise);
       const prof = cfg ? recentProfile(anaExercise, anaDate) : null;
       const sets = setsForExercise(anaExercise, (d) => d === anaDate);
-      const analyses = sets.map(({ set }) => ({ set, a: analyzeSet(set.reps, set.exercise, set.weightKg, { profile: prof, dateStr: anaDate }) }));
+      const analyses = sets.map(({ set }) => ({ set, a: analyzeSet(set.reps, set.exercise, set.weightKg, { profile: prof, dateStr: anaDate, touchAndGo: !!set.touchAndGo }) }));
       const work = analyses.filter((x) => !x.a.isWarmup);
       const totalReps = analyses.reduce((s, x) => s + planRepsOf(x), 0);
       const goodReps = work.reduce((s, x) => s + x.a.qualityReps, 0);
@@ -4754,7 +4984,7 @@
         return `<tr class="ana-set-row" data-ana-set-idx="${i}">
           <td>${i + 1}</td><td>${set.weightKg}</td><td>${a.pct1RM !== null ? Math.round(a.pct1RM) : '--'}</td>
           <td>${fmtV(a.vBest)}</td><td class="${vlCls}">${vlTxt}</td>
-          <td>${a.rirEnd === null ? '--' : (a.rirEnd >= 10 ? '10+' : a.rirEnd)}</td><td>${a.valid.length}${a.junkReps && !a.isWarmup ? `<span class="amber"> (${a.junkReps})</span>` : ''}</td>
+          <td>${a.rirEnd === null ? '--' : (a.rirEnd >= 10 ? '10+' : a.rirEnd)}</td><td>${a.completedCount ?? a.valid.length}${a.junkReps && !a.isWarmup ? `<span class="amber"> (${a.junkReps})</span>` : ''}</td>
           <td class="${a.isWarmup ? '' : a.gradeClass}">${a.isWarmup ? 'LÄ' : a.score} <span style="color:var(--muted);">›</span></td></tr>`;
       }).join('');
 
@@ -4872,6 +5102,18 @@
       setAnaSubTab(anaSubTab);
     }
 
+    function refreshBleDiagUI() {
+      const sumEl = document.getElementById('bleDiagSummary');
+      const listEl = document.getElementById('bleDiagList');
+      if (sumEl) sumEl.textContent = `▸ BLE-diagnostiikka (${bleDiagLog.length})`;
+      if (listEl) {
+        const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        listEl.innerHTML = bleDiagLog.length
+          ? bleDiagLog.slice().reverse().map((e) => `<div><span style="color:#93c5fd;">${esc(e.ts)}</span> [<strong>${esc(e.kind)}</strong>] ${esc(e.msg)}</div>`).join('')
+          : 'Ei merkintöjä.';
+      }
+    }
+
     function renderVbtSettingsCard() {
       const el = document.getElementById('anaSettingsCard');
       if (!el) return;
@@ -4927,6 +5169,17 @@
             </select></div>
           <div class="row"><span class="small">Raakadata (${recentRawTraces.length} sarjaa muistissa)</span>
             <button type="button" id="anaRawExport" style="padding:6px 10px; font-size:12px;">Vie raakadata CSV</button></div>
+          <details id="bleDiagDetails" class="details-toggle" style="margin-top:0;">
+            <summary id="bleDiagSummary">▸ BLE-diagnostiikka (${bleDiagLog.length})</summary>
+            <div style="margin-top:6px; display:flex; flex-direction:column; gap:6px;">
+              <div style="display:flex; gap:6px; align-items:center;">
+                <button type="button" id="bleDiagCopyBtn" style="padding:5px 10px; font-size:11px;">Kopioi loki</button>
+                <button type="button" id="bleDiagClearBtn" style="padding:5px 10px; font-size:11px;">Tyhjennä</button>
+                <span id="bleDiagCopyMsg" style="font-size:11px; color:var(--green);"></span>
+              </div>
+              <div id="bleDiagList" style="max-height:180px; overflow-y:auto; font-size:11px; font-family:ui-monospace,monospace; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:6px 8px; line-height:1.45; color:var(--muted);"></div>
+            </div>
+          </details>
         </div>
         <div style="font-size:12px; font-weight:700; margin:10px 0 4px;">Oma sarjamaksimi (kalibrointiankkuri, esim. 5RM)</div>
         <div style="overflow-x:auto;"><table class="ana-table">
@@ -4958,6 +5211,23 @@
       el.querySelector('#anaRestTimerSound').addEventListener('change', (e) => { vbtSettings.restTimerSound = e.target.checked; saveVbtSettings(); });
       el.querySelector('#anaBarAxis').addEventListener('change', (e) => { vbtSettings.barAxis = e.target.value; saveVbtSettings(); });
       el.querySelector('#anaRawExport').addEventListener('click', exportRawTracesCSV);
+      refreshBleDiagUI();
+      el.querySelector('#bleDiagCopyBtn').addEventListener('click', async () => {
+        const text = bleDiagLog.map((e) => `${e.ts} [${e.kind}] ${e.msg}`).join('\n') || 'Ei merkintöjä.';
+        const msgEl = el.querySelector('#bleDiagCopyMsg');
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+          }
+          if (msgEl) { msgEl.textContent = 'Kopioitu!'; setTimeout(() => { if (msgEl) msgEl.textContent = ''; }, 2000); }
+        } catch {
+          if (msgEl) msgEl.textContent = 'Kopiointi epäonnistui';
+        }
+      });
+      el.querySelector('#bleDiagClearBtn').addEventListener('click', () => {
+        bleDiagLog.length = 0;
+        refreshBleDiagUI();
+      });
       el.querySelectorAll('[data-mvt-lift]').forEach((inp) => {
         inp.addEventListener('change', () => {
           const k = inp.getAttribute('data-mvt-lift');
@@ -5009,10 +5279,10 @@
       return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
     }
 
-    // Sarjan toistomäärä päivän suunnitelmassa: käsin korjattu määrä, muuten kelvolliset toistot
+    // Sarjan toistomäärä päivän suunnitelmassa: käsin korjattu määrä, muuten kelvolliset + drift-toistot
     function planRepsOf(x) {
       const o = Number(x.set.repCountOverride);
-      return o > 0 ? Math.round(o) : x.a.valid.length;
+      return o > 0 ? Math.round(o) : (x.a.completedCount ?? x.a.valid.length);
     }
 
     function computeDailyPlan(exercise, dateStr) {
@@ -5033,18 +5303,18 @@
       let last = null;
       for (const d of prevDates.slice(0, 8)) {
         const work = setsForExercise(exercise, (x) => x === d)
-          .map(({ set }) => ({ set, a: analyzeSet(set.reps, exercise, set.weightKg, { profile: recentProfile(exercise, d), dateStr: d }) }))
+          .map(({ set }) => ({ set, a: analyzeSet(set.reps, exercise, set.weightKg, { profile: recentProfile(exercise, d), dateStr: d, touchAndGo: !!set.touchAndGo }) }))
           .filter((x) => !x.a.isWarmup && x.a.valid.length > 0 && x.a.pct1RM !== null && x.a.pct1RM >= pLo - 7.5);
         if (work.length) { last = { date: d, work }; break; }
       }
       // tyypillinen nopeuskustannus / toisto omista sarjoista (42 pv)
       const costsObs = setsForExercise(exercise, (d) => d <= dateStr && d >= addDaysIso(dateStr, -42))
-        .map(({ set, date }) => analyzeSet(set.reps, exercise, set.weightKg, { dateStr: date }))
+        .map(({ set, date }) => analyzeSet(set.reps, exercise, set.weightKg, { dateStr: date, touchAndGo: !!set.touchAndGo }))
         .filter((a) => a.costSource === 'set' && !a.isWarmup).map((a) => a.cost);
 
       // --- tämän päivän sarjat & viitesarja ---
       const today = setsForExercise(exercise, (d) => d === dateStr)
-        .map(({ set }) => ({ set, a: analyzeSet(set.reps, exercise, set.weightKg, { profile: histProf, dateStr }) }))
+        .map(({ set }) => ({ set, a: analyzeSet(set.reps, exercise, set.weightKg, { profile: histProf, dateStr, touchAndGo: !!set.touchAndGo }) }))
         .filter((x) => x.a.vBest);
       // viitesarjat = nousevan lämmittelyn viimeiset 62–79 % sarjat ennen varsinaisia työsarjoja;
       // toistuvat työsarjapainot tai raskaat (>79 %) työsarjat eivät muuta päivän viitesarjaa
@@ -5328,7 +5598,7 @@
           const setsAtReduced = Math.min(remSetsRaw + 1, Math.max(1, Math.ceil(remRepsRaw / reducedReps)));
 
           const whyReg = [];
-          if (missedReps) whyReg.push(`edellinen sarja jäi ${lastW.a.valid.length}/${reps} toistoon`);
+          if (missedReps) whyReg.push(`edellinen sarja jäi ${lastW.a.completedCount ?? lastW.a.valid.length}/${reps} toistoon`);
           if (lastW.a.vlFinal !== null && lastW.a.vlFinal >= cutoff - 1.5) whyReg.push(`VL ${lastW.a.vlFinal.toFixed(1)} %`);
           if (lastVmin !== null && lastVmin <= stickFail + 0.06) whyReg.push(`kuolokohta V<sub>min</sub> ${fmtV(lastVmin)} m/s`);
           if (lastW.a.rirEnd !== null && lastW.a.rirEnd <= 1) whyReg.push(`RIR ~${lastW.a.rirEnd}`);
@@ -5617,9 +5887,9 @@
         (w.sets || []).forEach((s) => {
           if (exercise && s.exercise !== exercise) return;
           if (!s.reps || !s.reps.length) return;
-          const a = analyzeSet(s.reps, s.exercise, s.weightKg, { dateStr: w.date });
+          const a = analyzeSet(s.reps, s.exercise, s.weightKg, { dateStr: w.date, touchAndGo: !!s.touchAndGo });
           if (a.isWarmup) return;
-          const rc = Number(s.repCountOverride) > 0 ? setRepCount(s) : a.valid.length;
+          const rc = Number(s.repCountOverride) > 0 ? setRepCount(s) : (a.completedCount ?? a.valid.length);
           reps += rc; tonnage += rc * (s.weightKg || 0); sets++;
           sessions.add(w.date);
         });
@@ -5959,11 +6229,31 @@
       if (n !== null && !(n >= 1 && n <= 99)) return false;
       const snap = captureUndoSnapshot('Toistomäärä korjattu');
       const cfg = getLiftCfg(s.exercise);
-      const hasSuspect = flagSuspectReps(s.reps || [], cfg, null, dateStr).some(Boolean);
+      const mInfo = detectMergedReps(s.reps || [], cfg, dateStr);
+      const flagged = flagSuspectReps(s.reps || [], cfg, mInfo, dateStr);
+      const hasSuspect = flagged.some((f, i) => f && !(mInfo[i] && mInfo[i].drift));
       if (n === null || (n === (s.reps || []).length && !hasSuspect)) delete s.repCountOverride;
       else s.repCountOverride = n;
       saveJSON(KEY_WORKOUTS, workouts);
       showUndoToast(n === null ? 'Toistomäärän korjaus poistettu' : `Toistomäärä korjattu: ${n}`, snap);
+      renderLiveSet();
+      renderCalendar();
+      renderHistoryList();
+      if (!document.getElementById('tabAnalysis').classList.contains('hidden')) renderAnalysisTab();
+      refreshOpenSetAnalysisSheet();
+      return true;
+    }
+
+    function setTouchAndGo(dateStr, setIdx, enabled) {
+      const w = workouts.find((x) => x.date === dateStr);
+      if (!w || !w.sets || !w.sets[setIdx]) return false;
+      const s = w.sets[setIdx];
+      if (enabled) s.touchAndGo = true;
+      else delete s.touchAndGo;
+      if (lastSavedSetRef === s && activeSetMeta) activeSetMeta.touchAndGo = !!enabled;
+      _ownCostCache = { sig: '', map: new Map() };
+      _mvtCache = { sig: '', map: {} };
+      saveJSON(KEY_WORKOUTS, workouts);
       renderLiveSet();
       renderCalendar();
       renderHistoryList();
@@ -6009,13 +6299,14 @@
       }
       const useDate = opts.dateStr || s._date || todayISO();
       const prof = getLiftCfg(s.exercise) ? recentProfile(s.exercise, useDate) : null;
-      const setA = analyzeSet(reps, s.exercise, s.weightKg, { profile: prof, dateStr: useDate });
+      const setA = analyzeSet(reps, s.exercise, s.weightKg, { profile: prof, dateStr: useDate, touchAndGo: !!(s && s.touchAndGo) });
       const statReps = (setA.valid && setA.valid.length >= 1) ? setA.valid.map((p) => reps[p.idx]) : reps;
       const statCount = statReps.length;
       const bestVel = Math.max(0, ...statReps.map((r) => r.meanVelocity || 0));
       const avgVel = statCount ? statReps.reduce((a, r) => a + (r.meanVelocity || 0), 0) / statCount : 0;
       const bestWatt = Math.max(0, ...statReps.map((r) => r.power || 0));
-      const avgRom = statCount ? statReps.reduce((a, r) => a + (r.rangeOfMotionCm || 0), 0) / statCount : 0;
+      const romVals = statReps.map((r) => Number(r.rangeOfMotionCm) || 0).filter((x) => x > 0);
+      const avgRom = romVals.length ? romVals.reduce((a, b) => a + b, 0) / romVals.length : 0;
 
       const repListRows = reps.map((r, rIdx) => {
         const pr = setA.perRep[rIdx];
@@ -6023,7 +6314,7 @@
         const qDot = pr ? `<span class="q-dot" style="border-color:${Q_COLORS[pr.quality]}" title="${pr.quality}"></span>` : '';
         const rirHtml = pr && pr.rir !== null ? `<span style="color:var(--muted); font-size:11px;">RIR ~${pr.rir >= 10 ? '10+' : pr.rir}</span>` : '';
         const dropHtml = pr && pr.suspect
-          ? `<span style="color:#64748b; font-size:11px;">${pr.merged ? 'yhdistetty' : 'epäilyttävä'}</span>`
+          ? `<span style="color:#64748b; font-size:11px;">${pr.merged ? 'yhdistetty' : (pr.drift ? 'IMU-ajautuma' : 'epäilyttävä')}</span>`
           : (repDrop === null || (pr && pr.v >= pr.bestSoFar && rIdx === setA.vBestIdx))
             ? '<span style="color:var(--muted); font-size:11px;">paras</span>'
             : `<span class="${repDrop > setA.cutoffPct ? (repDrop > setA.redVl ? 'red' : 'amber') : 'green'}" style="font-size:11px; font-weight:600;">VL ${repDrop.toFixed(0)} %</span> ${rirHtml}`;
@@ -6035,7 +6326,7 @@
             <span style="font-weight:700; color:var(--muted); width:38px;">${qDot}#${rIdx + 1}</span>
             <strong style="color:var(--text);">${r.meanVelocity.toFixed(2)} m/s</strong>
             <span style="color:var(--muted); font-size:11px;">${(r.power || 0).toFixed(0)} W</span>
-            <span style="color:var(--muted); font-size:11px;">${(r.rangeOfMotionCm || 0).toFixed(0)} cm</span>
+            <span style="color:var(--muted); font-size:11px;">${(Number(r.rangeOfMotionCm) || 0).toFixed(0)} cm</span>
             <div>${dropHtml}</div>
             ${pr && pr.rqi !== null && pr.rqi !== undefined ? `<span style="color:var(--muted); font-size:11px;">RQI ${Math.round(pr.rqi)}</span>` : ''}
             ${delBtn}
@@ -6044,16 +6335,25 @@
       }).join('');
 
       const meta = s.traceMeta;
+      const traceExtra = meta && meta.extraReps > 0 ? meta.extraReps : (meta && meta.segments > count ? meta.segments - count : 0);
       const traceStatusHtml = opts.showTraceStatus && (meta || lastTraceStatus)
-        ? `<div style="font-size:11px; color:var(--muted);">${
+        ? `<div style="font-size:11px; color:${traceExtra > 0 ? 'var(--amber)' : 'var(--muted)'};">${
             meta
-              ? `📡 Pin 80 Hz: ${meta.matched}/${count} toistoa · ${meta.samples} näytettä${meta.barAxis ? ' · akseli ' + meta.barAxis.toUpperCase() : ''}`
+              ? `📡 Pin 80 Hz: ${meta.matched}/${count} toistoa (segmenttejä ${meta.segments ?? meta.matched}) · ${meta.samples} näytettä${meta.barAxis ? ' · akseli ' + meta.barAxis.toUpperCase() : ''}${traceExtra > 0 ? ` · ⚠️ havaitsi ${meta.segments} nostoa (+${traceExtra} puuttuvaa)` : ''}`
               : lastTraceStatus
           }</div>`
         : '';
 
+      const tngToggleHtml = (opts.allowRepDelete && getLiftKey(s.exercise) === 'deadlift')
+        ? `<label class="row" style="justify-content:flex-start; gap:8px; font-size:12px; cursor:pointer;">
+            <input type="checkbox" data-toggle-tng="1" ${s.touchAndGo ? 'checked' : ''} />
+            <span>Touch-and-go (maastaveto: ohita 1. toisto V<sub>best</sub>/VL-vertailusta)</span>
+          </label>`
+        : '';
+
+      const completedDef = (setA.completedCount ?? setA.valid.length) + (setA.mergedReps ? setA.mergedReps.reduce((acc, m) => acc + m.est, 0) : 0);
       const fixDefault = Number(s.repCountOverride) > 0 ? Math.round(s.repCountOverride)
-        : (setA.mergedCount ? setA.valid.length + setA.mergedReps.reduce((acc, m) => acc + m.est, 0) : count);
+        : ((setA.mergedCount || setA.driftCount) ? completedDef : count);
       const fixCountHtml = opts.allowRepDelete
         ? `<div class="row" style="gap:6px; flex-wrap:wrap; align-items:center;">
             <span style="font-size:12px; font-weight:700;">Korjaa toistomäärä</span>
@@ -6100,6 +6400,7 @@
               ${repListRows}
             </div>
           </div>
+          ${tngToggleHtml}
           ${fixCountHtml}
           ${delSetHtml}
         </div>
@@ -6115,6 +6416,13 @@
           deleteRepFromSavedSet(dateStr, workoutSetIdx, rIdx);
         });
       });
+      const tngChk = containerEl.querySelector('[data-toggle-tng]');
+      if (tngChk) {
+        tngChk.addEventListener('change', (e) => {
+          e.stopPropagation();
+          setTouchAndGo(dateStr, workoutSetIdx, tngChk.checked);
+        });
+      }
       const fixBtn = containerEl.querySelector('[data-fix-repcount]');
       if (fixBtn) {
         fixBtn.addEventListener('click', (e) => {
@@ -6210,7 +6518,8 @@
       const ex = meta.exercise || getCurrentSelectedExerciseName();
       const wKg = Number(meta.weightKg) || 0;
       const prof = (!isFreeMode() && getLiftCfg(ex)) ? recentProfile(ex, dateStr) : null;
-      const a = analyzeSet(currentReps, ex, wKg, { profile: prof, dateStr });
+      const restTng = lastSavedSetRef ? !!lastSavedSetRef.touchAndGo : isLiveTouchAndGo(ex);
+      const a = analyzeSet(currentReps, ex, wKg, { profile: prof, dateStr, touchAndGo: restTng });
       const bestV = a.vBest || Math.max(0, ...currentReps.map((r) => r.meanVelocity || 0));
       const displayRepCount = (lastSavedSetRef && Number(lastSavedSetRef.repCountOverride) > 0)
         ? setRepCount(lastSavedSetRef)
@@ -6239,7 +6548,12 @@
 
       // Max 1 finding line
       if (findEl) {
-        const finding = isFreeMode() ? null : buildShortRestFinding(a, ex);
+        const restTraceMeta = (lastSavedSetRef && lastSavedSetRef.traceMeta) || pendingTraceMeta || null;
+        let finding = isFreeMode() ? null : buildShortRestFinding(a, ex, { traceMeta: restTraceMeta, count: currentReps.length });
+        if (!finding && restTraceMeta) {
+          const extra = restTraceMeta.extraReps > 0 ? restTraceMeta.extraReps : (restTraceMeta.segments > currentReps.length ? restTraceMeta.segments - currentReps.length : 0);
+          if (extra > 0) finding = { text: `⚠️ Pin 80 Hz havaitsi ${restTraceMeta.segments} nostoa, mutta sovellus tallensi ${currentReps.length} (+${extra} puuttuvaa)`, cls: 'amber' };
+        }
         if (finding) {
           findEl.className = finding.cls;
           findEl.classList.remove('hidden');
@@ -6269,7 +6583,7 @@
           const widthPct = Math.max(6, Math.round((r.meanVelocity / maxVel) * 100));
           const qDot = pr ? `<span class="q-dot" style="border-color:${Q_COLORS[pr.quality]}"></span>` : '';
           const vsFirstHtml = isFreeMode() ? '' : (pr && pr.suspect)
-            ? `<span style="color:#64748b; font-size:12px;">${pr.merged ? 'yhdistetty' : 'epäilyttävä'}</span>`
+            ? `<span style="color:#64748b; font-size:12px;">${pr.merged ? 'yhdistetty' : (pr.drift ? 'IMU-ajautuma' : 'epäilyttävä')}</span>`
             : (!pr || pr.vl === null || idx === a.vBestIdx)
               ? `<span style="color:var(--muted); font-size:12px;">paras</span>`
               : `<span class="${pr.vl > a.redVl ? 'red' : (pr.vl > a.cutoffPct ? 'amber' : 'green')}" style="font-size:12px; font-weight:600;">VL ${pr.vl.toFixed(0)} %</span>`
@@ -6278,10 +6592,10 @@
           div.innerHTML = `
             <div class="rep-item-top" style="flex-wrap: wrap;">
               <span class="rep-num">${qDot}#${idx + 1}</span>
-              <span><strong>${r.meanVelocity.toFixed(2)} m/s</strong> (${r.power.toFixed(0)} W)</span>
+              <span><strong>${r.meanVelocity.toFixed(2)} m/s</strong> (${(r.power || 0).toFixed(0)} W)</span>
               ${vsFirstHtml}
               ${lowHtml}
-              <span style="color:var(--muted)">${r.rangeOfMotionCm.toFixed(0)} cm</span>
+              <span style="color:var(--muted)">${(Number(r.rangeOfMotionCm) || 0).toFixed(0)} cm</span>
               <button type="button" data-del-live-rep="${idx}" title="Poista toisto" style="padding: 4px 8px; font-size: 12px; border-radius: 6px; background: transparent; border: 1px solid var(--border); color: var(--muted); min-width:34px; min-height:32px;">✕</button>
             </div>
             <div class="rep-bar-track">
@@ -6304,7 +6618,7 @@
       let overVlCount = 0;
       let bestE1 = null;
       sets.forEach((s) => {
-        const a = analyzeSet(s.reps, s.exercise, s.weightKg, { dateStr });
+        const a = analyzeSet(s.reps, s.exercise, s.weightKg, { dateStr, touchAndGo: !!s.touchAndGo });
         if (!a.isWarmup && a.vlFinal !== null && a.vlFinal > a.cutoffPct) overVlCount++;
         if (a.e1RM && (!bestE1 || a.e1RM > bestE1.e1RM)) bestE1 = { ex: s.exercise, e1RM: a.e1RM };
       });
@@ -6352,8 +6666,8 @@
       listEl.innerHTML = sets.map((s, idx) => {
         const count = setRepCount(s);
         const bestVel = (s.reps && s.reps.length) ? Math.max(0, ...s.reps.map((r) => r.meanVelocity || 0)) : 0;
-        const dropPct = calcVelocityDropPct(s.reps, s.exercise, dateStr);
-        const qa = analyzeSet(s.reps, s.exercise, s.weightKg, { dateStr });
+        const dropPct = calcVelocityDropPct(s.reps, s.exercise, dateStr, { touchAndGo: !!s.touchAndGo });
+        const qa = analyzeSet(s.reps, s.exercise, s.weightKg, { dateStr, touchAndGo: !!s.touchAndGo });
         const parts = [
           `<strong>#${idx + 1}</strong> ${s.exercise}`,
           `${s.weightKg} × ${count}`
@@ -6420,7 +6734,7 @@
 
       // Analyze active/current set for hero view
       const prof = (!isFreeMode() && getLiftCfg(currentExercise)) ? recentProfile(currentExercise, dateStr) : null;
-      const liveA = count > 0 ? analyzeSet(currentReps, currentExercise, activeWeight, { profile: prof, dateStr }) : null;
+      const liveA = count > 0 ? analyzeSet(currentReps, currentExercise, activeWeight, { profile: prof, dateStr, touchAndGo: isLiveTouchAndGo(currentExercise) }) : null;
       const lastP = (liveA && liveA.valid.length) ? liveA.valid[liveA.valid.length - 1] : null;
 
       // Active hero view updates
@@ -6545,7 +6859,12 @@
         extraHintEl.textContent = hint ? hint.text : '';
       }
       if (mergedWarnEl) {
-        const mw = (!isFreeMode() && liveA && liveA.mergedReps.length) ? liveA.mergedReps.map(mergedWarnText) : [];
+        const mw = (!isFreeMode() && liveA)
+          ? [
+              ...(liveA.mergedReps || []).map(mergedWarnText),
+              ...(liveA.driftReps || []).map(driftWarnText)
+            ]
+          : [];
         mergedWarnEl.classList.toggle('hidden', !mw.length);
         mergedWarnEl.innerHTML = mw.map((t) => `<div>${t}</div>`).join('');
       }
@@ -6728,10 +7047,11 @@
         w.sets.forEach((s, sIdx) => {
           const bestVel = Math.max(0, ...s.reps.map((r) => r.meanVelocity));
           const avgVel = s.reps.length ? s.reps.reduce((a, r) => a + r.meanVelocity, 0) / s.reps.length : 0;
-          const bestWatt = Math.max(0, ...s.reps.map((r) => r.power));
-          const avgRom = s.reps.length ? s.reps.reduce((a, r) => a + r.rangeOfMotionCm, 0) / s.reps.length : 0;
-          const dropPct = calcVelocityDropPct(s.reps, s.exercise, w.date);
-          const ha = analyzeSet(s.reps, s.exercise, s.weightKg, { dateStr: w.date });
+          const bestWatt = Math.max(0, ...s.reps.map((r) => r.power || 0));
+          const romVals = s.reps.map((r) => Number(r.rangeOfMotionCm) || 0).filter((x) => x > 0);
+          const avgRom = romVals.length ? romVals.reduce((a, b) => a + b, 0) / romVals.length : 0;
+          const dropPct = calcVelocityDropPct(s.reps, s.exercise, w.date, { touchAndGo: !!s.touchAndGo });
+          const ha = analyzeSet(s.reps, s.exercise, s.weightKg, { dateStr: w.date, touchAndGo: !!s.touchAndGo });
           const dropHtml = (dropPct !== null
             ? ` • VL paras→viim.: <strong class="${dropPct > ha.redVl ? 'red' : dropPct > ha.cutoffPct ? 'amber' : 'green'}">${dropPct.toFixed(1)} %</strong>`
             : '')
@@ -6787,7 +7107,7 @@
         w.sets.forEach((s, sIdx) => {
           const ex = `"${String(s.exercise).replace(/"/g, '""')}"`;
           const setDrop = calcFirstToLastDropPct(s.reps);
-          const ca = analyzeSet(s.reps, s.exercise, s.weightKg, { profile: getLiftCfg(s.exercise) ? recentProfile(s.exercise, w.date) : null, dateStr: w.date });
+          const ca = analyzeSet(s.reps, s.exercise, s.weightKg, { profile: getLiftCfg(s.exercise) ? recentProfile(s.exercise, w.date) : null, dateStr: w.date, touchAndGo: !!s.touchAndGo });
           const f = (x, d) => (x === null || x === undefined || !Number.isFinite(x)) ? '' : x.toFixed(d);
           const setDropStr = setDrop !== null ? setDrop.toFixed(1) : '';
           const set1RM = calcEpley1RM(s.weightKg, setRepCount(s));
@@ -6804,15 +7124,15 @@
               s.time || '',
               ex,
               sIdx + 1,
-              s.weightKg.toFixed(1),
+              (Number(s.weightKg) || 0).toFixed(1),
               s.targetReps,
               rIdx + 1,
-              r.meanVelocity.toFixed(3),
-              r.power.toFixed(2),
+              (Number(r.meanVelocity) || 0).toFixed(3),
+              (Number(r.power) || 0).toFixed(2),
               zoneStr,
               low,
               status,
-              r.rangeOfMotionCm.toFixed(1),
+              (Number(r.rangeOfMotionCm) || 0).toFixed(1),
               setDropStr,
               set1RMStr,
               f(r.propulsiveVelocity, 3),
@@ -6927,10 +7247,12 @@
       }
     });
     document.getElementById('finishWorkoutBtn').addEventListener('click', finishWorkout);
+    document.getElementById('rezeroBtn').addEventListener('click', rezeroPin);
 
     // More (⋯) bottom sheet
     function closeMoreMenuSheet() { document.getElementById('moreMenuSheet').classList.add('hidden'); }
     document.getElementById('moreMenuBtn').addEventListener('click', () => {
+      document.getElementById('menuRezeroBtn').classList.toggle('hidden', !(dataChar && !setActive && !zeroing && !bleConnecting));
       document.getElementById('clearRepsBtn').classList.toggle('hidden', currentReps.length === 0);
       document.getElementById('moreMenuSheet').classList.remove('hidden');
     });
@@ -6941,6 +7263,10 @@
     document.getElementById('menuOpenSettingsBtn').addEventListener('click', () => {
       closeMoreMenuSheet();
       document.getElementById('liftSettingsSheet').classList.remove('hidden');
+    });
+    document.getElementById('menuRezeroBtn').addEventListener('click', () => {
+      closeMoreMenuSheet();
+      rezeroPin();
     });
     document.getElementById('reloadAppBtn').addEventListener('click', () => {
       if ((setActive || (currentReps.length > 0 && !currentSetSaved)) && !confirm('Sarja on kesken. Päivitetäänkö sovellus silti?')) {
@@ -7056,6 +7382,12 @@
     });
     document.getElementById('targetRepsInput').addEventListener('input', handleTargetRepsChanged);
     document.getElementById('targetRepsInput').addEventListener('change', handleTargetRepsChanged);
+    document.getElementById('tngToggle').addEventListener('change', (e) => {
+      if (!currentSetSaved && activeSetMeta && (currentReps.length === 0 || getLiftKey(activeSetMeta.exercise) === 'deadlift')) {
+        activeSetMeta.touchAndGo = !!(getLiftKey(activeSetMeta.exercise) === 'deadlift' && e.target.checked);
+      }
+      renderLiveSet();
+    });
 
     // Exercise selection & adding (both modal and inline on iOS)
     document.getElementById('exerciseSelect').addEventListener('change', (e) => {
