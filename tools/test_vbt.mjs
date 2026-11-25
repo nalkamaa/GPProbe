@@ -13,13 +13,14 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 const INDEX_PATH = path.join(REPO_ROOT, 'index.html');
 const VOICE_PATH = path.join(REPO_ROOT, 'assets', 'kevytta-viela-yksi-toisto.mp3');
 
-function loadApp() {
+function loadApp(opts = {}) {
   const html = fs.readFileSync(INDEX_PATH, 'utf8');
   const scriptMatch = html.match(/<script>([\s\S]*)<\/script>/);
   assert.ok(scriptMatch, 'index.html must contain <script>');
 
   const els = new Map();
-  const storage = new Map();
+  const storage = new Map(Object.entries(opts.initialStorage || {}));
+  const docListeners = new Map();
   const audioSessionLog = [];
   const audioEvents = [];
   const timers = [];
@@ -33,11 +34,23 @@ function loadApp() {
     static now() { return clockMs !== null ? clockMs : RealDate.now(); }
   }
 
-  function makeEl(id = '') {
+  function makeEl(id = '', tagName = '') {
     const cls = new Set(id === 'tabAnalysis' ? ['hidden'] : []);
-    return {
-      id, value: '', textContent: '', innerHTML: '', checked: false, disabled: false,
-      dataset: {}, style: {},
+    const attrs = new Map();
+    const listeners = new Map();
+    let htmlStr = '';
+    const tagEls = new Map();
+    const qCache = new Map();
+    const el = {
+      id, tagName: String(tagName || '').toUpperCase(),
+      value: '', textContent: '', checked: false, disabled: false,
+      dataset: {}, style: {}, parentNode: null,
+      get innerHTML() { return htmlStr; },
+      set innerHTML(v) {
+        htmlStr = String(v ?? '');
+        tagEls.clear();
+        qCache.clear();
+      },
       classList: {
         _s: cls,
         add(...c) { c.forEach((x) => this._s.add(x)); },
@@ -48,25 +61,85 @@ function loadApp() {
         },
         contains(c) { return this._s.has(c); }
       },
-      addEventListener() {},
-      querySelector(sel) {
-        if (!this.innerHTML || !sel) return null;
-        const idM = sel.match(/^#([\w-]+)$/);
-        if (idM) return this.innerHTML.includes(`id="${idM[1]}"`) ? makeEl(idM[1]) : null;
-        const attrM = sel.match(/^\[([^\]=]+)/);
-        if (attrM) return this.innerHTML.includes(attrM[1]) ? makeEl() : null;
-        if (/^[a-z]+$/i.test(sel)) return this.innerHTML.includes(`<${sel}`) ? makeEl(sel) : null;
-        return null;
+      addEventListener(type, fn) {
+        if (!listeners.has(type)) listeners.set(type, []);
+        listeners.get(type).push(fn);
       },
-      querySelectorAll() { return []; },
-      appendChild() {},
-      remove() {},
+      removeEventListener(type, fn) {
+        const arr = listeners.get(type);
+        if (arr) listeners.set(type, arr.filter((f) => f !== fn));
+      },
+      dispatch(type, evt = {}) {
+        const eventObj = { target: el, currentTarget: el, preventDefault() {}, stopPropagation() {}, ...evt };
+        const list = (listeners.get(type) || []).slice();
+        const results = [];
+        for (const fn of list) results.push(fn(eventObj));
+        return results.some((r) => r && typeof r.then === 'function') ? Promise.all(results) : undefined;
+      },
+      querySelector(sel) {
+        return this.querySelectorAll(sel)[0] || null;
+      },
+      querySelectorAll(sel) {
+        if (!htmlStr || !sel) return [];
+        if (qCache.has(sel)) return qCache.get(sel);
+        const parts = sel.split(',').map((s) => s.trim()).filter(Boolean);
+        const matchedOffsets = new Set();
+        const out = [];
+        const tagRe = /<([a-zA-Z0-9-]+)([^>]*)>/g;
+        let m;
+        while ((m = tagRe.exec(htmlStr)) !== null) {
+          const tName = m[1];
+          const rawAttrs = m[2] || '';
+          const idM = rawAttrs.match(/\bid\s*=\s*"([^"]*)"/);
+          const tId = idM ? idM[1] : '';
+          const clsM = rawAttrs.match(/\bclass\s*=\s*"([^"]*)"/);
+          const tCls = clsM ? clsM[1].split(/\s+/).filter(Boolean) : [];
+          const matchesOne = (s) => {
+            if (s.startsWith('#')) return tId === s.slice(1);
+            if (s.startsWith('.')) return tCls.includes(s.slice(1));
+            const attrEq = s.match(/^\[([^\]=]+)=["']?([^\]"']*)["']?\]$/);
+            if (attrEq) {
+              const esc = attrEq[2].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              return new RegExp(`\\b${attrEq[1]}\\s*=\\s*["']${esc}["']`).test(rawAttrs);
+            }
+            const attrOnly = s.match(/^\[([^\]=]+)\]$/);
+            if (attrOnly) {
+              return new RegExp(`(?:^|\\s)${attrOnly[1]}(?:\\s*=|\\s|$)`).test(rawAttrs);
+            }
+            if (/^[a-zA-Z0-9-]+$/.test(s)) return tName.toLowerCase() === s.toLowerCase();
+            return false;
+          };
+          if (parts.some(matchesOne) && !matchedOffsets.has(m.index)) {
+            matchedOffsets.add(m.index);
+            let child = tagEls.get(m.index);
+            if (!child) {
+              child = makeEl(tId, tName);
+              const attrRe = /([a-zA-Z0-9_-]+)\s*=\s*"([^"]*)"/g;
+              let am;
+              while ((am = attrRe.exec(rawAttrs)) !== null) child.setAttribute(am[1], am[2]);
+              if (/\bchecked\b/.test(rawAttrs)) child.checked = true;
+              if (child.getAttribute('value') !== null) child.value = child.getAttribute('value');
+              tCls.forEach((c) => child.classList.add(c));
+              tagEls.set(m.index, child);
+            }
+            out.push(child);
+          }
+        }
+        qCache.set(sel, out);
+        return out;
+      },
+      appendChild(c) { if (c) c.parentNode = el; return c; },
+      remove() { if (el.parentNode && el.parentNode.removeChild) el.parentNode.removeChild(el); },
+      removeChild(c) { if (c && c.parentNode === el) c.parentNode = null; return c; },
       closest() { return null; },
-      getAttribute() { return null; },
-      setAttribute() {},
+      getAttribute(k) { return attrs.has(k) ? attrs.get(k) : null; },
+      setAttribute(k, v) { attrs.set(k, String(v)); },
+      select() {},
       focus() {},
-      click() {}
+      blur() {},
+      click() { return el.dispatch('click'); }
     };
+    return el;
   }
 
   let sessionType = 'ambient';
@@ -147,8 +220,12 @@ function loadApp() {
       getElementById(id) { if (!els.has(id)) els.set(id, makeEl(id)); return els.get(id); },
       querySelector() { return null; },
       querySelectorAll() { return []; },
-      createElement(tag) { return makeEl(tag); },
-      addEventListener() {},
+      createElement(tag) { return makeEl('', tag); },
+      addEventListener(type, fn) {
+        if (!docListeners.has(type)) docListeners.set(type, []);
+        docListeners.get(type).push(fn);
+      },
+      execCommand: undefined,
       visibilityState: 'visible'
     }
   };
@@ -169,6 +246,9 @@ function loadApp() {
       set pinStarted(v) { pinStarted = v; },
       get bleConnecting() { return bleConnecting; },
       set bleConnecting(v) { bleConnecting = v; },
+      get gattConnectPromise() { return gattConnectPromise; },
+      get reconnectTimer() { return reconnectTimer; },
+      get autoStartAfterZero() { return autoStartAfterZero; },
       get manualDisconnect() { return manualDisconnect; },
       set manualDisconnect(v) { manualDisconnect = v; },
       get dataChar() { return dataChar; },
@@ -193,6 +273,11 @@ function loadApp() {
       set lastEccEndAt(v) { lastEccEndAt = v; },
       get resumeSetAfterReconnect() { return resumeSetAfterReconnect; },
       set resumeSetAfterReconnect(v) { resumeSetAfterReconnect = v; },
+      get resumeSetDisconnectedAt() { return resumeSetDisconnectedAt; },
+      set resumeSetDisconnectedAt(v) { resumeSetDisconnectedAt = v; },
+      get pendingTraceMeta() { return pendingTraceMeta; },
+      set pendingTraceMeta(v) { pendingTraceMeta = v; },
+      get recentRawTraces() { return recentRawTraces; },
       get lastTraceStatus() { return lastTraceStatus; },
       get lastTraceFailed() { return lastTraceFailed; },
       get keepWarmOsc() { return keepWarmOsc; },
@@ -204,11 +289,12 @@ function loadApp() {
       getLiftKey, getLiftCfg, getAnchor1RM, workoutsSignature,
       detectMergedReps, splitCurveReps, historyMedianRom, flagSuspectReps,
       analyzeSet, ownVelocityCost, computeDailyPlan, planAltHTML,
-      readinessForDate, sessionProfile, recentProfile, weeklyVolume,
+      readinessForDate, sessionProfile, recentProfile, e1rmTrend, weeklyVolume,
       extraRepHint, isReferenceSetContext,
       setRepCount, setRepCountOverride, setTouchAndGo, isLiveTouchAndGo, planRepsOf,
       snapshotCurrentSetMeta, commitCurrentSetToWorkouts, renderContextAndSteppers,
-      startSetOnPin, stopSetOnPin, onNotification, onDisconnected, openGattSession, rezeroPin, finishCalibrationAndActivate,
+      renderLiveSet, renderVbtSettingsCard, openSetAnalysisSheet,
+      startSetOnPin, stopSetOnPin, disconnectPin, onNotification, onDisconnected, openGattSession, rezeroPin, finishCalibrationAndActivate,
       handleTraceNotification, analyzeTrace, attachTraceToRecentSet,
       buildSetAnalysisHTML, buildVerdict, buildShortRestFinding, buildCSV,
       playExtraRepVoiceCue, speakRepVelocity, startAudioKeepWarm
@@ -217,10 +303,15 @@ function loadApp() {
 
   return {
     api: sandbox.__api,
+    sandbox,
     html,
     els,
     storage,
     timers,
+    dispatchDoc: (type, evt = {}) => {
+      const list = (docListeners.get(type) || []).slice();
+      for (const fn of list) fn({ target: sandbox.document, ...evt });
+    },
     setNow: (ms) => { clockMs = ms; },
     advanceMs: (d) => { clockMs = (clockMs ?? RealDate.now()) + d; },
     audioSessionLog,
@@ -776,10 +867,11 @@ test('8. Manual-only deadlift TnG & vBest fallback never picks suspect/drift rep
   assert.equal(a2Tng.vBest, 0.563, 'Fallback must pick non-suspect rep over drift/suspect rep');
   assert.equal(a2Tng.vBestIdx, 0);
 
-  // Jos kaikki toistot ovat suspect, fallback käyttää silti Math.max(...vs)
+  // Jos kaikki toistot ovat suspect, vBest ja e1RM jäävät nulliksi (ei drift-nopeutta)
   const allSus = api.analyzeSet([makeRep(0.741, 114)], 'Maastaveto', 115, { dateStr: '2026-11-24' });
   assert.equal(allSus.driftCount, 1);
-  assert.equal(allSus.vBest, 0.741);
+  assert.equal(allSus.vBest, null);
+  assert.equal(allSus.e1RM, null);
 });
 
 test('9. Deadlift drift vs merged: excluded from velocity/e1RM, counted in reps/volume/anchor/plan', () => {
@@ -806,10 +898,10 @@ test('9. Deadlift drift vs merged: excluded from velocity/e1RM, counted in reps/
   assert.equal(a5.vBest, 0.490);
   assert.ok(Math.abs(a5.vlFinal - 13.673) < 0.2, `Expected ~13.7% VL (r1->r2), got ${a5.vlFinal}`);
 
-  // epleyRir laskee completedCount (3) + rirEnd (ei valid.length 2 + rirEnd)
-  assert.equal(a5.rirEnd, 4);
-  const expectedEpley3 = 0.5 * (130 * (1 + 7 / 30) + 130 * (36 / (37 - 7)));
-  assert.ok(Math.abs(a5.epleyRir - expectedEpley3) < 0.15, `Expected epleyRir for 7 reps (~158.0), got ${a5.epleyRir}`);
+  // epleyRir laskee completedCount (3) + rirEnd (3, lopun drift-toisto vähennetty -> 6 toistoa)
+  assert.equal(a5.rirEnd, 3);
+  const expectedEpley3 = 0.5 * (130 * (1 + 6 / 30) + 130 * (36 / (37 - 6)));
+  assert.ok(Math.abs(a5.epleyRir - expectedEpley3) < 0.15, `Expected epleyRir for 6 reps (~153.5), got ${a5.epleyRir}`);
 
   // planRepsOf & weeklyVolume laskevat drift-toistot mukaan (Set #1 lämmittely pois, Set #3=3 ja Set #5=3 -> 6)
   assert.equal(api.planRepsOf({ set: s5, a: a5 }), 3);
@@ -970,7 +1062,7 @@ test('12. Full 2026-10-29 + 2026-11-24 deadlift replay & computeDailyPlan checkp
   assert.ok(a4.perRep[2].flags.includes('tech') && !a4.perRep[2].flags.includes('dx'));
 
   assert.equal(a5.score, 100);
-  assert.equal(a5.rirEnd, 4);
+  assert.equal(a5.rirEnd, 3);
   assert.ok(a5.e1RM > 166 && a5.e1RM < 171);
 
   const planAt = (nSets, override78 = false) => {
@@ -1229,18 +1321,663 @@ test('13. BLE pauseMs jitter guard, partial burst, reconnect resume, rezero, 80 
   assert.equal(api.currentReps.length, 2);
   assert.equal(api.activeSetMeta.weightKg, 130);
 
-  // Lopeta sarja ja testaa manuaalinen rezeroPin() -> 0x04 + 0x03
+  // Lopeta sarja ja testaa manuaalinen rezeroPin() -> [CMD_STOP, CMD_START] järjestyksessä
   await drainTimers(api.stopSetOnPin(true));
   writtenBytes.length = 0;
   await drainTimers(api.rezeroPin());
   assert.equal(api.zeroing, true);
-  assert.ok(writtenBytes.includes(api.CMD_STOP), 'rezeroPin must send CMD_STOP (0x04)');
-  assert.ok(writtenBytes.includes(api.CMD_START), 'rezeroPin must send CMD_START (0x03)');
+  assert.deepEqual(writtenBytes, [api.CMD_STOP, api.CMD_START], 'rezeroPin must send [CMD_STOP, CMD_START] in order');
   assert.ok(api.bleDiagLog.some((e) => e.kind === 'rezero'));
 
   api.refreshBleDiagUI();
   assert.ok(els.get('bleDiagSummary').textContent.includes(String(api.bleDiagLog.length)));
   assert.ok(els.get('bleDiagList').innerHTML.includes('rezero'));
+});
+
+function buildSyntheticTracePackets(concPeaks, samplesBetween = 60) {
+  const samples = [];
+  const pushQuiet = (n) => { for (let i = 0; i < n; i++) samples.push([12500, 0, 0, 0, 0, 0, 2048, 0, 0]); };
+  const pushConc = (n, peak) => {
+    for (let i = 0; i < n; i++) {
+      const v = Math.round(Math.sin(((i + 0.5) / n) * Math.PI) * peak);
+      samples.push([12500, 0, 0, 0, 0, 0, 2048, 0, v]);
+    }
+  };
+  const pushEcc = (n) => {
+    for (let i = 0; i < n; i++) {
+      const v = -Math.round(Math.sin(((i + 0.5) / n) * Math.PI) * 500);
+      samples.push([12500, 0, 0, 0, 0, 0, 2048, 0, v]);
+    }
+  };
+  pushQuiet(30);
+  concPeaks.forEach((pk, idx) => {
+    if (idx > 0) pushQuiet(samplesBetween);
+    pushConc(32, pk);
+    pushEcc(24);
+  });
+  pushQuiet(30);
+  if (samples.length < 180) pushQuiet(180 - samples.length);
+
+  const pkts = [];
+  const b1 = new ArrayBuffer(15);
+  const b1dv = new DataView(b1);
+  b1dv.setUint8(0, 0xb1);
+  b1dv.setUint32(1, 0, true);
+  b1dv.setUint32(5, Math.round((samples.length / 80) * 1000), true);
+  b1dv.setUint16(9, concPeaks.length, true);
+  b1dv.setUint32(11, samples.length, true);
+  pkts.push(b1dv);
+
+  const perPkt = 23;
+  const totalPkts = Math.ceil(samples.length / perPkt);
+  for (let p = 0; p < totalPkts; p++) {
+    const chunk = samples.slice(p * perPkt, (p + 1) * perPkt);
+    const buf = new ArrayBuffer(6 + chunk.length * 34);
+    const dv = new DataView(buf);
+    dv.setUint8(0, 0xa4);
+    dv.setUint16(1, p, true);
+    dv.setUint16(3, totalPkts, true);
+    dv.setUint8(5, chunk.length);
+    chunk.forEach((row, idx) => {
+      const o = 6 + idx * 34;
+      dv.setUint16(o, row[0], true);
+      for (let c = 0; c < 8; c++) dv.setInt32(o + 2 + c * 4, row[c + 1], true);
+    });
+    pkts.push(dv);
+  }
+  return pkts;
+}
+
+test('14. BLE visibilitychange + 1200ms timer race & saveUnsavedSetBtn / clearRepsBtn reset resumeSetAfterReconnect', async () => {
+  const { api, els, sandbox, timers, dispatchDoc, setNow, advanceMs } = loadApp();
+  setNow(1700000000000);
+
+  let connectCalls = 0;
+  let deferredConnect = null;
+  const fakeChar = {
+    async startNotifications() {},
+    addEventListener() {},
+    removeEventListener() {},
+    async writeValue() {}
+  };
+  api.bleDevice = {
+    gatt: {
+      connected: false,
+      async connect() {
+        connectCalls++;
+        if (deferredConnect) {
+          await deferredConnect.promise;
+        }
+        this.connected = true;
+        return {
+          async getPrimaryService() {
+            return { async getCharacteristic() { return fakeChar; } };
+          }
+        };
+      }
+    }
+  };
+  const drainShort = async (maxMs = 500, untilFn = null) => {
+    for (let i = 0; i < 200; i++) {
+      let ran = false;
+      for (const t of timers) {
+        if (!t.cleared && t.ms <= maxMs) { t.cleared = true; t.fn(); ran = true; }
+      }
+      await Promise.resolve();
+      if (untilFn && untilFn() && !timers.some((t) => !t.cleared && t.ms <= maxMs)) break;
+      if (!untilFn && !ran && i > 10 && !timers.some((t) => !t.cleared && t.ms <= maxMs)) break;
+    }
+  };
+
+  // A. visibilitychange laukeaa ennen 1200 ms ajastinta -> peruu ajastimen, openGattSession vain kerran, sarja jatkuu
+  els.get('exerciseSelect').value = 'Maastaveto';
+  els.get('weightInput').value = '130';
+  els.get('targetRepsInput').value = '3';
+  els.get('workoutDate').value = '2026-11-24';
+  api.dataChar = fakeChar;
+  api.bleDevice.gatt.connected = true;
+  api.manualDisconnect = false;
+  api.setActive = true;
+  api.activeSetMeta = api.snapshotCurrentSetMeta();
+  api.currentReps = [makeRep(0.49, 44)];
+
+  api.bleDevice.gatt.connected = false;
+  api.onDisconnected();
+  assert.equal(api.resumeSetAfterReconnect, true);
+  const rcTimerA = timers.find((t) => !t.cleared && t.ms === 1200);
+  assert.ok(rcTimerA, 'onDisconnected must schedule 1200 ms reconnect timer');
+
+  sandbox.document.visibilityState = 'visible';
+  dispatchDoc('visibilitychange');
+  assert.equal(rcTimerA.cleared, true, 'visibilitychange must cancel pending 1200 ms reconnectTimer');
+  await drainShort(500, () => api.zeroing && api.gattConnectPromise === null);
+  assert.equal(connectCalls, 1, 'visibilitychange + canceled timer must call gatt.connect only once');
+  assert.equal(api.zeroing, true);
+  assert.equal(api.autoStartAfterZero, true);
+
+  // 3000 ms zeroTimer laukeaa -> sarja aktivoituu keskeytyksettä
+  const zTimerA = timers.find((t) => !t.cleared && t.ms === 3000);
+  assert.ok(zTimerA, '3000 ms calibration timer must be scheduled');
+  zTimerA.cleared = true;
+  zTimerA.fn();
+  assert.equal(api.setActive, true, 'Set must resume after 3000 ms calibration');
+  assert.equal(api.currentReps.length, 1);
+
+  // B. 1200 ms ajastin käynnistää openGattSession():n ja visibilitychange osuu keskelle kesken olevaa connect()-kutsua
+  connectCalls = 0;
+  let resolveConn;
+  deferredConnect = { promise: new Promise((r) => { resolveConn = r; }) };
+  api.bleDevice.gatt.connected = false;
+  api.onDisconnected();
+  const rcTimerB = timers.find((t) => !t.cleared && t.ms === 1200);
+  assert.ok(rcTimerB, 'Second disconnect must schedule 1200 ms reconnect timer');
+  advanceMs(1200);
+  rcTimerB.cleared = true;
+  const timerPromise = rcTimerB.fn();
+  await Promise.resolve();
+  assert.equal(connectCalls, 1);
+  assert.ok(api.gattConnectPromise, 'gattConnectPromise must be active while connecting');
+
+  dispatchDoc('visibilitychange');
+  await Promise.resolve();
+  assert.equal(connectCalls, 1, 'visibilitychange during in-flight gattConnectPromise must not connect twice');
+
+  deferredConnect = null;
+  resolveConn();
+  let timerDoneB = false;
+  timerPromise.then(() => { timerDoneB = true; });
+  await drainShort(500, () => timerDoneB);
+  await timerPromise;
+  assert.equal(connectCalls, 1);
+  const zTimerB = timers.find((t) => !t.cleared && t.ms === 3000);
+  assert.ok(zTimerB);
+  zTimerB.cleared = true;
+  zTimerB.fn();
+  assert.equal(api.setActive, true);
+  assert.equal(api.currentReps.length, 1);
+
+  // C. #saveUnsavedSetBtn katkoksen aikana nollaa resumeSetAfterReconnect eikä kadota uusia toistoja
+  api.workouts = [];
+  api.currentReps = [makeRep(0.51, 43), makeRep(0.46, 43)];
+  api.currentSetSaved = false;
+  api.lastSavedSetRef = null;
+  api.bleDevice.gatt.connected = false;
+  api.onDisconnected();
+  assert.equal(api.resumeSetAfterReconnect, true);
+  assert.equal(api.setActive, false);
+
+  await els.get('saveUnsavedSetBtn').dispatch('click');
+  assert.equal(api.currentSetSaved, true);
+  assert.equal(api.resumeSetAfterReconnect, false, '#saveUnsavedSetBtn must clear resumeSetAfterReconnect');
+  assert.equal(api.resumeSetDisconnectedAt, 0);
+  assert.equal(api.workouts[0].sets.length, 1);
+
+  const rcTimerC = timers.find((t) => !t.cleared && t.ms === 1200);
+  assert.ok(rcTimerC);
+  rcTimerC.cleared = true;
+  let timerDoneC = false;
+  const pC = rcTimerC.fn().then(() => { timerDoneC = true; });
+  await drainShort(500, () => timerDoneC);
+  await pC;
+  const zTimerC = timers.find((t) => !t.cleared && t.ms === 3000);
+  if (zTimerC) { zTimerC.cleared = true; zTimerC.fn(); }
+  assert.equal(api.setActive, false, 'Reconnect after manual save must NOT auto-resume saved set');
+
+  // Uusi sarja tallennuksen jälkeen: uudet toistot tallentuvat uutena sarjana eivätkä katoa
+  let startDone = false;
+  const pStart = api.startSetOnPin().then(() => { startDone = true; });
+  await drainShort(500, () => startDone);
+  await pStart;
+  assert.equal(api.setActive, true);
+  const pkt2 = (a, b) => ({ target: { value: new DataView(new Uint8Array([a, b]).buffer) } });
+  const pkt5 = (type, floatVal) => {
+    const buf = new ArrayBuffer(5);
+    const dv = new DataView(buf);
+    dv.setUint8(0, type);
+    dv.setFloat32(1, floatVal, true);
+    return { target: { value: dv } };
+  };
+  advanceMs(600);
+  api.onNotification(pkt2(0x01, 0x01));
+  api.onNotification(pkt5(0x03, 520));
+  api.onNotification(pkt5(0x05, 430));
+  api.onNotification(pkt5(0x04, 1400));
+  api.onNotification(pkt5(0x02, 500));
+  await api.stopSetOnPin(true);
+  assert.equal(api.workouts[0].sets.length, 2, 'New reps after saving unsaved set must be preserved');
+  assert.equal(api.workouts[0].sets[1].reps.length, 1);
+
+  // D. #clearRepsBtn katkoksen aikana nollaa resumeSetAfterReconnect ja pendingTraceMeta
+  api.currentReps = [makeRep(0.48, 43)];
+  api.currentSetSaved = false;
+  api.pendingTraceMeta = { segments: 1 };
+  api.setActive = true;
+  api.bleDevice.gatt.connected = false;
+  api.onDisconnected();
+  assert.equal(api.resumeSetAfterReconnect, true);
+
+  await els.get('clearRepsBtn').dispatch('click');
+  assert.equal(api.currentReps.length, 0);
+  assert.equal(api.pendingTraceMeta, null);
+  assert.equal(api.resumeSetAfterReconnect, false, '#clearRepsBtn must clear resumeSetAfterReconnect');
+  assert.equal(api.resumeSetDisconnectedAt, 0);
+
+  const rcTimerD = timers.find((t) => !t.cleared && t.ms === 1200);
+  assert.ok(rcTimerD);
+  rcTimerD.cleared = true;
+  let timerDoneD = false;
+  const pD = rcTimerD.fn().then(() => { timerDoneD = true; });
+  await drainShort(500, () => timerDoneD);
+  await pD;
+  const zTimerD = timers.find((t) => !t.cleared && t.ms === 3000);
+  if (zTimerD) { zTimerD.cleared = true; zTimerD.fn(); }
+  assert.equal(api.setActive, false, 'Reconnect after #clearRepsBtn must NOT auto-start empty set');
+});
+
+test('15. BLE pauseMs without 0x06 anchors to first 0x01 0x03 & partial burst excluded then filled by 80 Hz trace', () => {
+  const app = loadApp();
+  const { els, setNow, advanceMs } = app;
+  const aApi = app.api;
+  setNow(1700001000000);
+
+  const pkt2 = (a, b) => ({ target: { value: new DataView(new Uint8Array([a, b]).buffer) } });
+  const pkt5 = (type, floatVal) => {
+    const buf = new ArrayBuffer(5);
+    const dv = new DataView(buf);
+    dv.setUint8(0, type);
+    dv.setFloat32(1, floatVal, true);
+    return { target: { value: dv } };
+  };
+
+  els.get('workoutDate').value = '2026-11-24';
+  els.get('exerciseSelect').value = 'Maastaveto';
+  els.get('weightInput').value = '130';
+  els.get('targetRepsInput').value = '4';
+  aApi.workouts = [];
+  aApi.currentReps = [];
+  aApi.currentSetSaved = false;
+  aApi.activeSetMeta = aApi.snapshotCurrentSetMeta();
+  aApi.setActive = true;
+  aApi.setStartedAt = Date.now();
+  aApi.lastBottomAt = 0;
+  aApi.lastEccEndAt = 0;
+
+  // Toisto 1 (täysi burst)
+  advanceMs(500);
+  aApi.onNotification(pkt2(0x01, 0x01));
+  aApi.onNotification(pkt5(0x03, 520));
+  aApi.onNotification(pkt5(0x05, 420));
+  aApi.onNotification(pkt5(0x04, 1500));
+  aApi.onNotification(pkt5(0x02, 500)); // T0+500
+  assert.equal(aApi.currentReps.length, 1);
+
+  // Ei 0x06-pakettia! Lattiavaiheen 0x01 0x03 tulee kolme kertaa -> lukittuu ensimmäiseen (T0+1100)
+  advanceMs(600);
+  aApi.onNotification(pkt2(0x01, 0x03)); // T0+1100 (ensimmäinen 0x01 0x03)
+  advanceMs(500);
+  aApi.onNotification(pkt2(0x01, 0x03)); // T0+1600 (lattiavärähtely)
+  advanceMs(400);
+  aApi.onNotification(pkt2(0x01, 0x03)); // T0+2000 (lattiavärähtely)
+  advanceMs(200);
+  aApi.onNotification(pkt2(0x01, 0x01)); // T0+2200 -> tauko = 2200 - 1100 = 1100 ms
+  advanceMs(500);
+  aApi.onNotification(pkt5(0x03, 490));
+  aApi.onNotification(pkt5(0x05, 415));
+  aApi.onNotification(pkt5(0x04, 1400));
+  aApi.onNotification(pkt5(0x02, 470)); // T0+2700
+  assert.equal(aApi.currentReps.length, 2);
+  assert.equal(aApi.currentReps[1].pauseMs, 1100, 'pauseMs without 0x06 must anchor to first 0x01 0x03 and ignore floor jitter');
+
+  // Toisto 3: osittainen burst (vain 0x02, romCm = 0, keinotekoisen nopea mv=0.72)
+  advanceMs(1200);
+  aApi.onNotification(pkt2(0x01, 0x03));
+  advanceMs(800);
+  aApi.onNotification(pkt2(0x01, 0x01));
+  advanceMs(400);
+  aApi.onNotification(pkt5(0x02, 720));
+  assert.equal(aApi.currentReps.length, 3);
+  assert.equal(aApi.currentReps[2].partial, true);
+  assert.equal(aApi.currentReps[2].rangeOfMotionCm, 0);
+
+  const aPartial = aApi.analyzeSet(aApi.currentReps, 'Maastaveto', 130, { dateStr: '2026-11-24' });
+  assert.equal(aPartial.partialCount, 1);
+  assert.equal(aPartial.perRep[2].partial, true);
+  assert.equal(aPartial.perRep[2].suspect, true);
+  assert.ok(aPartial.perRep[2].flags.includes('partial'));
+  assert.equal(aPartial.vBest, 0.50, 'Partial rep must be excluded from vBest');
+  assert.equal(aPartial.vBestIdx, 0);
+  assert.ok(Math.abs(aPartial.vlFinal - 6.0) < 0.2, `VL must be computed from valid reps (0.50 -> 0.47 = 6%), got ${aPartial.vlFinal}`);
+  assert.equal(aPartial.completedCount, 3, 'Partial rep counts in completedCount');
+  const htmlPartial = aApi.buildSetAnalysisHTML({ exercise: 'Maastaveto', weightKg: 130, reps: aApi.currentReps }, { dateStr: '2026-11-24' });
+  assert.ok(htmlPartial.includes('vajaa data'), 'Set analysis HTML must label partial rep as vajaa data');
+
+  // 80 Hz trace täydentää osittaisen toiston rangeOfMotionCm:n ja poistaa partial-lipun
+  for (const dv of buildSyntheticTracePackets([785, 738, 1130], 60)) {
+    aApi.handleTraceNotification(dv);
+  }
+  assert.ok(aApi.currentReps[2].rangeOfMotionCm > 0, '80 Hz trace must fill rangeOfMotionCm on partial rep');
+  assert.equal(aApi.currentReps[2].partial, undefined, '80 Hz trace must clear partial flag once ROM is filled');
+  const aAfterTrace = aApi.analyzeSet(aApi.currentReps, 'Maastaveto', 130, { dateStr: '2026-11-24' });
+  assert.equal(aAfterTrace.partialCount, 0);
+});
+
+test('16. rezeroPin() [CMD_STOP, CMD_START] order, #rezeroStatusText disconnect clear & #bleDiagCopyBtn UI', async () => {
+  const { api, els, sandbox, timers } = loadApp();
+  const writtenBytes = [];
+  const fakeChar = {
+    async startNotifications() {},
+    addEventListener() {},
+    removeEventListener() {},
+    async writeValue(arr) { writtenBytes.push(arr[0]); }
+  };
+  api.bleDevice = { gatt: { connected: true, async disconnect() { this.connected = false; } } };
+  api.dataChar = fakeChar;
+  api.manualDisconnect = false;
+  api.setActive = false;
+  api.zeroing = false;
+  api.bleConnecting = false;
+
+  const drainPromise = async (p, maxMs = 500) => {
+    let done = false;
+    const tracked = Promise.resolve(p).then((v) => { done = true; return v; }, (e) => { done = true; throw e; });
+    for (let i = 0; i < 200 && !done; i++) {
+      for (const t of timers) {
+        if (!t.cleared && t.ms <= maxMs) { t.cleared = true; t.fn(); }
+      }
+      await Promise.resolve();
+    }
+    return tracked;
+  };
+
+  // Klikataan #rezeroBtn -> rezeroPin() lähettää [CMD_STOP, CMD_START] järjestyksessä
+  await drainPromise(els.get('rezeroBtn').dispatch('click'));
+  assert.deepEqual(writtenBytes, [api.CMD_STOP, api.CMD_START]);
+  assert.equal(api.zeroing, true);
+  assert.equal(els.get('rezeroStatusText').classList.contains('hidden'), false);
+  assert.ok(els.get('rezeroStatusText').textContent.includes('Nollataan anturia'));
+
+  // Katkos tyhjentää #rezeroStatusText-tilatekstin
+  api.onDisconnected();
+  assert.equal(els.get('rezeroStatusText').classList.contains('hidden'), true);
+  assert.equal(els.get('rezeroStatusText').textContent, '');
+
+  // Sama varmistus disconnectPin():ssä
+  api.dataChar = fakeChar;
+  api.bleDevice.gatt.connected = true;
+  api.bleConnecting = false;
+  api.zeroing = false;
+  await drainPromise(api.rezeroPin());
+  assert.equal(els.get('rezeroStatusText').classList.contains('hidden'), false);
+  await drainPromise(api.disconnectPin());
+  assert.equal(els.get('rezeroStatusText').classList.contains('hidden'), true);
+  assert.equal(els.get('rezeroStatusText').textContent, '');
+
+  // #bleDiagCopyBtn UI-testi: clipboard -> execCommand fallback -> epäonnistuminen
+  let copiedText = '';
+  sandbox.navigator.clipboard = {
+    async writeText(txt) { copiedText = txt; }
+  };
+  api.logBleDiag('info', 'diag-smoke-check');
+  api.renderVbtSettingsCard();
+  const settingsEl = els.get('anaSettingsCard');
+  const copyBtn = settingsEl.querySelector('#bleDiagCopyBtn');
+  const msgEl = settingsEl.querySelector('#bleDiagCopyMsg');
+  assert.ok(copyBtn, 'renderVbtSettingsCard must render #bleDiagCopyBtn');
+
+  await copyBtn.dispatch('click');
+  assert.ok(copiedText.includes('diag-smoke-check'));
+  assert.equal(msgEl.textContent, 'Kopioitu!');
+
+  sandbox.navigator.clipboard = undefined;
+  sandbox.document.execCommand = () => true;
+  await copyBtn.dispatch('click');
+  assert.equal(msgEl.textContent, 'Kopioitu!');
+
+  sandbox.document.execCommand = () => false;
+  await copyBtn.dispatch('click');
+  assert.equal(msgEl.textContent, 'Kopiointi epäonnistui');
+});
+
+test('17. flagSuspectReps drift guard, drift-only set isolation, 2-of-3 drift, TnG >1.6x merged & UI toggles', async () => {
+  const { api, els } = loadApp();
+  const { dl1029, dl1124 } = buildDeadliftFixtures();
+  api.vbtSettings.goal = 'baseStrength';
+  api.workouts = [dl1029, dl1124];
+
+  // 1. Nopea drift-toisto #2 ei liputa kelvollista 1. toistoa suspect:ksi
+  const aFastDrift = api.analyzeSet([makeRep(0.36, 42), makeRep(0.74, 85)], 'Maastaveto', 140, { dateStr: '2026-11-24' });
+  assert.equal(aFastDrift.perRep[0].suspect, false, 'Valid 1st rep must NOT be flagged suspect by fast 2nd drift rep');
+  assert.equal(aFastDrift.perRep[1].drift, true);
+  assert.equal(aFastDrift.vBest, 0.36);
+  assert.equal(aFastDrift.valid.length, 1);
+
+  // 2. Pelkkä drift-sarja ei saastuta sessionProfile / e1rmTrend / readinessForDate -laskentaa
+  api.workouts = [
+    {
+      date: '2026-11-10',
+      sets: [
+        { exercise: 'Maastaveto', weightKg: 115, targetReps: 3, reps: [makeRep(0.55, 42), makeRep(0.51, 42)] },
+        { exercise: 'Maastaveto', weightKg: 130, targetReps: 3, reps: [makeRep(0.45, 42), makeRep(0.41, 42)] }
+      ]
+    },
+    {
+      date: '2026-11-24',
+      sets: [
+        { exercise: 'Maastaveto', weightKg: 100, targetReps: 3, reps: [makeRep(0.65, 42), makeRep(0.62, 42)] },
+        { exercise: 'Maastaveto', weightKg: 115, targetReps: 1, reps: [makeRep(0.85, 114)] }, // pelkkä drift
+        { exercise: 'Maastaveto', weightKg: 130, targetReps: 3, reps: [makeRep(0.45, 42), makeRep(0.42, 42)] },
+        { exercise: 'Maastaveto', weightKg: 150, targetReps: 1, reps: [makeRep(0.30, 40)] }
+      ]
+    }
+  ];
+  const sp = api.sessionProfile('Maastaveto', '2026-11-24');
+  assert.equal(sp.points.some((p) => p.load === 115), false, 'sessionProfile must exclude drift-only set');
+  const rd = api.readinessForDate('Maastaveto', '2026-11-24');
+  assert.ok(rd && rd.weight === 130, `readinessForDate must skip drift-only 115 kg and match 130 kg, got ${rd && rd.weight}`);
+
+  api.workouts = [
+    { date: '2026-11-10', sets: [{ exercise: 'Maastaveto', weightKg: 130, targetReps: 3, reps: [makeRep(0.45, 42)] }] },
+    { date: '2026-11-24', sets: [{ exercise: 'Maastaveto', weightKg: 115, targetReps: 1, reps: [makeRep(0.85, 114)] }] }
+  ];
+  const trend = api.e1rmTrend('Maastaveto');
+  assert.equal(trend.some((t) => t.date === '2026-11-24'), false, 'e1rmTrend must exclude date with only drift reps');
+
+  // 3. Kaksi drift-toistoa 3 toiston sarjassa tunnistetaan historyMedianRom:n avulla
+  api.workouts = [dl1029, dl1124];
+  const aTwoDrift = api.analyzeSet(
+    [makeRep(0.48, 42), makeRep(0.68, 85), makeRep(0.70, 88)],
+    'Maastaveto', 120, { dateStr: '2026-11-24' }
+  );
+  assert.equal(aTwoDrift.driftCount, 2, 'Two drift reps in 3-rep set must both be detected via historyMedianRom');
+  assert.equal(aTwoDrift.valid.length, 1);
+  assert.equal(aTwoDrift.vBest, 0.48);
+
+  // 4. Eksplisiittinen touchAndGo: true luokittelee >1.6x ROM:n merged:ksi (ei driftiksi)
+  const aTngMerged = api.analyzeSet(
+    [makeRep(0.50, 42), makeRep(0.45, 80)],
+    'Maastaveto', 120, { dateStr: '2026-11-24', touchAndGo: true }
+  );
+  assert.equal(aTngMerged.mergedCount, 1);
+  assert.equal(aTngMerged.driftCount, 0);
+  assert.equal(aTngMerged.perRep[1].merged, true);
+
+  // 5. UI-käsittelijät #tngToggle ja [data-toggle-tng]
+  els.get('workoutDate').value = '2026-11-24';
+  els.get('exerciseSelect').value = 'Maastaveto';
+  els.get('weightInput').value = '120';
+  els.get('targetRepsInput').value = '3';
+  api.currentReps = [];
+  api.currentSetSaved = false;
+  api.activeSetMeta = api.snapshotCurrentSetMeta();
+  const tngChk = els.get('tngToggle');
+  tngChk.checked = true;
+  await tngChk.dispatch('change');
+  assert.equal(api.activeSetMeta.touchAndGo, true, '#tngToggle change must update activeSetMeta.touchAndGo');
+  tngChk.checked = false;
+  await tngChk.dispatch('change');
+  assert.equal(api.activeSetMeta.touchAndGo, false);
+
+  api.openSetAnalysisSheet('2026-11-24', 2);
+  const sheetBody = els.get('setAnalysisSheetBody');
+  const sheetTng = sheetBody.querySelector('[data-toggle-tng]');
+  assert.ok(sheetTng, 'openSetAnalysisSheet must render [data-toggle-tng] for deadlift');
+  sheetTng.checked = true;
+  await sheetTng.dispatch('change');
+  assert.equal(api.workouts[1].sets[2].touchAndGo, true, '[data-toggle-tng] change must persist touchAndGo on set');
+});
+
+test('18. computeDailyPlan safeStopRep with drift rep & readinessForDate 65-83% tier + TnG vs dead-stop', () => {
+  const { api } = loadApp();
+  const { dl1029 } = buildDeadliftFixtures();
+  api.vbtSettings.goal = 'baseStrength';
+
+  // safeStopRep drift-toiston kanssa: 3 valid + 1 drift ennen VL-ylitystä? Ei vaan [valid, valid, drift, valid-over]
+  // stopAfterRep = 3 (raw idx), valid.length = 3 -> vanha koodi (3 < 3 epätosi) antoi 1, uusi stopAfterCompleted = 3!
+  api.workouts = [
+    dl1029,
+    {
+      date: '2026-11-24',
+      sets: [
+        { exercise: 'Maastaveto', weightKg: 110, targetReps: 3, reps: [makeRep(0.60, 42), makeRep(0.58, 42), makeRep(0.56, 42)] },
+        {
+          exercise: 'Maastaveto', weightKg: 130, targetReps: 4,
+          reps: [
+            makeRep(0.49, 42),
+            makeRep(0.45, 42),
+            makeRep(0.52, 85), // drift rep #3
+            makeRep(0.35, 42)  // valid rep #4, VL = 28.6% > 20% cutoff (stopAfterRep=3, stopAfterCompleted=3)
+          ]
+        }
+      ]
+    }
+  ];
+  const plan = api.computeDailyPlan('Maastaveto', '2026-11-24');
+  assert.ok(plan.adjust && plan.adjust.repDropOption, 'computeDailyPlan must suggest repDropOption when VL exceeded');
+  assert.equal(plan.adjust.repDropOption.reps, 3, 'safeStopRep must use stopAfterCompleted (3) instead of falling back to 1');
+
+  // readinessForDate suosii 65–83 % (120–130 kg) yli raskaan 150 kg huipun
+  api.workouts = [
+    {
+      date: '2026-11-10',
+      sets: [
+        { exercise: 'Maastaveto', weightKg: 125, targetReps: 3, reps: [makeRep(0.50, 42), makeRep(0.47, 42)] },
+        { exercise: 'Maastaveto', weightKg: 150, targetReps: 1, reps: [makeRep(0.28, 36)] }
+      ]
+    },
+    {
+      date: '2026-11-24',
+      sets: [
+        { exercise: 'Maastaveto', weightKg: 125, targetReps: 3, reps: [makeRep(0.52, 42), makeRep(0.49, 42)] },
+        { exercise: 'Maastaveto', weightKg: 150, targetReps: 1, reps: [makeRep(0.26, 36)] }
+      ]
+    }
+  ];
+  const rdTier = api.readinessForDate('Maastaveto', '2026-11-24');
+  assert.ok(rdTier, 'readinessForDate must find match');
+  assert.equal(rdTier.weight, 125, 'readinessForDate must prefer 65-83% tier (125 kg) over fatigued 150 kg peak');
+
+  // TnG vs dead-stop erottelu: pelkkä TnG-historia ei vertaudu dead-stop-sarjaan
+  api.workouts = [
+    {
+      date: '2026-11-10',
+      sets: [
+        { exercise: 'Maastaveto', weightKg: 125, targetReps: 3, touchAndGo: true, reps: [makeRep(0.50, 42), makeRep(0.49, 42)] }
+      ]
+    },
+    {
+      date: '2026-11-24',
+      sets: [
+        { exercise: 'Maastaveto', weightKg: 125, targetReps: 3, touchAndGo: false, reps: [makeRep(0.52, 42), makeRep(0.49, 42)] }
+      ]
+    }
+  ];
+  assert.equal(api.readinessForDate('Maastaveto', '2026-11-24'), null, 'TnG baseline must not match dead-stop today set');
+  api.workouts[1].sets[0].touchAndGo = true;
+  const rdTngMatch = api.readinessForDate('Maastaveto', '2026-11-24');
+  assert.ok(rdTngMatch && rdTngMatch.weight === 125, 'TnG baseline must match TnG today set');
+});
+
+test('19. traceExtra override clear, workoutsSignature trace+override, DEFAULT_REF_MAX null, squat/bench redVl & 15 raw traces', () => {
+  // 1. DEFAULT_REF_MAX ei ylikirjoita eksplisiittistä null-arvoa
+  const appNull = loadApp({
+    initialStorage: {
+      gpath_vbt_settings_v1: JSON.stringify({ refMax: { deadlift: null, squat: null } })
+    }
+  });
+  assert.equal(appNull.api.vbtSettings.refMax.deadlift, null, 'Explicit null refMax.deadlift must be preserved');
+  assert.equal(appNull.api.vbtSettings.refMax.squat, null, 'Explicit null refMax.squat must be preserved');
+  assert.deepEqual({ ...appNull.api.vbtSettings.refMax.bench }, { weight: 105, reps: 5 }, 'Missing bench refMax gets default');
+
+  const { api, setNow } = loadApp();
+  setNow(1700002000000);
+
+  // 2. traceExtra-varoitus poistuu setRepCountOverride-korjauksella + workoutsSignature muuttuu tracesta & overridesta
+  const s = {
+    exercise: 'Maastaveto',
+    weightKg: 130,
+    targetReps: 3,
+    reps: [makeRep(0.49, 44, { t: Date.now() - 4000 }), makeRep(0.45, 43, { t: Date.now() - 1000 })]
+  };
+  api.workouts = [{ date: '2026-11-24', sets: [s] }];
+  api.lastSavedSetRef = s;
+  api.currentReps = s.reps.map((r) => ({ ...r }));
+  api.currentSetSaved = true;
+
+  const sigBeforeTrace = api.workoutsSignature();
+  for (const dv of buildSyntheticTracePackets([700, 650, 600], 60)) {
+    api.handleTraceNotification(dv);
+  }
+  const sigAfterTrace = api.workoutsSignature();
+  assert.notEqual(sigAfterTrace, sigBeforeTrace, 'workoutsSignature must change when trace attaches');
+  assert.equal(api.lastTraceFailed, true);
+
+  const aBeforeOvr = api.analyzeSet(s.reps, s.exercise, s.weightKg, { dateStr: '2026-11-24' });
+  assert.ok(api.buildVerdict(aBeforeOvr, s.exercise, { traceMeta: s.traceMeta, count: api.setRepCount(s) }).includes('puuttuvaa'));
+  assert.ok(api.buildShortRestFinding(aBeforeOvr, s.exercise, { traceMeta: s.traceMeta, count: api.setRepCount(s) }).text.includes('puuttuvaa'));
+  assert.ok(api.buildSetAnalysisHTML(s, { showTraceStatus: true, allowRepDelete: true, dateStr: '2026-11-24' }).includes('puuttuvaa'));
+
+  assert.equal(api.setRepCountOverride('2026-11-24', 0, 3), true);
+  const sigAfterOvr = api.workoutsSignature();
+  assert.notEqual(sigAfterOvr, sigAfterTrace, 'workoutsSignature must change on repCountOverride');
+  assert.equal(api.lastTraceFailed, false, 'setRepCountOverride >= segments must clear lastTraceFailed');
+  assert.equal(api.buildVerdict(aBeforeOvr, s.exercise, { traceMeta: s.traceMeta, count: api.setRepCount(s) }).includes('puuttuvaa'), false);
+  const findingAfter = api.buildShortRestFinding(aBeforeOvr, s.exercise, { traceMeta: s.traceMeta, count: api.setRepCount(s) });
+  assert.ok(!findingAfter || !findingAfter.text.includes('puuttuvaa'), 'buildShortRestFinding must clear traceExtra warning after repCountOverride');
+  assert.equal(api.buildSetAnalysisHTML(s, { showTraceStatus: true, allowRepDelete: true, dateStr: '2026-11-24' }).includes('puuttuvaa'), false);
+
+  // 3. Kyykky ja penkki redVl-ankkuroitu VL->RIR
+  api.workouts = [];
+  api.vbtSettings.goal = 'peaking';
+  // Kyykky: redVl = 25, redVl*0.85 = 21.25%. VL = 18% (<21.25%, vaikka > peaking cutoff*1.1=11%) ei leikkaa RIR:ää <= 2
+  const sqLowVl = api.analyzeSet([makeRep(0.65, 65), makeRep(0.59, 65), makeRep(0.533, 65)], 'Jalkakyykky', 120, { dateStr: '2026-11-24' });
+  assert.ok(sqLowVl.rirEnd > 2, `Squat 18% VL (< 21.25% redVl*0.85) must not clamp RIR to <=2, got ${sqLowVl.rirEnd}`);
+  // Kyykky VL = 22% (>= 21.25% ja < 25%) -> RIR = 2
+  const sqMidVl = api.analyzeSet([makeRep(0.66, 65), makeRep(0.59, 65), makeRep(0.515, 65)], 'Jalkakyykky', 120, { dateStr: '2026-11-24' });
+  assert.equal(sqMidVl.rirEnd, 2, `Squat 22% VL must clamp RIR to 2, got ${sqMidVl.rirEnd}`);
+  // Kyykky VL = 26% (>= 25%) -> RIR <= 1
+  const sqRedVl = api.analyzeSet([makeRep(0.66, 65), makeRep(0.57, 65), makeRep(0.488, 65)], 'Jalkakyykky', 120, { dateStr: '2026-11-24' });
+  assert.ok(sqRedVl.rirEnd <= 1, `Squat 26% VL (>= redVl 25%) must clamp RIR to <=1, got ${sqRedVl.rirEnd}`);
+
+  // Penkki: redVl = 28, redVl*0.85 = 23.8%. VL = 20% (<23.8%, vaikka > maxStrength cutoff*1.1=19.8%) ei leikkaa RIR:ää <= 2
+  api.vbtSettings.goal = 'maxStrength';
+  const bpLowVl = api.analyzeSet([makeRep(0.55, 29), makeRep(0.495, 29), makeRep(0.44, 29)], 'Penkkipunnerrus', 85, { dateStr: '2026-11-24' });
+  assert.ok(bpLowVl.rirEnd > 2, `Bench 20% VL (< 23.8% redVl*0.85) must not clamp RIR to <=2, got ${bpLowVl.rirEnd}`);
+  // Penkki VL = 25% (>= 23.8% ja < 28%) -> RIR = 2
+  const bpMidVl = api.analyzeSet([makeRep(0.55, 29), makeRep(0.48, 29), makeRep(0.412, 29)], 'Penkkipunnerrus', 85, { dateStr: '2026-11-24' });
+  assert.equal(bpMidVl.rirEnd, 2, `Bench 25% VL must clamp RIR to 2, got ${bpMidVl.rirEnd}`);
+  // Penkki VL = 30% (>= 28%) -> RIR <= 1
+  const bpRedVl = api.analyzeSet([makeRep(0.55, 29), makeRep(0.47, 29), makeRep(0.385, 29)], 'Penkkipunnerrus', 85, { dateStr: '2026-11-24' });
+  assert.ok(bpRedVl.rirEnd <= 1, `Bench 30% VL (>= redVl 28%) must clamp RIR to <=1, got ${bpRedVl.rirEnd}`);
+
+  // 4. recentRawTraces säilyttää >5 (15) sarjaa
+  api.recentRawTraces.length = 0;
+  const tracePkts = buildSyntheticTracePackets([700, 650], 60);
+  for (let i = 0; i < 15; i++) {
+    for (const dv of tracePkts) api.handleTraceNotification(dv);
+  }
+  assert.equal(api.recentRawTraces.length, 15, 'recentRawTraces must retain 15 sets (not cap at 5)');
+  for (const dv of tracePkts) api.handleTraceNotification(dv);
+  assert.equal(api.recentRawTraces.length, 15, 'recentRawTraces must cap at 15 sets');
 });
 
 let failed = 0;
