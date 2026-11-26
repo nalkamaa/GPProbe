@@ -1252,6 +1252,10 @@
     <span id="undoToastText">Poistettu</span>
     <button type="button" id="undoToastBtn">Kumoa</button>
   </div>
+  <!-- PIN NOTICE TOAST -->
+  <div id="pinNoticeToast" class="undo-toast hidden" role="status" aria-live="polite" style="border-color: var(--amber);">
+    <span id="pinNoticeToastText"></span>
+  </div>
 
   <!-- EXERCISE MODAL -->
   <div id="exerciseModal" class="modal-backdrop hidden">
@@ -1327,7 +1331,7 @@
     let undoTimerId = null;
     let activeSheetSetRef = null;
 
-    let pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: 0 };
+    let pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: 0, lastPacketAt: 0 };
     let currentReps = [];
     let currentSetSaved = false;
     let lastSavedSetRef = null;
@@ -1340,12 +1344,29 @@
     let resumeSetAfterReconnect = false;
     let resumeSetDisconnectedAt = 0;
     let rezeroNoticeTimer = null;
-    const BLE_DIAG_MAX = 50;
+    let disconnectedByUser = false;
+    let pinNoticeTimerId = null;
+    const BLE_DIAG_MAX = 120;
     const bleDiagLog = [];
     function logBleDiag(kind, msg) {
       bleDiagLog.push({ ts: new Date().toTimeString().slice(0, 8), kind: String(kind || 'info'), msg: String(msg || '') });
       if (bleDiagLog.length > BLE_DIAG_MAX) bleDiagLog.shift();
       if (typeof refreshBleDiagUI === 'function') refreshBleDiagUI();
+    }
+    function showPinNotice(msg, ms = 4500) {
+      const toast = document.getElementById('pinNoticeToast');
+      const txt = document.getElementById('pinNoticeToastText');
+      if (pinNoticeTimerId) { clearTimeout(pinNoticeTimerId); pinNoticeTimerId = null; }
+      if (!toast || !txt) return;
+      if (!msg) { toast.classList.add('hidden'); txt.textContent = ''; return; }
+      txt.textContent = msg;
+      toast.classList.remove('hidden');
+      if (ms > 0) {
+        pinNoticeTimerId = setTimeout(() => {
+          toast.classList.add('hidden');
+          pinNoticeTimerId = null;
+        }, ms);
+      }
     }
     function showRezeroStatus(msg, autoHideMs = 3500) {
       const el = document.getElementById('rezeroStatusText');
@@ -1750,7 +1771,7 @@
     function updateHeaderStatus() {
       if (bleConnecting) return;
       if (!dataChar) {
-        setStatus('Ei yhdistetty', '');
+        setStatus(disconnectedByUser ? 'Yhteys Gpath Pin -anturiin on katkaistu' : 'Ei yhdistetty', '');
         return;
       }
       if (zeroing) {
@@ -1813,6 +1834,7 @@
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     let writeChain = Promise.resolve();
     let pinStarted = false;
+    let barMovedSinceZero = false;
     let zeroTimer = null;
     let bleKeepAliveTimer = null;
     let lastBleActivityAt = 0;
@@ -1976,8 +1998,9 @@
       clearZeroTimer();
       if (!zeroing) return;
       pinStarted = true;
+      barMovedSinceZero = false;
       zeroing = false;
-      pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: 0 };
+      pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: 0, lastPacketAt: 0 };
 
       if (autoStartAfterZero) {
         autoStartAfterZero = false;
@@ -2002,6 +2025,7 @@
     }
 
     async function disconnectPin() {
+      const wasConnected = Boolean(dataChar || (bleDevice && bleDevice.gatt && bleDevice.gatt.connected));
       manualDisconnect = true;
       bleConnecting = false;
       if (reconnectTimer) {
@@ -2020,6 +2044,8 @@
       setActive = false;
       zeroing = false;
       pinStarted = false;
+      barMovedSinceZero = false;
+      disconnectedByUser = wasConnected;
       try {
         if (dataChar) {
           await writeByte(CMD_STOP);
@@ -2037,6 +2063,9 @@
       updateHeaderStatus();
       renderLiveSet();
       updateSetButton();
+      if (wasConnected) {
+        showPinNotice('Yhteys Gpath Pin -anturiin on katkaistu', 4500);
+      }
     }
 
     async function releaseStaleConnections() {
@@ -2071,6 +2100,8 @@
 
       workoutDoneState = false;
       manualDisconnect = false;
+      disconnectedByUser = false;
+      showPinNotice('');
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
@@ -2134,7 +2165,7 @@
             : '⏹ LOPETA SARJA';
         } else {
           mainBtn.disabled = false;
-          mainBtn.className = 'primary main-action-btn';
+          mainBtn.className = 'success main-action-btn';
           mainBtn.textContent = `▶ ALOITA SARJA #${nextSetNum}`;
         }
       }
@@ -2185,6 +2216,7 @@
       }
       gattConnectPromise = (async () => {
         bleConnecting = true;
+        disconnectedByUser = false;
         setStatus('Yhdistetään…', 'busy');
         try {
           const server = await bleDevice.gatt.connect();
@@ -2207,6 +2239,7 @@
 
           bleConnecting = false;
           pinStarted = false;
+          barMovedSinceZero = false;
           setActive = false;
           workoutDoneState = false;
           const shouldResume = resumeSetAfterReconnect && !currentSetSaved && (Date.now() - resumeSetDisconnectedAt) < 90000;
@@ -2233,6 +2266,7 @@
     async function rezeroPin() {
       if (!dataChar || setActive || zeroing || bleConnecting) return;
       pinStarted = false;
+      barMovedSinceZero = false;
       logBleDiag('rezero', 'Anturin manuaalinen nollaus käynnistetty (0x04 -> 0x03)');
       showRezeroStatus('Nollataan anturia (pidä paikallaan ~3 s)…', 0);
       const token = ++activeSetToken;
@@ -2312,16 +2346,17 @@
       workoutDoneState = false;
 
       // If previous set had reps, ensure it is saved before starting the new set, then clear currentReps!
+      if (currentReps.length > 0 && !currentSetSaved) {
+        commitCurrentSetToWorkouts(activeSetMeta);
+      }
+      if (traceBuf && traceBuf.pkts.size > 0) finalizeTrace();
       if (currentReps.length > 0) {
-        if (!currentSetSaved) {
-          commitCurrentSetToWorkouts(activeSetMeta);
-        }
         currentReps = [];
         currentSetSaved = false;
         lastSavedSetRef = null;
       }
 
-      pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: 0 };
+      pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: 0, lastPacketAt: 0 };
       lastBottomAt = 0;
       lastEccEndAt = 0;
       pendingTraceMeta = null;
@@ -2354,6 +2389,17 @@
         await writeByte(CMD_BATTERY);
         await sleep(50);
         await writeByte(CMD_START);
+      } else if (barMovedSinceZero) {
+        logBleDiag('auto-rezero', 'Sarjan aloitus: tanko liikkunut -> automaattinen nollaus (0x04 -> 0x03)');
+        pinStarted = false;
+        barMovedSinceZero = false;
+        const token = ++activeSetToken;
+        setActive = false;
+        beginZeroCountdown(token, true);
+        await writeByte(CMD_STOP);
+        await sleep(60);
+        if (token !== activeSetToken || !dataChar) return;
+        await writeByte(CMD_START);
       } else {
         // Pin is already calibrated and running in 0x03 mode -> start set IMMEDIATELY with zero delay!
         clearZeroTimer();
@@ -2369,6 +2415,7 @@
     }
 
     async function stopSetOnPin(autoSave = true) {
+      if (setActive) commitPendingRepFallback('stopSet', { deferPostRep: true });
       activeSetToken++;
       clearZeroTimer();
       stopAudioKeepWarm();
@@ -2378,7 +2425,8 @@
       setActive = false;
       zeroing = false;
       lastSetStoppedAt = Date.now();
-      pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: 0 };
+      pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: 0, lastPacketAt: 0 };
+      if (currentReps.length > 0) barMovedSinceZero = true;
 
       // Automatically save completed set when user ends the set so next set starts fresh
       if (autoSave && currentReps.length > 0 && !currentSetSaved) {
@@ -2429,6 +2477,7 @@
       autoStartAfterZero = false;
       dataChar = null;
       pinStarted = false;
+      barMovedSinceZero = false;
       setActive = false;
       zeroing = false;
       renderLiveSet();
@@ -2474,6 +2523,151 @@
     let lastEccEndAt = 0;
     const MIN_VALID_ROM_CM  = 12.0;
 
+    function handlePostLiveRep(meanVel) {
+      if (!isFreeMode() && vbtOnNewRep()) return; // set auto-stopped at the velocity-loss cutoff
+
+      const targetReps = parseInt(document.getElementById('targetRepsInput').value, 10) || 5;
+      const extraOk = (!isFreeMode() && currentReps.length >= targetReps) ? liveExtraRepHint(targetReps) : null;
+      if (extraOk) {
+        // "+1 toisto ok": älä lopeta sarjaa automaattisesti, keskeytä taustamusiikki puhekehotteen ajaksi ja jatka sitten
+        playExtraRepVoiceCue();
+        renderLiveSet();
+        updateSetButton();
+      } else if (!isFreeMode() && currentReps.length >= targetReps) {
+        // Target reps reached: play fanfare and automatically complete & save this set!
+        setTimeout(() => speakRepVelocity(meanVel), 220);
+        soundTargetReached();
+        stopSetOnPin(true);
+      } else {
+        setTimeout(() => speakRepVelocity(meanVel), 220);
+        soundRep();
+        renderLiveSet();
+        updateSetButton();
+      }
+    }
+
+    function recordLiveRep({ meanVel, rawPropVel, rawPropAcc, rawRomCm, liftStartAt, repTimestamp, fallback02 = false, fallbackTrigger = '', deferPostRep = false }) {
+      const hasFullBurst = rawPropVel !== null && rawRomCm !== null && rawPropAcc !== null;
+      const propVel = rawPropVel ?? meanVel;
+      const propAcc = rawPropAcc ?? 0;
+      const romCm   = rawRomCm ?? 0;
+
+      // 1. Enforce strict full-burst only on Rep 1 during the initial 1500 ms after set start
+      const isInitialWindow = currentReps.length === 0 && (Date.now() - setStartedAt) < 1500;
+      if (!hasFullBurst && isInitialWindow) {
+        console.debug('Ignored incomplete rep burst on 0x02:', { meanVel, propVel, propAcc, romCm });
+        logBleDiag('ghost-filtered', `Puuttuva pakettiryhmä sarjan alussa (mv=${Number.isFinite(meanVel) ? meanVel.toFixed(2) : '?'} m/s)`);
+        return null;
+      }
+
+      // 2. Reject non-lift ghost movements (cable slack pull, pin adjustment, <0.12 m/s or <12 cm ROM when present)
+      if (
+        !Number.isFinite(meanVel) ||
+        meanVel < MIN_VALID_VEL_M_S ||
+        (rawRomCm !== null && rawRomCm < MIN_VALID_ROM_CM) ||
+        (rawPropAcc !== null && rawPropAcc < 0)
+      ) {
+        console.debug('Filtered ghost movement:', { meanVel, romCm: rawRomCm, propAcc: rawPropAcc });
+        logBleDiag('ghost-filtered', `Haamuliike suodatettu (mv=${Number.isFinite(meanVel) ? meanVel.toFixed(2) : '?'} m/s, rom=${rawRomCm !== null ? rawRomCm.toFixed(1) : 'null'} cm)`);
+        return null;
+      }
+
+      // 3. Reject end-of-set bar-racking ghost movement (e.g., after >=2 consistent reps, a sudden <0.21 m/s
+      //    movement that is <40% of the previous rep's velocity when setting the bar into the rack)
+      if (currentReps.length >= 2) {
+        const prevRep = currentReps[currentReps.length - 1];
+        if (meanVel < 0.21 && prevRep.meanVelocity > 0.45 && meanVel < prevRep.meanVelocity * 0.40) {
+          console.debug('Filtered bar-racking movement at end of set:', { meanVel, prevVel: prevRep.meanVelocity });
+          logBleDiag('ghost-filtered', `Telineeseen lasku suodatettu (mv=${meanVel.toFixed(2)} vs ${prevRep.meanVelocity.toFixed(2)} m/s)`);
+          return null;
+        }
+      }
+
+      if (fallback02) {
+        logBleDiag('fallback-02-missing', `0x02 puuttui (${fallbackTrigger || '?'}) -> toisto #${currentReps.length + 1} kirjattu 0x03-datasta (pv=${meanVel.toFixed(2)} m/s, rom=${rawRomCm !== null ? rawRomCm.toFixed(1) : 'null'})`);
+      } else if (!hasFullBurst) {
+        logBleDiag('partial-accepted', `Osittainen toisto hyväksytty #${currentReps.length + 1} (mv=${meanVel.toFixed(2)} m/s, rom=${rawRomCm !== null ? rawRomCm.toFixed(1) : 'null'})`);
+      }
+
+      // 4. Auto-replace bogus 1st "unrack / positioning" movement if rep #1 was slow (<0.22 m/s, no lowering)
+      //    and the immediate next lift is >2.2x faster (the real 1st rep of the set)
+      if (
+        currentReps.length === 1 &&
+        currentReps[0].meanVelocity < 0.22 &&
+        currentReps[0].loweringVelocity === null &&
+        meanVel > currentReps[0].meanVelocity * 2.2
+      ) {
+        console.debug('Replaced initial unrack movement with real 1st rep:', {
+          unrackVel: currentReps[0].meanVelocity,
+          realFirstVel: meanVel
+        });
+        logBleDiag('ghost-filtered', `Alun telineestä otto korvattu (mv=${currentReps[0].meanVelocity.toFixed(2)} -> ${meanVel.toFixed(2)} m/s)`);
+        currentReps.pop();
+      }
+
+      const weightKg = parseFloat(document.getElementById('weightInput').value) || 0;
+      if (!activeSetMeta) {
+        activeSetMeta = snapshotCurrentSetMeta();
+      } else if (currentReps.length === 0) {
+        activeSetMeta = snapshotCurrentSetMeta();
+      }
+      // Verified power formula: P = m * (g + 0.58 * a_prop) * v
+      const power = weightKg * (9.80665 + 0.58 * propAcc) * meanVel;
+
+      // Pause at the bottom before this rep. Anchor bottom to lastEccEndAt when available after prevT
+      // so rest-state 0x01 0x03 oscillations never reset the pause clock.
+      let pauseMs = null;
+      if (currentReps.length > 0 && liftStartAt > 0) {
+        const prevT = currentReps[currentReps.length - 1].t || 0;
+        const bottom = lastEccEndAt > prevT ? lastEccEndAt : (lastBottomAt > prevT ? lastBottomAt : 0);
+        if (bottom > prevT && liftStartAt >= bottom) pauseMs = liftStartAt - bottom;
+        else if (bottom <= prevT && liftStartAt > prevT) pauseMs = 0; // no rest phase seen between reps
+      }
+      if (currentReps.length === 0) { vbtCutoffAlerted = false; vbtFailureAlerted = false; }
+
+      const repObj = {
+        meanVelocity: meanVel,
+        propulsiveVelocity: propVel,
+        propulsiveAcceleration: propAcc,
+        rangeOfMotionCm: romCm,
+        loweringVelocity: null,
+        power: power,
+        t: repTimestamp || Date.now(),
+        pauseMs: pauseMs
+      };
+      if (fallback02) repObj.fallback02 = true;
+      if (!hasFullBurst && (!fallback02 || !(rawRomCm > 0))) repObj.partial = true;
+      currentReps.push(repObj);
+      lastRepAt = Date.now();
+      if (!deferPostRep) handlePostLiveRep(meanVel);
+      return repObj;
+    }
+
+    function commitPendingRepFallback(trigger, opts = {}) {
+      if (pendingRep.propVel === null && pendingRep.romCm === null && pendingRep.propAcc === null) return null;
+      const rawPropVel = pendingRep.propVel;
+      const rawPropAcc = pendingRep.propAcc;
+      const rawRomCm = pendingRep.romCm;
+      const liftStartAt = pendingRep.phaseStartedAt || 0;
+      const lastPacketAt = pendingRep.lastPacketAt || 0;
+      pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: 0, lastPacketAt: 0 };
+      if (rawPropVel === null) {
+        logBleDiag('fallback-02-missing', `0x02 ja 0x03 puuttuivat (${trigger}, rom=${rawRomCm !== null ? rawRomCm.toFixed(1) : 'null'}) – odotetaan 80 Hz palautusta`);
+        return null;
+      }
+      return recordLiveRep({
+        meanVel: rawPropVel,
+        rawPropVel,
+        rawPropAcc,
+        rawRomCm,
+        liftStartAt,
+        repTimestamp: lastPacketAt || Date.now(),
+        fallback02: true,
+        fallbackTrigger: trigger,
+        deferPostRep: !!opts.deferPostRep
+      });
+    }
+
     function onNotification(event) {
       const dv = event.target.value;
       if (!dv || dv.byteLength === 0) return;
@@ -2497,8 +2691,10 @@
       if (dv.byteLength === 2 && type === 0x01) {
         const phase = dv.getUint8(1);
         if (phase === 0x01) {
+          if (!zeroing) barMovedSinceZero = true;
+          if (setActive) commitPendingRepFallback('0x01-0x01');
           // Fresh upward movement started: clear any leftover partial packets from prior movements
-          pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: Date.now() };
+          pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: setActive ? Date.now() : 0, lastPacketAt: 0 };
         } else if (phase === 0x03) {
           const prevT = currentReps.length > 0 ? (currentReps[currentReps.length - 1].t || 0) : 0;
           if (lastBottomAt <= prevT) {
@@ -2516,8 +2712,13 @@
         return;
       }
 
+      if (type >= 0x02 && type <= 0x06 && !zeroing) barMovedSinceZero = true;
+
       // Allow final rep's eccentric lowering packet (0x06) within 4s of stopping the set (auto or manual)
       if (!setActive) {
+        if (type === 0x02) {
+          logBleDiag('dropped-inactive', `0x02 ohitettu (!setActive, mv=${(val / 1000).toFixed(2)} m/s, zeroing=${zeroing ? 1 : 0})`);
+        }
         if (type === 0x06 && currentReps.length > 0 && (Date.now() - lastSetStoppedAt) < 4000) {
           const eccVel = val / 1000.0;
           const last = currentReps[currentReps.length - 1];
@@ -2536,128 +2737,24 @@
 
       if (type === 0x03) {
         pendingRep.propVel = val / 1000.0;
+        pendingRep.lastPacketAt = Date.now();
       } else if (type === 0x05) {
         pendingRep.romCm = val / 10.0;
+        pendingRep.lastPacketAt = Date.now();
       } else if (type === 0x04) {
         pendingRep.propAcc = val / 1000.0;
+        pendingRep.lastPacketAt = Date.now();
       } else if (type === 0x02) {
         const meanVel = val / 1000.0;
         const rawPropVel = pendingRep.propVel;
         const rawPropAcc = pendingRep.propAcc;
         const rawRomCm = pendingRep.romCm;
-        const hasFullBurst = rawPropVel !== null && rawRomCm !== null && rawPropAcc !== null;
-        const propVel = rawPropVel ?? meanVel;
-        const propAcc = rawPropAcc ?? 0;
-        const romCm   = rawRomCm ?? 0;
         const liftStartAt = pendingRep.phaseStartedAt || 0;
-        pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: 0 };
-
-        // 1. Enforce strict full-burst only on Rep 1 during the initial 1500 ms after set start
-        const isInitialWindow = currentReps.length === 0 && (Date.now() - setStartedAt) < 1500;
-        if (!hasFullBurst && isInitialWindow) {
-          console.debug('Ignored incomplete rep burst on 0x02:', { meanVel, propVel, propAcc, romCm });
-          logBleDiag('ghost-filtered', `Puuttuva pakettiryhmä sarjan alussa (mv=${Number.isFinite(meanVel) ? meanVel.toFixed(2) : '?'} m/s)`);
-          return;
-        }
-
-        // 2. Reject non-lift ghost movements (cable slack pull, pin adjustment, <0.12 m/s or <12 cm ROM when present)
-        if (
-          !Number.isFinite(meanVel) ||
-          meanVel < MIN_VALID_VEL_M_S ||
-          (rawRomCm !== null && rawRomCm < MIN_VALID_ROM_CM) ||
-          (rawPropAcc !== null && rawPropAcc < 0)
-        ) {
-          console.debug('Filtered ghost movement:', { meanVel, romCm: rawRomCm, propAcc: rawPropAcc });
-          logBleDiag('ghost-filtered', `Haamuliike suodatettu (mv=${Number.isFinite(meanVel) ? meanVel.toFixed(2) : '?'} m/s, rom=${rawRomCm !== null ? rawRomCm.toFixed(1) : 'null'} cm)`);
-          return;
-        }
-
-        // 3. Reject end-of-set bar-racking ghost movement (e.g., after >=2 consistent reps, a sudden <0.21 m/s
-        //    movement that is <40% of the previous rep's velocity when setting the bar into the rack)
-        if (currentReps.length >= 2) {
-          const prevRep = currentReps[currentReps.length - 1];
-          if (meanVel < 0.21 && prevRep.meanVelocity > 0.45 && meanVel < prevRep.meanVelocity * 0.40) {
-            console.debug('Filtered bar-racking movement at end of set:', { meanVel, prevVel: prevRep.meanVelocity });
-            logBleDiag('ghost-filtered', `Telineeseen lasku suodatettu (mv=${meanVel.toFixed(2)} vs ${prevRep.meanVelocity.toFixed(2)} m/s)`);
-            return;
-          }
-        }
-
-        if (!hasFullBurst) {
-          logBleDiag('partial-accepted', `Osittainen toisto hyväksytty #${currentReps.length + 1} (mv=${meanVel.toFixed(2)} m/s, rom=${rawRomCm !== null ? rawRomCm.toFixed(1) : 'null'})`);
-        }
-
-        // 4. Auto-replace bogus 1st "unrack / positioning" movement if rep #1 was slow (<0.22 m/s, no lowering)
-        //    and the immediate next lift is >2.2x faster (the real 1st rep of the set)
-        if (
-          currentReps.length === 1 &&
-          currentReps[0].meanVelocity < 0.22 &&
-          currentReps[0].loweringVelocity === null &&
-          meanVel > currentReps[0].meanVelocity * 2.2
-        ) {
-          console.debug('Replaced initial unrack movement with real 1st rep:', {
-            unrackVel: currentReps[0].meanVelocity,
-            realFirstVel: meanVel
-          });
-          logBleDiag('ghost-filtered', `Alun telineestä otto korvattu (mv=${currentReps[0].meanVelocity.toFixed(2)} -> ${meanVel.toFixed(2)} m/s)`);
-          currentReps.pop();
-        }
-
-        const weightKg = parseFloat(document.getElementById('weightInput').value) || 0;
-        if (!activeSetMeta) {
-          activeSetMeta = snapshotCurrentSetMeta();
-        } else if (currentReps.length === 0) {
-          activeSetMeta = snapshotCurrentSetMeta();
-        }
-        // Verified power formula: P = m * (g + 0.58 * a_prop) * v
-        const power = weightKg * (9.80665 + 0.58 * propAcc) * meanVel;
-
-        // Pause at the bottom before this rep. Anchor bottom to lastEccEndAt when available after prevT
-        // so rest-state 0x01 0x03 oscillations never reset the pause clock.
-        let pauseMs = null;
-        if (currentReps.length > 0 && liftStartAt > 0) {
-          const prevT = currentReps[currentReps.length - 1].t || 0;
-          const bottom = lastEccEndAt > prevT ? lastEccEndAt : (lastBottomAt > prevT ? lastBottomAt : 0);
-          if (bottom > prevT && liftStartAt >= bottom) pauseMs = liftStartAt - bottom;
-          else if (bottom <= prevT && liftStartAt > prevT) pauseMs = 0; // no rest phase seen between reps
-        }
-        if (currentReps.length === 0) { vbtCutoffAlerted = false; vbtFailureAlerted = false; }
-
-        const repObj = {
-          meanVelocity: meanVel,
-          propulsiveVelocity: propVel,
-          propulsiveAcceleration: propAcc,
-          rangeOfMotionCm: romCm,
-          loweringVelocity: null,
-          power: power,
-          t: Date.now(),
-          pauseMs: pauseMs
-        };
-        if (!hasFullBurst) repObj.partial = true;
-        currentReps.push(repObj);
-        lastRepAt = Date.now();
-        if (!isFreeMode() && vbtOnNewRep()) return; // set auto-stopped at the velocity-loss cutoff
-
-        const targetReps = parseInt(document.getElementById('targetRepsInput').value, 10) || 5;
-        const extraOk = (!isFreeMode() && currentReps.length >= targetReps) ? liveExtraRepHint(targetReps) : null;
-        if (extraOk) {
-          // "+1 toisto ok": älä lopeta sarjaa automaattisesti, keskeytä taustamusiikki puhekehotteen ajaksi ja jatka sitten
-          playExtraRepVoiceCue();
-          renderLiveSet();
-          updateSetButton();
-        } else if (!isFreeMode() && currentReps.length >= targetReps) {
-          // Target reps reached: play fanfare and automatically complete & save this set!
-          setTimeout(() => speakRepVelocity(meanVel), 220);
-          soundTargetReached();
-          stopSetOnPin(true);
-        } else {
-          setTimeout(() => speakRepVelocity(meanVel), 220);
-          soundRep();
-          renderLiveSet();
-          updateSetButton();
-        }
+        pendingRep = { propVel: null, propAcc: null, romCm: null, phaseStartedAt: 0, lastPacketAt: 0 };
+        recordLiveRep({ meanVel, rawPropVel, rawPropAcc, rawRomCm, liftStartAt, repTimestamp: Date.now() });
       } else if (type === 0x06) {
         const eccVel = val / 1000.0;
+        const fbRep = commitPendingRepFallback('0x06', { deferPostRep: true });
         lastEccEndAt = Date.now();
         if (currentReps.length > 0 && eccVel >= 0.08 && eccVel <= 3.5) {
           const last = currentReps[currentReps.length - 1];
@@ -2665,7 +2762,10 @@
           if (eccVel > 0.60) {
             soundLoweringWarn();
           }
-          renderLiveSet();
+          if (fbRep) handlePostLiveRep(fbRep.meanVelocity);
+          else renderLiveSet();
+        } else if (fbRep) {
+          handlePostLiveRep(fbRep.meanVelocity);
         }
       }
     }
@@ -2961,9 +3061,11 @@
           reps: dv.getUint16(9, true), samples: dv.getUint32(11, true)
         };
         if (traceBuf && !traceBuf.header) traceBuf.header = traceHeader;
+        logBleDiag('trace-b1', `0xB1: reps=${traceHeader.reps}, samples=${traceHeader.samples}, dur=${((traceHeader.endMs - traceHeader.startMs) / 1000).toFixed(1)} s`);
         return;
       }
       if (type === 0xa4 && dv.byteLength >= 6) {
+        barMovedSinceZero = true;
         const seq = dv.getUint16(1, true);
         const total = dv.getUint16(3, true);
         const count = dv.getUint8(5);
@@ -3012,6 +3114,8 @@
       recentRawTraces.push(raw);
       if (recentRawTraces.length > 15) recentRawTraces.shift();
       if (rows.length < 160 || buf.truncated) {
+        if (buf.truncated) logBleDiag('trace-truncated', `80 Hz raakadata katkesi (samples=${rows.length}, cov=${Math.round(coverage * 100)}%)`);
+        else logBleDiag('trace-short', `80 Hz raakadata liian lyhyt (samples=${rows.length}, cov=${Math.round(coverage * 100)}%)`);
         lastTraceFailed = true;
         lastTraceStatus = buf.truncated
           ? '⚠️ Raakadata katkesi (BLE-paketti liian suuri tälle laitteelle/selaimelle)'
@@ -3084,7 +3188,7 @@
     }
 
     // ---------- trace analysis ----------
-    function analyzeTrace(rows, exercise) {
+    function analyzeTrace(rows, exercise, weightKg = 0) {
       const n = rows.length, dt = 1 / TRACE_FS;
       const acc = rows.map((r) => [r[1], r[2], r[6]].map((x) => x / TRACE_ACC_LSB_PER_G * G0));
       const gyr = rows.map((r) => [r[3], r[4], r[5]].map((x) => x / TRACE_GYRO_LSB_PER_DPS * Math.PI / 180));
@@ -3174,7 +3278,8 @@
       }
 
       const rules = TRACE_LIFT_RULES[getLiftKey(exercise)] || null;
-      const reps = segs.map((sg) => {
+      const w = Number(weightKg) || 0;
+      const reps = segs.map((sg, segIdx) => {
         const { s, e } = sg;
         const len = e - s + 1;
         const pos = []; let z = 0;
@@ -3184,6 +3289,54 @@
         // propulsive phase ends where vertical acceleration (firmware) turns negative after the peak
         let ip = sg.pk;
         let mpv = 0; for (let k = s; k <= ip; k++) mpv += v[k]; mpv /= Math.max(1, ip - s + 1);
+        let hasFwAcc = false;
+        for (let k = s; k <= ip; k++) {
+          if (Math.abs(rows[k][7]) > 1) { hasFwAcc = true; break; }
+        }
+        let posAccSum = 0, posAccN = 0, allAccSum = 0;
+        const propN = Math.max(1, ip - s + 1);
+        for (let k = s; k <= ip; k++) {
+          const ak = hasFwAcc ? rows[k][7] / 1000 : aVert[k];
+          allAccSum += ak;
+          if (ak > 0) { posAccSum += ak; posAccN++; }
+        }
+        const propAcc = posAccN > 0 ? posAccSum / posAccN : Math.max(0, allAccSum / propN);
+        const power = w > 0 ? w * (G0 + 0.58 * propAcc) * mv : 0;
+
+        let loweringVelocity = null;
+        const nextS = segIdx + 1 < segs.length ? segs[segIdx + 1].s : n;
+        const scanEnd = Math.min(nextS, e + TRACE_FS * 8);
+        let bestEcc = null;
+        for (let k = e + 1; k < scanEnd;) {
+          if (v[k] < -0.02) {
+            let j = k;
+            while (j < scanEnd && v[j] < -0.02) j++;
+            let pk = k;
+            for (let m = k; m < j; m++) if (v[m] < v[pk]) pk = m;
+            const negPk = -v[pk];
+            if (negPk >= 0.08) {
+              const eccTh = Math.max(0.02, 0.1 * negPk);
+              let es = pk; while (es > k && -v[es - 1] > eccTh) es--;
+              let ee = pk; while (ee < j - 1 && -v[ee + 1] > eccTh) ee++;
+              let eccDisp = 0;
+              for (let m = es; m <= ee; m++) eccDisp += (-v[m]) * dt;
+              if (eccDisp >= 0.10 && (!bestEcc || eccDisp > bestEcc.disp)) {
+                bestEcc = { es, ee, disp: eccDisp };
+              }
+            }
+            k = j;
+          } else {
+            k++;
+          }
+        }
+        if (bestEcc) {
+          let eccSum = 0;
+          for (let m = bestEcc.es; m <= bestEcc.ee; m++) eccSum += -v[m];
+          const eccMean = eccSum / (bestEcc.ee - bestEcc.es + 1);
+          if (eccMean >= 0.08 && eccMean <= 3.5) {
+            loweringVelocity = +eccMean.toFixed(3);
+          }
+        }
 
         // ---- sticking point: V1 (first local max) -> Vmin -> V2 ----
         let stick = null;
@@ -3254,7 +3407,9 @@
         let b0i = s - 1; while (b0i > 0 && v[b0i] > -0.03) b0i--;
         if (b0i > 0 && s - b0i < TRACE_FS * 8) pauseMs = Math.round((s - b0i) * dt * 1000);
         return {
+          startSample: s, endSample: e,
           romCm: rom * 100, mv, mpv, vPeak: v[sg.pk], durMs: Math.round(len * dt * 1000),
+          propAcc, power, loweringVelocity,
           stick, midMin, path, dxMax, dxNet, tiltMax, curve, pauseMs
         };
       });
@@ -3271,7 +3426,9 @@
       for (let i = 0; i <= A; i++) for (let j = 0; j <= B; j++) {
         const c = cost[i][j]; if (c >= INF) continue;
         if (i < A && j < B) {
-          const d = c + Math.abs(traceReps[i].mv - (Number(appReps[j].meanVelocity) || 0));
+          const appRom = Number(appReps[j].rangeOfMotionCm) || 0;
+          const romPenalty = (appRom > 0 && traceReps[i].romCm > 0 && traceReps[i].romCm < appRom * 0.55) ? 0.08 : 0;
+          const d = c + Math.abs(traceReps[i].mv - (Number(appReps[j].meanVelocity) || 0)) + romPenalty;
           if (d < cost[i + 1][j + 1]) { cost[i + 1][j + 1] = d; from[i + 1][j + 1] = [i, j, 'm']; }
         }
         if (i < A && c + SKIP < cost[i + 1][j]) { cost[i + 1][j] = c + SKIP; from[i + 1][j] = [i, j, 's']; }
@@ -3307,40 +3464,139 @@
         if (cand) { targets.push(cand.reps); targetSet = cand; exercise = cand.exercise; }
       }
       if (!targets.length) { lastTraceFailed = true; lastTraceStatus = '📡 Raakadata vastaanotettu, mutta sarjaa ei löytynyt'; return; }
-      const ta = analyzeTrace(raw.rows, exercise);
+      const setWeightKg = (targetSet && Number(targetSet.weightKg)) || (activeSetMeta && Number(activeSetMeta.weightKg)) || (parseFloat(document.getElementById('weightInput').value) || 0);
+      let setDate = document.getElementById('workoutDate').value || todayISO();
+      if (targetSet) {
+        const coords = findSetCoordinates(targetSet);
+        if (coords && coords.date) setDate = coords.date;
+      }
+      const ta = analyzeTrace(raw.rows, exercise, setWeightKg);
       const map = matchTraceReps(ta.reps, targets[0]);
+      const buildRepTraceObj = (tr) => ({
+        romCm: +tr.romCm.toFixed(1), mvF: +tr.mv.toFixed(3), vPeak: +tr.vPeak.toFixed(3), durMs: tr.durMs,
+        stick: tr.stick ? { h: +tr.stick.heightCm.toFixed(1), vmin: +tr.stick.vmin.toFixed(3), v1: +tr.stick.v1.toFixed(3), v2: +tr.stick.v2.toFixed(3), ms: tr.stick.durationMs, pct: Math.round(tr.stick.pctRom) } : null,
+        midMin: tr.midMin ? { v: +tr.midMin.v.toFixed(3), h: +tr.midMin.heightCm.toFixed(1) } : null,
+        dxMax: tr.dxMax !== null ? +tr.dxMax.toFixed(1) : null,
+        dxNet: tr.dxNet !== null ? +tr.dxNet.toFixed(1) : null,
+        tilt: tr.tiltMax !== null ? +tr.tiltMax.toFixed(1) : null,
+        path: tr.path, curve: tr.curve, pauseMs: tr.pauseMs
+      });
       let matched = 0;
       targets.forEach((reps) => {
         reps.forEach((r, j) => {
           const k = map[j];
           if (k < 0) return;
           const tr = ta.reps[k];
-          r.trace = {
-            romCm: +tr.romCm.toFixed(1), mvF: +tr.mv.toFixed(3), vPeak: +tr.vPeak.toFixed(3), durMs: tr.durMs,
-            stick: tr.stick ? { h: +tr.stick.heightCm.toFixed(1), vmin: +tr.stick.vmin.toFixed(3), v1: +tr.stick.v1.toFixed(3), v2: +tr.stick.v2.toFixed(3), ms: tr.stick.durationMs, pct: Math.round(tr.stick.pctRom) } : null,
-            midMin: tr.midMin ? { v: +tr.midMin.v.toFixed(3), h: +tr.midMin.heightCm.toFixed(1) } : null,
-            dxMax: tr.dxMax !== null ? +tr.dxMax.toFixed(1) : null,
-            dxNet: tr.dxNet !== null ? +tr.dxNet.toFixed(1) : null,
-            tilt: tr.tiltMax !== null ? +tr.tiltMax.toFixed(1) : null,
-            path: tr.path, curve: tr.curve, pauseMs: tr.pauseMs
-          };
-          if (!(r.rangeOfMotionCm > 0) && tr.romCm > 0) {
+          r.trace = buildRepTraceObj(tr);
+          if (r.fallback02) {
+            r.meanVelocity = +tr.mv.toFixed(3);
+            r.propulsiveVelocity = +tr.mpv.toFixed(3);
+            r.propulsiveAcceleration = +tr.propAcc.toFixed(3);
             r.rangeOfMotionCm = +tr.romCm.toFixed(1);
+            if (tr.loweringVelocity !== null) r.loweringVelocity = tr.loweringVelocity;
+            r.power = setWeightKg > 0 ? setWeightKg * (G0 + 0.58 * r.propulsiveAcceleration) * r.meanVelocity : 0;
+            delete r.fallback02;
             delete r.partial;
+            r.refinedFromTrace = true;
+          } else {
+            if (!(r.rangeOfMotionCm > 0) && tr.romCm > 0) {
+              r.rangeOfMotionCm = +tr.romCm.toFixed(1);
+              delete r.partial;
+            }
+            if (r.loweringVelocity === null && tr.loweringVelocity !== null) {
+              r.loweringVelocity = tr.loweringVelocity;
+            }
           }
           if (Number.isFinite(tr.pauseMs)) r.pauseMs = tr.pauseMs;
           if (reps === targets[0]) matched++;
         });
       });
+
+      const cfg = getLiftCfg(exercise);
+      const liftMinRom = cfg ? cfg.minRomCm : 15;
+      const matchedRoms = targets[0]
+        .map((r, j) => (map[j] >= 0 ? ta.reps[map[j]].romCm : (Number(r && r.rangeOfMotionCm) || 0)))
+        .filter((x) => x > 0);
+      const refRom = matchedRoms.length ? vbtMedian(matchedRoms) : (cfg ? historyMedianRom(cfg.id, setDate) : null);
+
+      const matchedTraceIdx = new Set(map.filter((k) => k >= 0));
+      const toRecover = [];
+      let rejectedNoise = 0;
+      ta.reps.forEach((tr, k) => {
+        if (matchedTraceIdx.has(k)) return;
+        const isRecoverable = tr.mv >= 0.12 && tr.vPeak >= 0.15 && tr.durMs >= 180 && tr.romCm >= liftMinRom && (!refRom || tr.romCm >= 0.55 * refRom);
+        if (isRecoverable) toRecover.push(k);
+        else rejectedNoise++;
+      });
+
+      if (toRecover.length > 0) {
+        const toRecoverSet = new Set(toRecover);
+        let anchorLiveT = 0, anchorEndSample = null;
+        for (let j = 0; j < targets[0].length; j++) {
+          if (map[j] >= 0 && targets[0][j] && Number(targets[0][j].t) > 0) {
+            anchorLiveT = Number(targets[0][j].t);
+            anchorEndSample = ta.reps[map[j]].endSample;
+            break;
+          }
+        }
+        const makeRecoveredRep = (tr) => {
+          const meanVelocity = +tr.mv.toFixed(3);
+          const propulsiveVelocity = +tr.mpv.toFixed(3);
+          const propulsiveAcceleration = +tr.propAcc.toFixed(3);
+          const rangeOfMotionCm = +tr.romCm.toFixed(1);
+          const power = setWeightKg > 0 ? setWeightKg * (G0 + 0.58 * propulsiveAcceleration) * meanVelocity : 0;
+          const t = (anchorLiveT > 0 && anchorEndSample !== null)
+            ? Math.round(anchorLiveT + ((tr.endSample - anchorEndSample) / TRACE_FS) * 1000)
+            : Math.round((raw.receivedAt || now) - ((ta.samples - tr.endSample) / TRACE_FS) * 1000);
+          return {
+            meanVelocity,
+            propulsiveVelocity,
+            propulsiveAcceleration,
+            rangeOfMotionCm,
+            loweringVelocity: tr.loweringVelocity,
+            power,
+            t,
+            pauseMs: tr.pauseMs,
+            recoveredFromTrace: true,
+            trace: buildRepTraceObj(tr)
+          };
+        };
+
+        targets.forEach((repsArr) => {
+          const merged = [];
+          let nextTraceK = 0;
+          for (let j = 0; j < repsArr.length; j++) {
+            if (map[j] >= 0) {
+              while (nextTraceK < map[j]) {
+                if (toRecoverSet.has(nextTraceK)) merged.push(makeRecoveredRep(ta.reps[nextTraceK]));
+                nextTraceK++;
+              }
+              merged.push(repsArr[j]);
+              nextTraceK = map[j] + 1;
+            } else {
+              merged.push(repsArr[j]);
+            }
+          }
+          while (nextTraceK < ta.reps.length) {
+            if (toRecoverSet.has(nextTraceK)) merged.push(makeRecoveredRep(ta.reps[nextTraceK]));
+            nextTraceK++;
+          }
+          repsArr.splice(0, repsArr.length, ...merged);
+        });
+      }
+
+      const validSegments = matched + toRecover.length;
       const targetCount = targetSet ? setRepCount(targetSet) : targets[0].length;
-      const extraReps = Math.max(0, ta.reps.length - targetCount);
+      const extraReps = Math.max(0, validSegments - targetCount);
       const meta = {
         samples: ta.samples,
         coverage: +raw.coverage.toFixed(3),
         barAxis: ta.barAxis ? 'xyz'[ta.barAxis.indexOf(1)] : null,
         barAxisConf: +ta.barAxisConf.toFixed(2),
-        segments: ta.reps.length,
-        matched,
+        segments: validSegments,
+        rawSegments: ta.reps.length,
+        matched: validSegments,
+        recovered: toRecover.length,
         extraReps
       };
       if (currentSetSaved && lastSavedSetRef && targets.includes(lastSavedSetRef.reps)) lastSavedSetRef.traceMeta = meta;
@@ -3348,13 +3604,18 @@
         workouts.forEach((w) => (w.sets || []).forEach((s) => { if (targets.includes(s.reps)) s.traceMeta = meta; }));
       } else pendingTraceMeta = meta;
       saveJSON(KEY_WORKOUTS, workouts);
+      if (toRecover.length > 0) {
+        logBleDiag('trace-recovered', `80 Hz palautti ${toRecover.length} puuttuvaa toistoa (yht. ${targets[0].length}, hylätty kohinaa ${rejectedNoise})`);
+      }
       if (extraReps > 0) {
-        logBleDiag('trace-mismatch', `80 Hz raakadata havaitsi ${ta.reps.length} nostoa, sovellus tallensi ${targetCount} (+${extraReps} puuttuvaa)`);
+        logBleDiag('trace-mismatch', `80 Hz raakadata havaitsi ${validSegments} nostoa, sovellus tallensi ${targetCount} (+${extraReps} puuttuvaa)`);
         lastTraceFailed = true;
-        lastTraceStatus = `⚠️ Pin 80 Hz havaitsi ${ta.reps.length} nostoa, mutta sovellukseen tallentui ${targetCount} toistoa (+${extraReps} puuttuvaa) – korjaa toistomäärä Analyysissä.`;
+        lastTraceStatus = `⚠️ Pin 80 Hz havaitsi ${validSegments} nostoa, mutta sovellukseen tallentui ${targetCount} toistoa (+${extraReps} puuttuvaa) – korjaa toistomäärä Analyysissä.`;
       } else {
         lastTraceFailed = false;
-        lastTraceStatus = `📡 Raakadata analysoitu: ${matched}/${targets[0].length} toistoa (${ta.samples} näytettä${meta.barAxis ? ', tangon akseli ' + meta.barAxis.toUpperCase() : ', tangon akseli ei tunnistettu'})`;
+        const recTxt = toRecover.length > 0 ? `, +${toRecover.length} palautettu 80 Hz` : '';
+        const noiseTxt = rejectedNoise > 0 ? `, ${rejectedNoise} kohinaa hylätty` : '';
+        lastTraceStatus = `📡 Raakadata analysoitu: ${validSegments}/${targets[0].length} toistoa${recTxt}${noiseTxt} (${ta.samples} näytettä${meta.barAxis ? ', tangon akseli ' + meta.barAxis.toUpperCase() : ', tangon akseli ei tunnistettu'})`;
       }
       renderCalendar();
       renderHistoryList();
@@ -3373,15 +3634,79 @@
       return Math.sqrt(ss / path.length);
     }
 
-    function exportRawTracesCSV() {
-      if (!recentRawTraces.length) { alert('Ei raakadataa tässä istunnossa. Tee sarja ja odota ~10 s sarjan jälkeen.'); return; }
+    async function saveCsvFile(csvText, filename) {
+      const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+
+      // Save to local disk. On desktop/Android no share sheet is used.
+      // Prefer the native "Save as" dialog where supported (Chromium desktop).
+      if (window.showSaveFilePicker) {
+        try {
+          const handle = await window.showSaveFilePicker({
+            suggestedName: filename,
+            types: [{ description: 'CSV', accept: { 'text/csv': ['.csv'] } }],
+          });
+          const writable = await handle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          return 'saved';
+        } catch (err) {
+          if (err && err.name === 'AbortError') return 'cancelled'; // user cancelled
+          // otherwise fall through to plain download
+        }
+      }
+      // Fallback: regular file download to the device's Downloads folder.
+      // iOS (Bluefy / WKWebView) ignores <a download>, so there the only way to
+      // write a file to local storage is the system sheet ("Tallenna Tiedostoihin").
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (isIOS) {
+        const file = new File([blob], filename, { type: 'text/csv' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file] });
+            return 'shared';
+          } catch (err) {
+            if (err && err.name === 'AbortError') return 'cancelled';
+            throw err;
+          }
+        }
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return 'saved';
+    }
+
+    async function exportRawTracesCSV() {
+      const card = document.getElementById('anaSettingsCard');
+      const msgEl = (card && card.querySelector('#anaRawExportMsg')) || document.getElementById('anaRawExportMsg');
+      const showMsg = (txt, color = 'var(--green)') => {
+        if (!msgEl) return;
+        msgEl.style.color = color;
+        msgEl.textContent = txt;
+        setTimeout(() => { if (msgEl && msgEl.textContent === txt) msgEl.textContent = ''; }, 3000);
+      };
+      if (!recentRawTraces.length) {
+        showMsg('Ei raakadataa', 'var(--amber)');
+        alert('Ei raakadataa tässä istunnossa. Tee sarja ja odota ~10 s sarjan jälkeen.');
+        return;
+      }
       const lines = ['trace,received_at,sample,dt_us,ax,ay,gx,gy,gz,az,a_vert_mm_s2,v_vert_mm_s'];
       recentRawTraces.forEach((t, ti) => t.rows.forEach((r, i) => lines.push([ti + 1, new Date(t.receivedAt).toISOString(), i, ...r].join(','))));
-      const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `gpath_raw_${todayISO()}.csv`;
-      document.body.appendChild(a); a.click(); a.remove();
+      try {
+        const res = await saveCsvFile(lines.join('\n'), `gpath_raw_${todayISO()}.csv`);
+        if (res === 'shared') showMsg('Jaettu!');
+        else if (res === 'cancelled') showMsg('Peruttu', 'var(--muted)');
+        else showMsg('Tallennettu!');
+      } catch (err) {
+        showMsg('Vienti epäonnistui', 'var(--red)');
+        alert('Raakadatan CSV-tallennus epäonnistui: ' + (err && err.message ? err.message : err));
+      }
     }
     // =================== /RAAKADATA ===================
 
@@ -3465,7 +3790,7 @@
         const tl = t.tilt !== null ? `<span class="${t.tilt > TILT_WARN_DEG ? 'amber' : ''}">${t.tilt.toFixed(1)}°</span>` : '--';
         const rq = p && p.rqi !== null ? `<strong class="${p.rqi >= 70 ? 'green' : p.rqi >= 50 ? 'amber' : 'red'}">${Math.round(p.rqi)}</strong>` : '--';
         const fl = p && p.flags && p.flags.length ? `<div style="font-size:10px; color:#fcd34d;">${p.flags.map((f) => flagTxt[f]).join(', ')}</div>` : '';
-        return `<tr><td>${i + 1}</td><td>${st}</td><td>${mid}</td><td>${dx}</td><td>${dev}</td><td>${tl}</td><td>${t.pauseMs !== null && t.pauseMs !== undefined ? (t.pauseMs / 1000).toFixed(1) + ' s' : '--'}</td><td>${rq}${fl}</td></tr>`;
+        return `<tr><td>${i + 1}${r.recoveredFromTrace ? ' 📡' : ''}</td><td>${st}</td><td>${mid}</td><td>${dx}</td><td>${dev}</td><td>${tl}</td><td>${t.pauseMs !== null && t.pauseMs !== undefined ? (t.pauseMs / 1000).toFixed(1) + ' s' : '--'}</td><td>${rq}${fl}</td></tr>`;
       }).join('');
       return `
         <div style="margin-top:10px; padding-top:8px; border-top:1px dashed rgba(148,163,184,0.25);">
@@ -3779,18 +4104,21 @@
         let med = null, src = null;
         if (n >= 3) {
           let others = roms.filter((x, j) => j !== i && x > 0);
+          const hm = getHistMed();
+          if (hm) {
+            const histClean = others.filter((x) => x <= MERGED_ROM_FACTOR * hm && x >= minValid);
+            if (histClean.length >= 1) others = histClean;
+          }
           if (others.length >= 2) {
             // 2. kierros: jätä referenssistä pois ensimmäisen kierroksen kynnyksen ylittävät (useita yhdistyneitä samassa sarjassa)
             const thr1 = MERGED_ROM_FACTOR * vbtMedian(others);
             const trimmed = others.filter((x) => x <= thr1);
             if (trimmed.length >= 2) others = trimmed;
+            else if (trimmed.length === 1 && trimmed[0] >= minValid) others = trimmed;
             med = vbtMedian(others); src = 'set';
-            if (med) {
-              const hm = getHistMed();
-              if (hm && med > 1.35 * hm) {
-                med = hm;
-                src = 'history';
-              }
+            if (med && hm && med > 1.35 * hm) {
+              med = hm;
+              src = 'history';
             }
           }
         }
@@ -3819,6 +4147,26 @@
         if (traceSplit) { est = lo = hi = sp.count; estSrc = 'trace'; }
         out[i] = { idx: i, romCm: rom, medRom: useMed, refSrc: src || 'trace', est, lo, hi, estSrc, drift: false };
       });
+      if (cfg && cfg.id === 'deadlift' && !(opts && opts.touchAndGo) && n >= 2) {
+        const hm = getHistMed();
+        const setHasDrift = out.some((m) => m && m.drift);
+        for (let i = 0; i < n; i++) {
+          if (out[i]) continue;
+          const rom = roms[i];
+          const v = repV(reps[i]);
+          if (!(rom > 0) || !(v > 0)) continue;
+          for (let k = i + 1; k < n; k++) {
+            if (out[k] || roms[k] < minValid) continue;
+            const vk = repV(reps[k]);
+            if (!(vk > 0)) continue;
+            if (v < 0.65 * vk && (rom >= 1.35 * roms[k] || (setHasDrift && hm && rom >= 1.35 * hm))) {
+              const refRom = (setHasDrift && hm) ? Math.min(roms[k], hm) : roms[k];
+              out[i] = { idx: i, romCm: rom, medRom: refRom, refSrc: (setHasDrift && hm && refRom === hm) ? 'history' : 'set', est: 1, lo: 1, hi: 1, estSrc: 'drift', drift: true };
+              break;
+            }
+          }
+        }
+      }
       return out;
     }
     function mergedWarnText(m) {
@@ -5262,8 +5610,11 @@
               <option value="y" ${vbtSettings.barAxis === 'y' ? 'selected' : ''}>Anturin Y</option>
               <option value="z" ${vbtSettings.barAxis === 'z' ? 'selected' : ''}>Anturin Z</option>
             </select></div>
-          <div class="row"><span class="small">Raakadata (${recentRawTraces.length} sarjaa muistissa)</span>
-            <button type="button" id="anaRawExport" style="padding:6px 10px; font-size:12px;">Vie raakadata CSV</button></div>
+          <div class="row" style="gap:6px; flex-wrap:wrap;"><span class="small">Raakadata (${recentRawTraces.length} sarjaa muistissa)</span>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span id="anaRawExportMsg" style="font-size:11px; color:var(--green);"></span>
+              <button type="button" id="anaRawExport" style="padding:6px 10px; font-size:12px;">Vie raakadata CSV</button>
+            </div></div>
           <details id="bleDiagDetails" class="details-toggle" style="margin-top:0;">
             <summary id="bleDiagSummary">▸ BLE-diagnostiikka (${bleDiagLog.length})</summary>
             <div style="margin-top:6px; display:flex; flex-direction:column; gap:6px;">
@@ -6454,6 +6805,7 @@
           <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; background:rgba(15,23,42,0.55); border:1px solid rgba(51,65,85,0.4); padding:6px 8px; border-radius:7px; font-size:12px; font-variant-numeric:tabular-nums; flex-wrap:wrap;">
             <span style="font-weight:700; color:var(--muted); width:38px;">${qDot}#${rIdx + 1}</span>
             <strong style="color:var(--text);">${(Number(r.meanVelocity) || 0).toFixed(2)} m/s</strong>
+            ${r.recoveredFromTrace ? '<span style="font-size:10px; padding:1px 6px; border-radius:999px; background:rgba(59,130,246,0.18); color:#93c5fd; border:1px solid rgba(59,130,246,0.35);">📡 80 Hz</span>' : ''}
             <span style="color:var(--muted); font-size:11px;">${(Number(r.power) || 0).toFixed(0)} W</span>
             <span style="color:var(--muted); font-size:11px;">${(Number(r.rangeOfMotionCm) || 0).toFixed(0)} cm</span>
             <div>${dropHtml}</div>
@@ -6725,6 +7077,7 @@
             <div class="rep-item-top" style="flex-wrap: wrap;">
               <span class="rep-num">${qDot}#${idx + 1}</span>
               <span><strong>${mv.toFixed(2)} m/s</strong> (${(Number(r.power) || 0).toFixed(0)} W)</span>
+              ${r.recoveredFromTrace ? '<span style="font-size:10px; padding:1px 5px; border-radius:999px; background:rgba(59,130,246,0.18); color:#93c5fd; border:1px solid rgba(59,130,246,0.35);">📡 80 Hz</span>' : ''}
               ${vsFirstHtml}
               ${lowHtml}
               <span style="color:var(--muted)">${(Number(r.rangeOfMotionCm) || 0).toFixed(0)} cm</span>
@@ -6767,7 +7120,7 @@
         </div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;">
           <button type="button" id="doneOpenAnaBtn" class="primary" style="flex:1; min-height:48px;">📈 Avaa Analyysi</button>
-          <button type="button" id="resumeWorkoutBtn" style="flex:1; min-height:48px;">▶ Aloita uusi sarja</button>
+          <button type="button" id="resumeWorkoutBtn" class="success" style="flex:1; min-height:48px;">▶ Aloita uusi sarja</button>
         </div>
       `;
       card.querySelector('#doneOpenAnaBtn').addEventListener('click', () => {
@@ -7308,52 +7661,11 @@
       const filename = document.getElementById('filterDateChk').checked
         ? `gpath_${selectedHistoryDate}.csv`
         : 'gpath_workouts.csv';
-
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-
-      // Save to local disk. On desktop/Android no share sheet is used.
-      // Prefer the native "Save as" dialog where supported (Chromium desktop).
-      if (window.showSaveFilePicker) {
-        try {
-          const handle = await window.showSaveFilePicker({
-            suggestedName: filename,
-            types: [{ description: 'CSV', accept: { 'text/csv': ['.csv'] } }],
-          });
-          const writable = await handle.createWritable();
-          await writable.write(blob);
-          await writable.close();
-          return;
-        } catch (err) {
-          if (err && err.name === 'AbortError') return; // user cancelled
-          // otherwise fall through to plain download
-        }
+      try {
+        await saveCsvFile(csv, filename);
+      } catch (err) {
+        alert('CSV-tallennus epäonnistui: ' + (err && err.message ? err.message : err));
       }
-      // Fallback: regular file download to the device's Downloads folder.
-      // iOS (Bluefy / WKWebView) ignores <a download>, so there the only way to
-      // write a file to local storage is the system sheet ("Tallenna Tiedostoihin").
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-      if (isIOS) {
-        const file = new File([blob], filename, { type: 'text/csv' });
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({ files: [file] });
-          } catch (err) {
-            if (!err || err.name !== 'AbortError') {
-              alert('CSV-tallennus epäonnistui: ' + (err && err.message ? err.message : err));
-            }
-          }
-          return;
-        }
-      }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
     // --- Event Listeners ---

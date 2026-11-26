@@ -44,12 +44,13 @@ function loadApp(opts = {}) {
     const el = {
       id, tagName: String(tagName || '').toUpperCase(),
       value: '', textContent: '', checked: false, disabled: false,
-      dataset: {}, style: {}, parentNode: null,
+      dataset: {}, style: {}, parentNode: null, children: [],
       get innerHTML() { return htmlStr; },
       set innerHTML(v) {
         htmlStr = String(v ?? '');
         tagEls.clear();
         qCache.clear();
+        el.children.length = 0;
       },
       classList: {
         _s: cls,
@@ -128,7 +129,7 @@ function loadApp(opts = {}) {
         qCache.set(sel, out);
         return out;
       },
-      appendChild(c) { if (c) c.parentNode = el; return c; },
+      appendChild(c) { if (c) { c.parentNode = el; el.children.push(c); } return c; },
       remove() { if (el.parentNode && el.parentNode.removeChild) el.parentNode.removeChild(el); },
       removeChild(c) { if (c && c.parentNode === el) c.parentNode = null; return c; },
       closest() { return null; },
@@ -198,8 +199,9 @@ function loadApp(opts = {}) {
     addEventListener: () => {},
     removeEventListener: () => {},
     matchMedia: () => ({ matches: false, addEventListener: () => {} }),
-    Blob: class {},
-    URL: { createObjectURL: () => '', revokeObjectURL: () => {} },
+    Blob: class { constructor(parts = [], opts = {}) { this.parts = parts; this.type = opts.type || ''; } },
+    File: class { constructor(parts = [], name = '', opts = {}) { this.parts = parts; this.name = name; this.type = opts.type || ''; } },
+    URL: { createObjectURL: () => 'blob:mock', revokeObjectURL: () => {} },
     Audio: FakeAudio,
     AudioContext: class {
       constructor() { this.state = 'running'; this.currentTime = 0; this.destination = {}; }
@@ -244,6 +246,12 @@ function loadApp(opts = {}) {
       set zeroing(v) { zeroing = v; },
       get pinStarted() { return pinStarted; },
       set pinStarted(v) { pinStarted = v; },
+      get barMovedSinceZero() { return barMovedSinceZero; },
+      set barMovedSinceZero(v) { barMovedSinceZero = v; },
+      get pendingRep() { return pendingRep; },
+      set pendingRep(v) { pendingRep = v; },
+      get traceBuf() { return traceBuf; },
+      set traceBuf(v) { traceBuf = v; },
       get bleConnecting() { return bleConnecting; },
       set bleConnecting(v) { bleConnecting = v; },
       get gattConnectPromise() { return gattConnectPromise; },
@@ -282,10 +290,10 @@ function loadApp(opts = {}) {
       get lastTraceFailed() { return lastTraceFailed; },
       get keepWarmOsc() { return keepWarmOsc; },
       get extraVoicePlaying() { return extraVoicePlaying; },
-      bleDiagLog, logBleDiag, refreshBleDiagUI,
+      bleDiagLog, logBleDiag, refreshBleDiagUI, BLE_DIAG_MAX,
       EXTRA_REP_VOICE_DATA_URI,
       DEFAULT_REF_MAX, VBT_GOALS, LIFT_ANALYSIS, TRACE_LIFT_RULES,
-      CMD_START, CMD_STOP,
+      CMD_START, CMD_STOP, CMD_END,
       getLiftKey, getLiftCfg, getAnchor1RM, workoutsSignature,
       detectMergedReps, splitCurveReps, historyMedianRom, flagSuspectReps,
       analyzeSet, ownVelocityCost, computeDailyPlan, planAltHTML,
@@ -294,9 +302,11 @@ function loadApp(opts = {}) {
       setRepCount, setRepCountOverride, setTouchAndGo, isLiveTouchAndGo, planRepsOf,
       snapshotCurrentSetMeta, commitCurrentSetToWorkouts, renderContextAndSteppers,
       renderLiveSet, renderVbtSettingsCard, openSetAnalysisSheet,
-      startSetOnPin, stopSetOnPin, disconnectPin, onNotification, onDisconnected, openGattSession, rezeroPin, finishCalibrationAndActivate,
-      handleTraceNotification, analyzeTrace, attachTraceToRecentSet,
-      buildSetAnalysisHTML, buildVerdict, buildShortRestFinding, buildCSV,
+      startSetOnPin, stopSetOnPin, disconnectPin, connectPin, onNotification, onDisconnected, openGattSession, rezeroPin, finishCalibrationAndActivate,
+      updateSetButton, finishWorkout,
+      handleTraceNotification, finalizeTrace, analyzeTrace, attachTraceToRecentSet, matchTraceReps,
+      saveCsvFile, exportCSV, exportRawTracesCSV,
+      buildSetAnalysisHTML, buildTraceSectionHTML, buildVerdict, buildShortRestFinding, buildCSV,
       playExtraRepVoiceCue, speakRepVelocity, startAudioKeepWarm
     };
   `, sandbox);
@@ -1219,7 +1229,7 @@ test('13. BLE pauseMs jitter guard, partial burst, reconnect resume, rezero, 80 
   assert.equal(api.currentReps[1].rangeOfMotionCm, 0);
   assert.ok(api.bleDiagLog.some((e) => e.kind === 'partial-accepted'));
 
-  // C. 80 Hz trace (0xB1 + 0xA4): korvaa pauseMs ja varoittaa ylimääräisestä segmentistä (+1 puuttuva)
+  // C. 80 Hz trace (0xB1 + 0xA4): korvaa pauseMs, palauttaa puuttuvan toiston automaattisesti & hylkää matalan kohinan
   const samples = [];
   const pushQuiet = (n) => { for (let i = 0; i < n; i++) samples.push([12500, 0, 0, 0, 0, 0, 2048, 0, 0]); };
   const pushConc = (n, peak) => {
@@ -1235,21 +1245,24 @@ test('13. BLE pauseMs jitter guard, partial burst, reconnect resume, rezero, 80 
     }
   };
   pushQuiet(30);
-  pushConc(32, 700);
+  pushConc(56, 740); // ~33 cm, mv ~0.49
   pushEcc(24);
   pushQuiet(80); // ~1000 ms dead-stop pause before Rep 2
-  pushConc(32, 650);
+  pushConc(56, 650); // ~29 cm, mv ~0.43
   pushEcc(24);
-  pushQuiet(48); // ~600 ms pause before Rep 3 (missed live)
-  pushConc(32, 600);
-  pushQuiet(20); // total 322 samples
+  pushQuiet(48); // ~600 ms pause before Rep 3 (missed live, valid ROM ~28.5 cm >= 25 cm)
+  pushConc(64, 560);
+  pushQuiet(20);
+  // Lisätään 17 cm haamukohina (>= 12 cm segmentointi, < 25 cm liftMinRom), joka hylätään palautuksessa
+  pushConc(36, 600);
+  pushQuiet(20);
 
   const b1 = new ArrayBuffer(15);
   const b1dv = new DataView(b1);
   b1dv.setUint8(0, 0xb1);
   b1dv.setUint32(1, 0, true);
   b1dv.setUint32(5, 4000, true);
-  b1dv.setUint16(9, 3, true);
+  b1dv.setUint16(9, 4, true);
   b1dv.setUint32(11, samples.length, true);
   api.handleTraceNotification(b1dv);
 
@@ -1270,10 +1283,12 @@ test('13. BLE pauseMs jitter guard, partial burst, reconnect resume, rezero, 80 
     });
     api.handleTraceNotification(dv);
   }
-  assert.equal(api.lastTraceFailed, true, 'Trace mismatch (3 segments vs 2 reps) must flag lastTraceFailed');
-  assert.ok(api.lastTraceStatus.includes('3 nostoa') && api.lastTraceStatus.includes('+1 puuttuvaa'));
+  assert.equal(api.currentReps.length, 3, '80 Hz trace must auto-recover missing 3rd rep and reject low-ROM noise');
+  assert.equal(api.currentReps[2].recoveredFromTrace, true);
+  assert.equal(api.lastTraceFailed, false, 'Auto-recovered trace with rejected noise must clear lastTraceFailed');
+  assert.ok(api.lastTraceStatus.includes('+1 palautettu 80 Hz') && api.lastTraceStatus.includes('1 kohinaa hylätty'));
   assert.ok(api.currentReps[1].pauseMs >= 800 && api.currentReps[1].pauseMs <= 1350, `Expected trace pauseMs ~1000 ms, got ${api.currentReps[1].pauseMs}`);
-  assert.ok(api.bleDiagLog.some((e) => e.kind === 'trace-mismatch'));
+  assert.ok(api.bleDiagLog.some((e) => e.kind === 'trace-recovered'));
 
   const aLive = api.analyzeSet(api.currentReps, 'Maastaveto', 130, { dateStr: '2026-11-24' });
   const verdict = api.buildVerdict(aLive, 'Maastaveto', { traceMeta: { segments: 3, extraReps: 1 }, count: 2 });
@@ -1315,10 +1330,10 @@ test('13. BLE pauseMs jitter guard, partial burst, reconnect resume, rezero, 80 
   assert.equal(api.resumeSetAfterReconnect, false);
   assert.ok(api.bleDiagLog.some((e) => e.kind === 'reconnect-resumed'));
 
-  // Kalibroinnin valmistuttua sarja jatkuu vanhoilla toistoilla & activeSetMeta säilyy
+  // Kalibroinnin valmistuttua sarja jatkuu vanhoilla toistoilla (2 live + 1 palautettu = 3) & activeSetMeta säilyy
   api.finishCalibrationAndActivate(api.activeSetToken);
   assert.equal(api.setActive, true);
-  assert.equal(api.currentReps.length, 2);
+  assert.equal(api.currentReps.length, 3);
   assert.equal(api.activeSetMeta.weightKg, 130);
 
   // Lopeta sarja ja testaa manuaalinen rezeroPin() -> [CMD_STOP, CMD_START] järjestyksessä
@@ -1334,7 +1349,7 @@ test('13. BLE pauseMs jitter guard, partial burst, reconnect resume, rezero, 80 
   assert.ok(els.get('bleDiagList').innerHTML.includes('rezero'));
 });
 
-function buildSyntheticTracePackets(concPeaks, samplesBetween = 60) {
+function buildSyntheticTracePackets(concPeaks, samplesBetween = 60, concSamples = 32, eccPeak = 500, eccSamples = 24) {
   const samples = [];
   const pushQuiet = (n) => { for (let i = 0; i < n; i++) samples.push([12500, 0, 0, 0, 0, 0, 2048, 0, 0]); };
   const pushConc = (n, peak) => {
@@ -1343,17 +1358,17 @@ function buildSyntheticTracePackets(concPeaks, samplesBetween = 60) {
       samples.push([12500, 0, 0, 0, 0, 0, 2048, 0, v]);
     }
   };
-  const pushEcc = (n) => {
+  const pushEcc = (n, peak) => {
     for (let i = 0; i < n; i++) {
-      const v = -Math.round(Math.sin(((i + 0.5) / n) * Math.PI) * 500);
+      const v = -Math.round(Math.sin(((i + 0.5) / n) * Math.PI) * peak);
       samples.push([12500, 0, 0, 0, 0, 0, 2048, 0, v]);
     }
   };
   pushQuiet(30);
   concPeaks.forEach((pk, idx) => {
     if (idx > 0) pushQuiet(samplesBetween);
-    pushConc(32, pk);
-    pushEcc(24);
+    pushConc(concSamples, pk);
+    pushEcc(eccSamples, eccPeak);
   });
   pushQuiet(30);
   if (samples.length < 180) pushQuiet(180 - samples.length);
@@ -1911,7 +1926,7 @@ test('19. traceExtra override clear, workoutsSignature trace+override, DEFAULT_R
   const { api, setNow } = loadApp();
   setNow(1700002000000);
 
-  // 2. traceExtra-varoitus poistuu setRepCountOverride-korjauksella + workoutsSignature muuttuu tracesta & overridesta
+  // 2. 80 Hz trace palauttaa täysimittaisen 3. noston, ja traceExtra-varoitus (kun repCountOverride < segments) poistuu korjauksella + workoutsSignature muuttuu tracesta & overridesta
   const s = {
     exercise: 'Maastaveto',
     weightKg: 130,
@@ -1924,13 +1939,19 @@ test('19. traceExtra override clear, workoutsSignature trace+override, DEFAULT_R
   api.currentSetSaved = true;
 
   const sigBeforeTrace = api.workoutsSignature();
-  for (const dv of buildSyntheticTracePackets([700, 650, 600], 60)) {
+  for (const dv of buildSyntheticTracePackets([770, 710, 650], 60, 56)) {
     api.handleTraceNotification(dv);
   }
   const sigAfterTrace = api.workoutsSignature();
   assert.notEqual(sigAfterTrace, sigBeforeTrace, 'workoutsSignature must change when trace attaches');
-  assert.equal(api.lastTraceFailed, true);
+  assert.equal(s.reps.length, 3, '80 Hz trace must auto-recover 3rd full-ROM deadlift rep');
+  assert.equal(s.traceMeta.recovered, 1);
+  assert.equal(api.lastTraceFailed, false);
 
+  // Simuloidaan puuttuva toisto käsin alennetulla repCountOverridella -> varoitus näkyy ja poistuu korjauksella
+  s.reps.pop();
+  s.traceMeta.extraReps = 1;
+  assert.equal(api.setRepCountOverride('2026-11-24', 0, 2), true);
   const aBeforeOvr = api.analyzeSet(s.reps, s.exercise, s.weightKg, { dateStr: '2026-11-24' });
   assert.ok(api.buildVerdict(aBeforeOvr, s.exercise, { traceMeta: s.traceMeta, count: api.setRepCount(s) }).includes('puuttuvaa'));
   assert.ok(api.buildShortRestFinding(aBeforeOvr, s.exercise, { traceMeta: s.traceMeta, count: api.setRepCount(s) }).text.includes('puuttuvaa'));
@@ -1978,6 +1999,508 @@ test('19. traceExtra override clear, workoutsSignature trace+override, DEFAULT_R
   assert.equal(api.recentRawTraces.length, 15, 'recentRawTraces must retain 15 sets (not cap at 5)');
   for (const dv of tracePkts) api.handleTraceNotification(dv);
   assert.equal(api.recentRawTraces.length, 15, 'recentRawTraces must cap at 15 sets');
+});
+
+test('20. Live BLE 0x02 fallback (0x01-0x01, 0x06, stopSet) & expanded diagnostics (BLE_DIAG_MAX=120)', async () => {
+  const { api, els, sandbox, setNow, advanceMs } = loadApp();
+  setNow(1700003000000);
+
+  const pkt2 = (a, b) => ({ target: { value: new DataView(new Uint8Array([a, b]).buffer) } });
+  const pkt5 = (type, floatVal) => {
+    const buf = new ArrayBuffer(5);
+    const dv = new DataView(buf);
+    dv.setUint8(0, type);
+    dv.setFloat32(1, floatVal, true);
+    return { target: { value: dv } };
+  };
+
+  assert.equal(api.BLE_DIAG_MAX, 120);
+  for (let i = 0; i < 130; i++) api.logBleDiag('test', `entry-${i}`);
+  assert.equal(api.bleDiagLog.length, 120, 'bleDiagLog must cap at BLE_DIAG_MAX=120');
+  api.bleDiagLog.length = 0;
+
+  // dropped-inactive & trace-b1 & trace-truncated / trace-short
+  api.setActive = false;
+  api.zeroing = false;
+  api.onNotification(pkt5(0x02, 500));
+  assert.ok(api.bleDiagLog.some((e) => e.kind === 'dropped-inactive'));
+
+  const b1 = new ArrayBuffer(15);
+  const b1dv = new DataView(b1);
+  b1dv.setUint8(0, 0xb1); b1dv.setUint32(1, 0, true); b1dv.setUint32(5, 3500, true);
+  b1dv.setUint16(9, 2, true); b1dv.setUint32(11, 280, true);
+  api.handleTraceNotification(b1dv);
+  assert.ok(api.bleDiagLog.some((e) => e.kind === 'trace-b1' && e.msg.includes('reps=2')));
+
+  // trace-short
+  const shortPkt = new ArrayBuffer(6 + 34 * 2);
+  const shortDv = new DataView(shortPkt);
+  shortDv.setUint8(0, 0xa4); shortDv.setUint16(1, 0, true); shortDv.setUint16(3, 1, true); shortDv.setUint8(5, 2);
+  api.handleTraceNotification(shortDv);
+  assert.ok(api.bleDiagLog.some((e) => e.kind === 'trace-short'));
+
+  // trace-truncated
+  const truncPkt = new ArrayBuffer(6 + 34 * 1);
+  const truncDv = new DataView(truncPkt);
+  truncDv.setUint8(0, 0xa4); truncDv.setUint16(1, 0, true); truncDv.setUint16(3, 1, true); truncDv.setUint8(5, 5);
+  api.handleTraceNotification(truncDv);
+  assert.ok(api.bleDiagLog.some((e) => e.kind === 'trace-truncated'));
+
+  // Setup live set
+  els.get('workoutDate').value = '2026-11-24';
+  els.get('exerciseSelect').value = 'Maastaveto';
+  els.get('weightInput').value = '120';
+  els.get('targetRepsInput').value = '5';
+  api.workouts = [];
+  api.currentReps = [];
+  api.currentSetSaved = false;
+  api.lastSavedSetRef = null;
+  api.activeSetMeta = api.snapshotCurrentSetMeta();
+  api.setActive = true;
+  api.setStartedAt = Date.now();
+  api.lastBottomAt = 0;
+  api.lastEccEndAt = 0;
+
+  // Rep 1: 0x03 + 0x05 + 0x04 ilman 0x02 -> 0x01 0x01 triggeröi fallbackin repTimestamp = lastPacketAt
+  advanceMs(2000);
+  api.onNotification(pkt2(0x01, 0x01));
+  advanceMs(300);
+  api.onNotification(pkt5(0x03, 540));
+  advanceMs(100);
+  api.onNotification(pkt5(0x05, 420));
+  advanceMs(50);
+  api.onNotification(pkt5(0x04, 1400));
+  const rep1LastPktAt = sandbox.Date.now();
+  assert.equal(api.pendingRep.lastPacketAt, rep1LastPktAt);
+
+  advanceMs(800);
+  api.onNotification(pkt2(0x01, 0x03)); // bottom at rep1LastPktAt + 800
+  const bottomAt = sandbox.Date.now();
+  advanceMs(900);
+  api.onNotification(pkt2(0x01, 0x01)); // Trigger 1: 0x01-0x01!
+
+  assert.equal(api.currentReps.length, 1, '0x01 0x01 must commit pending Rep 1 fallback');
+  assert.equal(api.currentReps[0].fallback02, true);
+  assert.equal(api.currentReps[0].partial, undefined, 'Full 0x03+0x04+0x05 fallback must not be marked partial');
+  assert.equal(api.currentReps[0].t, rep1LastPktAt, 'Fallback rep timestamp must use lastPacketAt to preserve next pauseMs');
+  assert.ok(api.bleDiagLog.some((e) => e.kind === 'fallback-02-missing' && e.msg.includes('0x01-0x01')));
+
+  // Rep 2: 0x03 + 0x05 (ilman 0x02 ja 0x04) -> 0x06 triggeröi fallbackin ennen loweringVelocity-liitosta
+  advanceMs(400);
+  api.onNotification(pkt5(0x03, 510));
+  api.onNotification(pkt5(0x05, 410));
+  advanceMs(400);
+  api.onNotification(pkt5(0x06, 480)); // Trigger 2: 0x06!
+
+  assert.equal(api.currentReps.length, 2, '0x06 must commit pending Rep 2 fallback');
+  assert.equal(api.currentReps[1].fallback02, true);
+  assert.equal(api.currentReps[1].partial, undefined, 'Fallback with rawRomCm > 0 must not be marked partial');
+  assert.equal(api.currentReps[1].loweringVelocity, 0.48, '0x06 must attach loweringVelocity to the newly committed fallback rep');
+  assert.equal(api.currentReps[1].pauseMs, sandbox.Date.now() - 800 - bottomAt, 'Rep 2 pauseMs preserved via Rep 1 lastPacketAt');
+  assert.ok(api.bleDiagLog.some((e) => e.kind === 'fallback-02-missing' && e.msg.includes('0x06')));
+
+  // Rep 3: pelkkä 0x05 (ei 0x02 eikä 0x03) -> commitPendingRepFallback palauttaa null ja loggaa odotetaan 80 Hz palautusta
+  advanceMs(500);
+  api.onNotification(pkt2(0x01, 0x01));
+  api.onNotification(pkt5(0x05, 400));
+  advanceMs(200);
+  api.onNotification(pkt2(0x01, 0x01));
+  assert.equal(api.currentReps.length, 2, 'Missing both 0x02 and 0x03 must not create ghost rep');
+  assert.ok(api.bleDiagLog.some((e) => e.kind === 'fallback-02-missing' && e.msg.includes('odotetaan 80 Hz palautusta')));
+
+  // Rep 4: pelkkä 0x03 (ilman 0x02/0x04/0x05) -> stopSetOnPin(true) triggeröi fallbackin (partial: true) ja tallentaa
+  api.onNotification(pkt5(0x03, 470));
+  await api.stopSetOnPin(true);
+  assert.equal(api.currentReps.length, 3, 'stopSetOnPin must commit pending Rep 3 fallback');
+  assert.equal(api.currentReps[2].fallback02, true);
+  assert.equal(api.currentReps[2].partial, true, 'Fallback without ROM must be marked partial');
+  assert.equal(api.workouts[0].sets[0].reps.length, 3);
+  assert.ok(api.bleDiagLog.some((e) => e.kind === 'fallback-02-missing' && e.msg.includes('stopSet')));
+});
+
+test('21. 80 Hz trace: propAcc, power, loweringVelocity, fallback02 refinement, chronological recovery & noise rejection', () => {
+  const { api, els, sandbox, setNow } = loadApp();
+  setNow(1700004000000);
+
+  // 1. analyzeTrace propAcc (firmware rows[k][7] vs aVert), power ja loweringVelocity (>= 10 cm)
+  const rowsFw = [];
+  const pushQ = (n) => { for (let i = 0; i < n; i++) rowsFw.push([12500, 0, 0, 0, 0, 2048, 2048, 0, 0]); };
+  pushQ(30);
+  for (let i = 0; i < 56; i++) {
+    const v = Math.round(Math.sin(((i + 0.5) / 56) * Math.PI) * 800);
+    rowsFw.push([12500, 0, 0, 0, 0, 2048, 2048, 2200, v]); // fw acc = 2.2 m/s^2
+  }
+  for (let i = 0; i < 40; i++) {
+    const v = -Math.round(Math.sin(((i + 0.5) / 40) * Math.PI) * 550); // ~14 cm downward >= 10 cm
+    rowsFw.push([12500, 0, 0, 0, 0, 2048, 2048, 0, v]);
+  }
+  pushQ(60);
+  const taFw = api.analyzeTrace(rowsFw, 'Maastaveto', 120);
+  assert.equal(taFw.reps.length, 1);
+  assert.ok(taFw.reps[0].startSample >= 25 && taFw.reps[0].endSample > taFw.reps[0].startSample);
+  assert.ok(Math.abs(taFw.reps[0].propAcc - 2.2) < 0.05, `Expected firmware propAcc ~2.2, got ${taFw.reps[0].propAcc}`);
+  assert.ok(taFw.reps[0].power > 400, `Expected positive power for 120 kg, got ${taFw.reps[0].power}`);
+  assert.ok(taFw.reps[0].loweringVelocity > 0.25 && taFw.reps[0].loweringVelocity < 0.50, `Expected loweringVelocity ~0.35, got ${taFw.reps[0].loweringVelocity}`);
+
+  // 2. matchTraceReps lievä ROM-rangaistus (0.08 < 2*SKIP) suosii oikeaa ROM:ia saman nopeuden yli
+  const mapRom = api.matchTraceReps(
+    [{ mv: 0.50, romCm: 15 }, { mv: 0.50, romCm: 42 }],
+    [{ meanVelocity: 0.50, rangeOfMotionCm: 42 }]
+  );
+  assert.equal(mapRom[0], 1, 'matchTraceReps must prefer matching ROM (42 cm) over short segment (15 cm)');
+
+  // 3. attachTraceToRecentSet: fallback02 refine + keskimmäinen & viimeinen palautus kronologisessa järjestyksessä + kohinan hylkäys
+  els.get('workoutDate').value = '2026-11-24';
+  els.get('exerciseSelect').value = 'Maastaveto';
+  els.get('weightInput').value = '130';
+  els.get('targetRepsInput').value = '4';
+
+  const tBase = sandbox.Date.now() - 12000;
+  // Live-toistot: #1 fallback02, #2 puuttuu (keskellä), #3 normaali, #4 puuttuu (lopussa)
+  const liveReps = [
+    { meanVelocity: 0.55, propulsiveVelocity: 0.55, propulsiveAcceleration: 0, rangeOfMotionCm: 0, loweringVelocity: null, power: 0, t: tBase, pauseMs: null, fallback02: true, partial: true },
+    { meanVelocity: 0.44, propulsiveVelocity: 0.45, propulsiveAcceleration: 1.4, rangeOfMotionCm: 38, loweringVelocity: null, power: 600, t: tBase + 3500, pauseMs: 800 }
+  ];
+  const savedSet = { exercise: 'Maastaveto', weightKg: 130, targetReps: 4, reps: liveReps.map((r) => ({ ...r })) };
+  api.workouts = [{ date: '2026-11-24', sets: [savedSet] }];
+  api.activeSetMeta = api.snapshotCurrentSetMeta();
+  api.lastSavedSetRef = savedSet;
+  api.currentReps = liveReps;
+  api.currentSetSaved = true;
+
+  // Rakennetaan 80 Hz trace: [Rep1 (mv~0.55, rom~41), Rep2 missed (mv~0.49, rom~36), Rep3 (mv~0.44, rom~32), lyhyt kohina (7 cm), Rep4 missed (mv~0.38, rom~29)]
+  const rows = [];
+  const pushQuiet = (n) => { for (let i = 0; i < n; i++) rows.push([12500, 0, 0, 0, 0, 0, 2048, 0, 0]); };
+  const pushC = (n, peak) => { for (let i = 0; i < n; i++) rows.push([12500, 0, 0, 0, 0, 0, 2048, 0, Math.round(Math.sin(((i + 0.5) / n) * Math.PI) * peak)]); };
+  const pushE = (n, peak) => { for (let i = 0; i < n; i++) rows.push([12500, 0, 0, 0, 0, 0, 2048, 0, -Math.round(Math.sin(((i + 0.5) / n) * Math.PI) * peak)]); };
+  pushQuiet(30);
+  pushC(60, 820); pushE(40, 500); pushQuiet(40); // Rep 1
+  pushC(60, 730); pushE(40, 480); pushQuiet(40); // Rep 2 (missed middle)
+  pushC(60, 650); pushE(40, 460); pushQuiet(40); // Rep 3
+  pushC(36, 600); pushQuiet(30);                 // Kohina (~17 cm >= 12 cm, < 25 cm liftMinRom)
+  pushC(64, 560); pushE(40, 440); pushQuiet(30); // Rep 4 (missed end)
+
+  const b1 = new ArrayBuffer(15);
+  const b1dv = new DataView(b1);
+  b1dv.setUint8(0, 0xb1); b1dv.setUint32(1, 0, true); b1dv.setUint32(5, 6000, true);
+  b1dv.setUint16(9, 5, true); b1dv.setUint32(11, rows.length, true);
+  api.handleTraceNotification(b1dv);
+
+  const perPkt = 23;
+  const totalPkts = Math.ceil(rows.length / perPkt);
+  for (let p = 0; p < totalPkts; p++) {
+    const chunk = rows.slice(p * perPkt, (p + 1) * perPkt);
+    const buf = new ArrayBuffer(6 + chunk.length * 34);
+    const dv = new DataView(buf);
+    dv.setUint8(0, 0xa4); dv.setUint16(1, p, true); dv.setUint16(3, totalPkts, true); dv.setUint8(5, chunk.length);
+    chunk.forEach((row, idx) => {
+      const o = 6 + idx * 34;
+      dv.setUint16(o, row[0], true);
+      for (let c = 0; c < 8; c++) dv.setInt32(o + 2 + c * 4, row[c + 1], true);
+    });
+    api.handleTraceNotification(dv);
+  }
+
+  assert.equal(savedSet.reps.length, 4, 'Must have 2 live + 2 recovered = 4 reps (noise rejected)');
+  assert.equal(api.currentReps.length, 4, 'currentReps must also receive recovered reps in place');
+  // Rep #1: refinedFromTrace
+  assert.equal(savedSet.reps[0].refinedFromTrace, true);
+  assert.equal(savedSet.reps[0].fallback02, undefined);
+  assert.equal(savedSet.reps[0].partial, undefined);
+  assert.ok(savedSet.reps[0].rangeOfMotionCm >= 30);
+  assert.ok(savedSet.reps[0].loweringVelocity > 0.2);
+  assert.ok(savedSet.reps[0].power > 100);
+  // Rep #2: recovered middle rep, strictly between #1 and #3 in velocity & timestamp
+  assert.equal(savedSet.reps[1].recoveredFromTrace, true);
+  assert.ok(savedSet.reps[1].meanVelocity < savedSet.reps[0].meanVelocity && savedSet.reps[1].meanVelocity > savedSet.reps[2].meanVelocity);
+  assert.ok(savedSet.reps[1].t > savedSet.reps[0].t && savedSet.reps[1].t < savedSet.reps[2].t, 'Middle recovered rep timestamp must be strictly chronological');
+  // Rep #3: original live rep 2, filled loweringVelocity
+  assert.equal(savedSet.reps[2].recoveredFromTrace, undefined);
+  assert.ok(savedSet.reps[2].loweringVelocity > 0.2);
+  // Rep #4: recovered end rep
+  assert.equal(savedSet.reps[3].recoveredFromTrace, true);
+  assert.ok(savedSet.reps[3].t > savedSet.reps[2].t);
+  // traceMeta
+  assert.equal(savedSet.traceMeta.recovered, 2);
+  assert.equal(savedSet.traceMeta.segments, 4);
+  assert.equal(savedSet.traceMeta.rawSegments, 5);
+  assert.equal(savedSet.traceMeta.extraReps, 0);
+  assert.equal(api.lastTraceFailed, false);
+  assert.ok(api.bleDiagLog.some((e) => e.kind === 'trace-recovered'));
+
+  // 📡 80 Hz badge näkyy buildSetAnalysisHTML, renderRestSummaryCard ja buildTraceSectionHTML
+  const anaHtml = api.buildSetAnalysisHTML(savedSet, { dateStr: '2026-11-24', showTraceStatus: true });
+  assert.ok(anaHtml.includes('📡 80 Hz'), 'buildSetAnalysisHTML must render 📡 80 Hz badge for recovered rep');
+  api.renderLiveSet();
+  assert.ok(els.get('repList').children.some((c) => c.innerHTML.includes('📡 80 Hz')), 'renderRestSummaryCard must render 📡 80 Hz badge');
+  const setA = api.analyzeSet(savedSet.reps, 'Maastaveto', 130, { dateStr: '2026-11-24' });
+  assert.ok(api.buildTraceSectionHTML(savedSet, setA).includes('📡'), 'buildTraceSectionHTML must mark recovered rep with 📡');
+});
+
+test('22. Movement-based auto-rezero at set start (0x04 -> 0x03) & traceBuf finalize before next set', async () => {
+  const { api, els, timers, setNow, advanceMs } = loadApp();
+  setNow(1700005000000);
+
+  const pkt2 = (a, b) => ({ target: { value: new DataView(new Uint8Array([a, b]).buffer) } });
+  const pkt5 = (type, floatVal) => {
+    const buf = new ArrayBuffer(5);
+    const dv = new DataView(buf);
+    dv.setUint8(0, type);
+    dv.setFloat32(1, floatVal, true);
+    return { target: { value: dv } };
+  };
+  const drainTimers = async (promise, maxMs = 500) => {
+    let done = false;
+    const tracked = promise.then((v) => { done = true; return v; }, (e) => { done = true; throw e; });
+    for (let i = 0; i < 60 && !done; i++) {
+      for (const t of timers) {
+        if (!t.cleared && t.ms <= maxMs) { t.cleared = true; t.fn(); }
+      }
+      await Promise.resolve();
+    }
+    return tracked;
+  };
+
+  const writtenBytes = [];
+  const fakeChar = {
+    async startNotifications() {},
+    addEventListener() {},
+    removeEventListener() {},
+    async writeValue(arr) { writtenBytes.push(arr[0]); }
+  };
+  api.bleDevice = {
+    gatt: {
+      connected: true,
+      async connect() {
+        return { async getPrimaryService() { return { async getCharacteristic() { return fakeChar; } }; } };
+      }
+    }
+  };
+
+  els.get('workoutDate').value = '2026-11-24';
+  els.get('exerciseSelect').value = 'Jalkakyykky';
+  els.get('weightInput').value = '100';
+  els.get('targetRepsInput').value = '3';
+
+  await drainTimers(api.openGattSession());
+  api.finishCalibrationAndActivate(api.activeSetToken);
+  assert.equal(api.pinStarted, true);
+  assert.equal(api.barMovedSinceZero, false);
+
+  // Sarja #1 alkaa kun tanko EI ole liikkunut -> välitön aloitus ilman 0x04
+  writtenBytes.length = 0;
+  await drainTimers(api.startSetOnPin());
+  assert.equal(api.setActive, true);
+  assert.equal(api.zeroing, false);
+  assert.equal(writtenBytes.includes(api.CMD_STOP), false, 'Stationary bar must start immediately without CMD_STOP');
+
+  // Toisto tapahtuu -> barMovedSinceZero = true
+  advanceMs(2000);
+  api.onNotification(pkt2(0x01, 0x01));
+  api.onNotification(pkt5(0x03, 600));
+  api.onNotification(pkt5(0x05, 620));
+  api.onNotification(pkt5(0x04, 1500));
+  api.onNotification(pkt5(0x02, 580));
+  assert.equal(api.barMovedSinceZero, true);
+
+  // stopSetOnPin ei saa KOSKAAN lähettää CMD_STOP (0x04)
+  writtenBytes.length = 0;
+  await api.stopSetOnPin(true);
+  assert.equal(writtenBytes.includes(api.CMD_STOP), false, 'stopSetOnPin must NEVER send CMD_STOP');
+  assert.equal(api.workouts[0].sets.length, 1);
+
+  // Jätetään osittainen 80 Hz traceBuf auki (>= 160 näytettä, viimeinen paketti puuttuu) ennen seuraavan sarjan aloitusta
+  const tracePkts = buildSyntheticTracePackets([750], 60, 56);
+  for (let i = 0; i < tracePkts.length - 1; i++) {
+    api.handleTraceNotification(tracePkts[i]);
+  }
+  assert.ok(api.traceBuf && api.traceBuf.pkts.size === tracePkts.length - 2);
+
+  // Sarja #2 alkaa kun barMovedSinceZero === true -> finalizeTrace + auto-rezero (0x04 -> 0x03)
+  writtenBytes.length = 0;
+  await drainTimers(api.startSetOnPin());
+  assert.equal(api.traceBuf, null, 'startSetOnPin must finalize open traceBuf before clearing currentReps');
+  assert.ok(api.workouts[0].sets[0].reps[0].trace, 'Finalized traceBuf must attach to Set #1 before clearing');
+  assert.equal(api.zeroing, true);
+  assert.deepEqual(writtenBytes, [api.CMD_STOP, api.CMD_START], 'Moved bar must trigger CMD_STOP -> CMD_START');
+  assert.ok(api.bleDiagLog.some((e) => e.kind === 'auto-rezero'));
+
+  api.finishCalibrationAndActivate(api.activeSetToken);
+  assert.equal(api.setActive, true);
+  assert.equal(api.barMovedSinceZero, false);
+
+  // Myös kun !setActive ja !zeroing, 0x02..0x06 merkitsee barMovedSinceZero = true
+  await api.stopSetOnPin(true);
+  assert.equal(api.barMovedSinceZero, false);
+  api.onNotification(pkt5(0x06, 450));
+  assert.equal(api.barMovedSinceZero, true, '0x02..0x06 while !setActive && !zeroing must mark barMovedSinceZero');
+
+  // rezeroPin & onDisconnected nollaavat barMovedSinceZero
+  await drainTimers(api.rezeroPin());
+  assert.equal(api.barMovedSinceZero, false);
+  api.barMovedSinceZero = true;
+  api.onDisconnected();
+  assert.equal(api.barMovedSinceZero, false);
+});
+
+test('23. Vie raakadata CSV: saveCsvFile(), exportRawTracesCSV(), exportCSV() & #anaRawExportMsg', async () => {
+  const { api, els, sandbox } = loadApp();
+  api.renderVbtSettingsCard();
+  const settingsEl = els.get('anaSettingsCard');
+  const rawBtn = settingsEl.querySelector('#anaRawExport');
+  const msgEl = settingsEl.querySelector('#anaRawExportMsg');
+  assert.ok(rawBtn && msgEl, 'renderVbtSettingsCard must render #anaRawExport and #anaRawExportMsg');
+
+  // 1. Tyhjä muisti -> 'Ei raakadataa'
+  api.recentRawTraces.length = 0;
+  await api.exportRawTracesCSV();
+  assert.equal(msgEl.textContent, 'Ei raakadataa');
+
+  // Lisätään 1 raakadata
+  api.recentRawTraces.push({ receivedAt: 1700005000000, rows: [[12500, 1, 2, 3, 4, 5, 2048, 0, 500]] });
+
+  // 2. showSaveFilePicker-polku -> 'Tallennettu!'
+  let writtenBlob = null;
+  let pickedName = '';
+  sandbox.showSaveFilePicker = async (opts) => {
+    pickedName = opts.suggestedName;
+    return {
+      async createWritable() {
+        return {
+          async write(b) { writtenBlob = b; },
+          async close() {}
+        };
+      }
+    };
+  };
+  await api.exportRawTracesCSV();
+  assert.equal(msgEl.textContent, 'Tallennettu!');
+  assert.ok(pickedName.startsWith('gpath_raw_'));
+  assert.ok(writtenBlob && writtenBlob.parts[0].includes('trace,received_at,sample'));
+
+  // 3. showSaveFilePicker AbortError -> 'Peruttu'
+  sandbox.showSaveFilePicker = async () => { const e = new Error('cancel'); e.name = 'AbortError'; throw e; };
+  await api.exportRawTracesCSV();
+  assert.equal(msgEl.textContent, 'Peruttu');
+
+  // 4. iOS navigator.share-polku -> 'Jaettu!' + File-olio
+  delete sandbox.showSaveFilePicker;
+  sandbox.navigator.userAgent = 'iPhone';
+  let sharedFiles = null;
+  sandbox.navigator.canShare = ({ files }) => files && files.length === 1;
+  sandbox.navigator.share = async ({ files }) => { sharedFiles = files; };
+  await api.exportRawTracesCSV();
+  assert.equal(msgEl.textContent, 'Jaettu!');
+  assert.ok(sharedFiles && sharedFiles[0] instanceof sandbox.File && sharedFiles[0].name.endsWith('.csv'));
+
+  // 5. iOS share virhe -> 'Vienti epäonnistui'
+  sandbox.navigator.share = async () => { throw new Error('share failed'); };
+  await api.exportRawTracesCSV();
+  assert.equal(msgEl.textContent, 'Vienti epäonnistui');
+
+  // 6. Fallback <a download> + URL.revokeObjectURL (sekä exportRawTracesCSV että exportCSV)
+  sandbox.navigator.userAgent = 'Windows';
+  let revokedUrl = '';
+  sandbox.URL.revokeObjectURL = (u) => { revokedUrl = u; };
+  let clickedDownload = false;
+  const origCreate = sandbox.document.createElement.bind(sandbox.document);
+  sandbox.document.createElement = (tag) => {
+    const el = origCreate(tag);
+    if (tag === 'a') {
+      const origDispatch = el.dispatch.bind(el);
+      el.click = () => { clickedDownload = true; return origDispatch('click'); };
+    }
+    return el;
+  };
+  await api.exportRawTracesCSV();
+  assert.equal(msgEl.textContent, 'Tallennettu!');
+  assert.equal(clickedDownload, true);
+
+  // exportCSV jakaa saman saveCsvFile-polun
+  api.workouts = [{ date: '2026-11-24', sets: [{ exercise: 'Maastaveto', weightKg: 120, targetReps: 1, reps: [makeRep(0.5, 42)] }] }];
+  clickedDownload = false;
+  await api.exportCSV();
+  assert.equal(clickedDownload, true);
+  assert.equal(revokedUrl, '', 'revokeObjectURL runs in 1000ms timeout');
+});
+
+test('24. Drift anomaly guard (second pass + histClean), green start buttons & disconnectPin notice', async () => {
+  const { api, els, timers } = loadApp();
+  const { dl1029, dl1124 } = buildDeadliftFixtures();
+  api.vbtSettings.goal = 'baseStrength';
+  api.workouts = [dl1029, dl1124];
+
+  // 1. Drift anomaly guard: hidas eka toisto + lievästi venynyt ROM (<1.6x, >=1.35x) vs nopea seuraava toisto -> drift
+  const aDrift2 = api.analyzeSet(
+    [makeRep(0.28, 60), makeRep(0.52, 42)],
+    'Maastaveto', 120, { dateStr: '2026-11-24' }
+  );
+  assert.equal(aDrift2.driftCount, 1);
+  assert.equal(aDrift2.perRep[0].drift, true, 'Slow rep #1 with 1.43x inflated ROM vs fast rep #2 must be flagged drift');
+  assert.equal(aDrift2.perRep[1].drift, false);
+  assert.equal(aDrift2.vBest, 0.52);
+
+  // TnG:ssä second pass ei merkitse driftiksi
+  const aTng = api.analyzeSet(
+    [makeRep(0.28, 60), makeRep(0.52, 42)],
+    'Maastaveto', 120, { dateStr: '2026-11-24', touchAndGo: true }
+  );
+  assert.equal(aTng.driftCount, 0);
+
+  // n >= 3 histClean & trimmed.length === 1 (ääriarvot siivotaan)
+  const m3 = api.detectMergedReps(
+    [makeRep(0.50, 42), makeRep(0.45, 90), makeRep(0.42, 95)],
+    api.LIFT_ANALYSIS.deadlift, '2026-11-24', { touchAndGo: false }
+  );
+  assert.equal(m3[0], null);
+  assert.equal(m3[1].drift, true);
+  assert.equal(m3[2].drift, true);
+
+  // 2. Vihreä "Aloita sarja" & done summary #resumeWorkoutBtn
+  const fakeChar = {
+    async startNotifications() {},
+    addEventListener() {},
+    removeEventListener() {},
+    async writeValue() {}
+  };
+  api.bleDevice = { gatt: { connected: true, async disconnect() { this.connected = false; } } };
+  api.dataChar = fakeChar;
+  api.setActive = false;
+  api.zeroing = false;
+  api.bleConnecting = false;
+  api.updateSetButton();
+  const mainBtn = els.get('mainSetActionBtn');
+  assert.equal(mainBtn.className, 'success main-action-btn');
+  assert.ok(mainBtn.textContent.includes('ALOITA SARJA'));
+
+  const drainTimers = async (promise) => {
+    let done = false;
+    const p = promise.then(() => { done = true; }, () => { done = true; });
+    for (let i = 0; i < 60 && !done; i++) {
+      for (const t of timers) { if (!t.cleared && t.ms <= 500) { t.cleared = true; t.fn(); } }
+      await Promise.resolve();
+    }
+    return p;
+  };
+  api.currentReps = [];
+  await drainTimers(api.finishWorkout());
+  const resumeBtn = els.get('doneSummaryCard').querySelector('#resumeWorkoutBtn');
+  assert.ok(resumeBtn && resumeBtn.classList.contains('success'), '#resumeWorkoutBtn must have class="success"');
+
+  // 3. disconnectPin() katkaisee yhteyden: #rezeroStatusText jää piiloon, #statusText & #pinNoticeToast näyttävät katkaisuilmoituksen
+  api.bleDevice.gatt.connected = true;
+  api.dataChar = fakeChar;
+  await drainTimers(api.disconnectPin());
+  assert.equal(els.get('rezeroStatusText').classList.contains('hidden'), true, 'disconnectPin must keep #rezeroStatusText hidden');
+  assert.equal(els.get('rezeroStatusText').textContent, '');
+  assert.equal(els.get('statusText').textContent, 'Yhteys Gpath Pin -anturiin on katkaistu');
+  assert.equal(els.get('pinNoticeToast').classList.contains('hidden'), false);
+  assert.equal(els.get('pinNoticeToastText').textContent, 'Yhteys Gpath Pin -anturiin on katkaistu');
+
+  // Uudelleenyhdistäminen nollaa disconnectedByUser:n
+  api.bleDevice.gatt.connect = async () => ({ async getPrimaryService() { return { async getCharacteristic() { return fakeChar; } }; } });
+  await drainTimers(api.openGattSession());
+  assert.notEqual(els.get('statusText').textContent, 'Yhteys Gpath Pin -anturiin on katkaistu');
 });
 
 let failed = 0;
